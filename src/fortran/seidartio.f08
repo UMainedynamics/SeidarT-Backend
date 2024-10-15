@@ -217,6 +217,8 @@ module seidartio
         
         real(real64), allocatable :: extended_stiffness(:,:,:)
         real(real64), allocatable :: extended_attenuation(:,:,:)
+        real(real64), allocatable :: density_gradient(:,:)
+        
         integer :: nx, nz, cpml 
         integer :: i, j, k, id_value 
         integer :: nx_ext, nz_ext 
@@ -224,12 +226,12 @@ module seidartio
         
         character(len=7) :: stiffness_fn
         character(len=10) :: attenuation_fn
-        character(len=3), dimension(21) :: scoef_names = (/ &
+        character(len=3), dimension(22) :: scoef_names = (/ &
                                             'c11', 'c12', 'c13', 'c14', 'c15', &
                                             'c16', 'c22', 'c23', 'c24', 'c25', &
                                             'c26', 'c33', 'c34', 'c35', 'c36', &
                                             'c44', 'c45', 'c46', 'c55', 'c56', &
-                                            'c66' /)
+                                            'c66', 'rho' /)
         
         character(len=6), dimension(3) :: acoef_names = (/ 'gammax', 'gammay', 'gammaz'/)
         
@@ -241,10 +243,14 @@ module seidartio
         ! Calculate extended dimensions
         nx_ext = 2 * cpml + nx
         nz_ext = 2 * cpml + nz
-
+        
         ! Allocate the extended stiffness array with extra CPML padding
-        allocate(extended_stiffness(nx_ext, nz_ext, 21))
+        allocate(extended_stiffness(nx_ext, nz_ext, 22))
         allocate(extended_attenuation(nx_ext, nz_ext, 3))  
+        allocate(density_gradient(nx_ext, nz_ext))
+        
+        ! Load the density gradient 
+        call material_rw('density_gradient.dat', density_gradient, .TRUE. )
         
         extended_stiffness(:,:,:) = 0.0 
         extended_attenuation(:,:,:) = 0.0
@@ -276,6 +282,7 @@ module seidartio
                 extended_stiffness(i + cpml, j + cpml, 19) = stiffness(id_value)%c55
                 extended_stiffness(i + cpml, j + cpml, 20) = stiffness(id_value)%c56
                 extended_stiffness(i + cpml, j + cpml, 21) = stiffness(id_value)%c66
+                extended_stiffness(i + cpml, j + cpml, 22) = stiffness(id_value)%density
                 ! same for attenuation
                 extended_attenuation(i + cpml, j + cpml, 1) = attenuation(id_value)%alpha_x
                 extended_attenuation(i + cpml, j + cpml, 2) = attenuation(id_value)%alpha_y
@@ -285,29 +292,33 @@ module seidartio
         
         ! Extend the values at 1 + cpml to the 1 to cpml indices
         do k = 1, 21
-          ! Extend along x-direction (rows)
-          do j = 1, nz_ext
-            do i = 1, cpml
-              extended_stiffness(i, j, k) = extended_stiffness(1 + cpml, j, k)
-              extended_attenuation(i, j, k) = extended_attenuation(1 + cpml, j, k)
-              extended_stiffness(nx_ext - i + 1, j, k) = extended_stiffness(nx_ext - cpml, j, k)
-              extended_attenuation(nx_ext - i + 1, j, k) = extended_attenuation(nx_ext - cpml, j, k)
+            ! Extend along x-direction (rows)
+            do j = 1, nz_ext
+                do i = 1, cpml
+                    extended_stiffness(i, j, k) = extended_stiffness(1 + cpml, j, k)
+                    extended_attenuation(i, j, k) = extended_attenuation(1 + cpml, j, k)
+                    extended_stiffness(nx_ext - i + 1, j, k) = extended_stiffness(nx_ext - cpml, j, k)
+                    extended_attenuation(nx_ext - i + 1, j, k) = extended_attenuation(nx_ext - cpml, j, k)
+                end do
             end do
-          end do
-        
-          ! Extend along z-direction (columns)
-          do i = 1, nx_ext
-            do j = 1, cpml
-              extended_stiffness(i, j, k) = extended_stiffness(i, 1 + cpml, k)
-              extended_attenuation(i, j, k) = extended_attenuation(i, 1 + cpml, k)
-              extended_stiffness(i, nz_ext - j + 1, k) = extended_stiffness(i, nz_ext - cpml, k)
-              extended_attenuation(i, nz_ext - j + 1, k) = extended_attenuation(i, nz_ext - cpml, k)
+            
+            
+            ! Extend along z-direction (columns)
+            do i = 1, nx_ext
+                do j = 1, cpml
+                    extended_stiffness(i, j, k) = extended_stiffness(i, 1 + cpml, k)
+                    extended_attenuation(i, j, k) = extended_attenuation(i, 1 + cpml, k)
+                    extended_stiffness(i, nz_ext - j + 1, k) = extended_stiffness(i, nz_ext - cpml, k)
+                    extended_attenuation(i, nz_ext - j + 1, k) = extended_attenuation(i, nz_ext - cpml, k)
+                end do
             end do
-          end do
         end do
         
+        ! Scale the density by the gradient that was calculated around air boundaries
+        extended_stiffness(:,:,22) = extended_stiffness(:,:,22) * density_gradient
+        
         ! Write each 2D array (stiffness coefficients) to separate files
-        do k = 1, 21
+        do k = 1, 22
             ! Create filename based on coefficient name (e.g., 'c11.dat')
             write(stiffness_fn, '(A3, ".dat")') scoef_names(k)
 

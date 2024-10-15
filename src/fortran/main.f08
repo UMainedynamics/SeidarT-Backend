@@ -1,4 +1,12 @@
 program main 
+    ! ==========================================================================
+    ! 
+    !
+    ! Refer to the Makefile in the root directory for compile directions and 
+    ! options. To run use the command:
+    ! 
+    !       seidartfdtd <input.json> [seismic=<true|false>]
+    ! ==========================================================================
     
     ! Types are defined in seidartio
     use seidartio 
@@ -52,12 +60,6 @@ program main
         end if
     end if
 
-    ! Print out to confirm the seismic flag status
-    if (seismic) then
-        print *, "Seismic flag is TRUE"
-    else
-        print *, "Seismic flag is FALSE"
-    end if
     
     ! --------------------------------------------------------------------------
     ! Get going 

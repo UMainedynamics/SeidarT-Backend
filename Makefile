@@ -25,7 +25,7 @@ $(EXECUTABLE): $(SOURCES)
 # Install the executable into the correct Miniconda folder
 install: $(EXECUTABLE)
 	@echo "Installing the executable to $(BIN_PATH)..."
-	cp $(EXECUTABLE) $(BIN_PATH)
+	mv $(EXECUTABLE) $(BIN_PATH)
 	@echo "SeidarT CPML FDTD executable is in the $(BIN_PATH)"
 	
 # Uninstall
@@ -33,7 +33,9 @@ uninstall:
 	@echo "Removing $(BIN_PATH)$(EXECUTABLE)"
 	rm -f $(BIN_PATH)/$(EXECUTABLE)
 	@echo "Uninstall successful."
-	
+
+# Reinstall target depends on uninstall, install, and clean
+reinstall: uninstall install
 
 # Clean up
 clean:
