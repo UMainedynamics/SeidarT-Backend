@@ -175,8 +175,7 @@ module cpmlfdtd
             ! ------------------------------------------------------------
             !  compute stress sigma and update memory variables for C-PML
             ! ------------------------------------------------------------
-            !$omp parallel do private(i, j, deltarho, &
-            ! value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz)
+            !$omp parallel do private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz)
             do j = 2,nz
                 do i = 1,nx-1
         
@@ -245,8 +244,8 @@ module cpmlfdtd
             ! --------------------------------------------------------
             !  compute velocity and update memory variables for C-PML
             ! --------------------------------------------------------
+            
             !$omp parallel do private(i, j, deltarho, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
-
             do j = 2,nz
                 do i = 2,nx
         
@@ -290,8 +289,7 @@ module cpmlfdtd
         
                 enddo
             enddo
-            !$omp end do
-            !$omp end parallel
+            !$omp end parallel do
             
             ! Add the source term
             vx(isource,jsource) = vx(isource,jsource) + srcx(it) * dt / rho(isource,jsource)
@@ -413,7 +411,7 @@ module cpmlfdtd
         nx = domain%nx
         ny = domain%ny 
         nz = domain%nz 
-        dt = dt 
+        dt = source%dt 
         dx = domain%dx
         dy = domain%dy 
         dz = domain%dz
@@ -490,99 +488,99 @@ module cpmlfdtd
 
         ! ================================ LOAD SOURCE ================================
 
-            call loadsource('seismicsourcex.dat', source%time_steps, srcx)
-            call loadsource('seismicsourcey.dat', source%time_steps, srcy)
-            call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        call loadsource('seismicsourcex.dat', source%time_steps, srcx)
+        call loadsource('seismicsourcey.dat', source%time_steps, srcy)
+        call loadsource('seismicsourcez.dat', source%time_steps, srcz)
 
         ! ==================================== PML ====================================
         ! Initialize PML 
-            K_x(:) = 1.d0
-            K_x_half(:) = 1.d0
-            alpha_x(:) = 0.d0
-            alpha_x_half(:) = 0.d0
-            a_x(:) = 0.d0
-            a_x_half(:) = 0.d0
+        K_x(:) = 1.d0
+        K_x_half(:) = 1.d0
+        alpha_x(:) = 0.d0
+        alpha_x_half(:) = 0.d0
+        a_x(:) = 0.d0
+        a_x_half(:) = 0.d0
 
-            K_y(:) = 1.d0
-            K_y_half(:) = 1.d0
-            alpha_y(:) = 0.d0
-            alpha_y_half(:) = 0.d0
-            a_y(:) = 0.d0
-            a_y_half(:) = 0.d0
+        K_y(:) = 1.d0
+        K_y_half(:) = 1.d0
+        alpha_y(:) = 0.d0
+        alpha_y_half(:) = 0.d0
+        a_y(:) = 0.d0
+        a_y_half(:) = 0.d0
 
-            K_z(:) = 1.d0
-            K_z_half(:) = 1.d0 
-            alpha_z(:) = 0.d0
-            alpha_z_half(:) = 0.d0
-            a_z(:) = 0.d0
-            a_z_half(:) = 0.d0
+        K_z(:) = 1.d0
+        K_z_half(:) = 1.d0 
+        alpha_z(:) = 0.d0
+        alpha_z_half(:) = 0.d0
+        a_z(:) = 0.d0
+        a_z_half(:) = 0.d0
 
         ! ------------------------- Boundary Conditions -------------------------
-            call loadcpml('kappax_cpml.dat', K_x)
-            call loadcpml('alphax_cpml.dat', alpha_x)
-            call loadcpml('acoefx_cpml.dat', a_x)
-            call loadcpml('bcoefx_cpml.dat', b_x)
+        call loadcpml('kappax_cpml.dat', K_x)
+        call loadcpml('alphax_cpml.dat', alpha_x)
+        call loadcpml('acoefx_cpml.dat', a_x)
+        call loadcpml('bcoefx_cpml.dat', b_x)
 
-            call loadcpml('kappay_cpml.dat', K_y)
-            call loadcpml('alphay_cpml.dat', alpha_y)
-            call loadcpml('acoefy_cpml.dat', a_y)
-            call loadcpml('bcoefy_cpml.dat', b_y)
+        call loadcpml('kappay_cpml.dat', K_y)
+        call loadcpml('alphay_cpml.dat', alpha_y)
+        call loadcpml('acoefy_cpml.dat', a_y)
+        call loadcpml('bcoefy_cpml.dat', b_y)
 
-            call loadcpml('kappaz_cpml.dat', K_z)
-            call loadcpml('alphaz_cpml.dat', alpha_z)
-            call loadcpml('acoefz_cpml.dat', a_z)
-            call loadcpml('bcoefz_cpml.dat', b_z)
+        call loadcpml('kappaz_cpml.dat', K_z)
+        call loadcpml('alphaz_cpml.dat', alpha_z)
+        call loadcpml('acoefz_cpml.dat', a_z)
+        call loadcpml('bcoefz_cpml.dat', b_z)
 
-            call loadcpml('kappax_half_cpml.dat', K_x_half)
-            call loadcpml('alphax_half_cpml.dat', alpha_x_half)
-            call loadcpml('acoefx_half_cpml.dat', a_x_half)
-            call loadcpml('bcoefx_half_cpml.dat', b_x_half)
+        call loadcpml('kappax_half_cpml.dat', K_x_half)
+        call loadcpml('alphax_half_cpml.dat', alpha_x_half)
+        call loadcpml('acoefx_half_cpml.dat', a_x_half)
+        call loadcpml('bcoefx_half_cpml.dat', b_x_half)
 
-            call loadcpml('kappay_half_cpml.dat', K_y_half)
-            call loadcpml('alphay_half_cpml.dat', alpha_y_half)
-            call loadcpml('acoefy_half_cpml.dat', a_y_half)
-            call loadcpml('bcoefy_half_cpml.dat', b_y_half)
+        call loadcpml('kappay_half_cpml.dat', K_y_half)
+        call loadcpml('alphay_half_cpml.dat', alpha_y_half)
+        call loadcpml('acoefy_half_cpml.dat', a_y_half)
+        call loadcpml('bcoefy_half_cpml.dat', b_y_half)
 
-            call loadcpml('kappaz_half_cpml.dat', K_z_half)
-            call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
-            call loadcpml('acoefz_half_cpml.dat', a_z_half)
-            call loadcpml('bcoefz_half_cpml.dat', b_z_half)
+        call loadcpml('kappaz_half_cpml.dat', K_z_half)
+        call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
+        call loadcpml('acoefz_half_cpml.dat', a_z_half)
+        call loadcpml('bcoefz_half_cpml.dat', b_z_half)
 
         ! Load initial condition
-            call material_rw3('initialconditionVx.dat', vx, .TRUE.)
-            call material_rw3('initialconditionVy.dat', vy, .TRUE.)
-            call material_rw3('initialconditionVz.dat', vz, .TRUE.)
+        call material_rw3('initialconditionVx.dat', vx, .TRUE.)
+        call material_rw3('initialconditionVy.dat', vy, .TRUE.)
+        call material_rw3('initialconditionVz.dat', vz, .TRUE.)
 
         ! Initialize the stress values
-            sigmaxx(:,:,:) = 0.d0
-            sigmayy(:,:,:) = 0.d0
-            sigmazz(:,:,:) = 0.d0
-            sigmaxy(:,:,:) = 0.d0
-            sigmaxz(:,:,:) = 0.d0
-            sigmayz(:,:,:) = 0.d0
+        sigmaxx(:,:,:) = 0.d0
+        sigmayy(:,:,:) = 0.d0
+        sigmazz(:,:,:) = 0.d0
+        sigmaxy(:,:,:) = 0.d0
+        sigmaxz(:,:,:) = 0.d0
+        sigmayz(:,:,:) = 0.d0
 
-            ! PML
-            memory_dvx_dx(:,:,:) = 0.d0
-            memory_dvx_dy(:,:,:) = 0.d0
-            memory_dvx_dz(:,:,:) = 0.d0
+        ! PML
+        memory_dvx_dx(:,:,:) = 0.d0
+        memory_dvx_dy(:,:,:) = 0.d0
+        memory_dvx_dz(:,:,:) = 0.d0
 
-            memory_dvy_dx(:,:,:) = 0.d0
-            memory_dvy_dy(:,:,:) = 0.d0
-            memory_dvy_dz(:,:,:) = 0.d0
+        memory_dvy_dx(:,:,:) = 0.d0
+        memory_dvy_dy(:,:,:) = 0.d0
+        memory_dvy_dz(:,:,:) = 0.d0
 
-            memory_dvz_dx(:,:,:) = 0.d0
-            memory_dvz_dy(:,:,:) = 0.d0 
-            memory_dvz_dz(:,:,:) = 0.d0
+        memory_dvz_dx(:,:,:) = 0.d0
+        memory_dvz_dy(:,:,:) = 0.d0 
+        memory_dvz_dz(:,:,:) = 0.d0
 
-            memory_dsigmaxx_dx(:,:,:) = 0.d0
-            memory_dsigmayy_dy(:,:,:) = 0.d0
-            memory_dsigmazz_dz(:,:,:) = 0.d0
-            memory_dsigmaxy_dx(:,:,:) = 0.d0
-            memory_dsigmaxy_dy(:,:,:) = 0.d0
-            memory_dsigmaxz_dx(:,:,:) = 0.d0
-            memory_dsigmaxz_dz(:,:,:) = 0.d0
-            memory_dsigmayz_dy(:,:,:) = 0.d0
-            memory_dsigmayz_dz(:,:,:) = 0.d0
+        memory_dsigmaxx_dx(:,:,:) = 0.d0
+        memory_dsigmayy_dy(:,:,:) = 0.d0
+        memory_dsigmazz_dz(:,:,:) = 0.d0
+        memory_dsigmaxy_dx(:,:,:) = 0.d0
+        memory_dsigmaxy_dy(:,:,:) = 0.d0
+        memory_dsigmaxz_dx(:,:,:) = 0.d0
+        memory_dsigmaxz_dz(:,:,:) = 0.d0
+        memory_dsigmayz_dy(:,:,:) = 0.d0
+        memory_dsigmayz_dz(:,:,:) = 0.d0
 
         ! Do it 
         
@@ -1178,469 +1176,482 @@ module cpmlfdtd
 
 
     ! =========================================================================
-    ! subroutine electromag25(domain, source, SINGLE_OUTPUT)
-    !     !--------------------------------------------------------------------------------------
-    !     ! Electromagnetic wave propagation in a 3D grid with Convolutional-PML (C-PML)
-    !     ! absorbing conditions for an anisotropic medium.
-    !     !
-    !     ! This subroutine solves electromagnetic wave propagation using a finite-difference
-    !     ! time-domain (FDTD) method in a 3D grid, with PML absorbing conditions.
-    !     !
-    !     !--------------------------------------------------------------------------------------
+    subroutine electromag25(domain, source, SINGLE_OUTPUT)
+        !--------------------------------------------------------------------------------------
+        ! Electromagnetic wave propagation in a 3D grid with Convolutional-PML (C-PML)
+        ! absorbing conditions for an anisotropic medium.
+        !
+        ! This subroutine solves electromagnetic wave propagation using a finite-difference
+        ! time-domain (FDTD) method in a 3D grid, with PML absorbing conditions.
+        !
+        !--------------------------------------------------------------------------------------
         
-    !     use constants
+        use constants
         
-    !     implicit none
+        implicit none
 
-    !     ! Input arguments
-    !     type(Domain_Type), intent(in) :: domain
-    !     type(Source_Type), intent(in) :: source
-    !     type(Electromagnetic3_Variables_Type), intent(inout) :: emvar
-    !     logical, intent(in), optional :: SINGLE_OUTPUT
+        ! Input arguments
+        type(Domain_Type), intent(in) :: domain
+        type(Source_Type), intent(in) :: source
+        logical, intent(in), optional :: SINGLE_OUTPUT
         
-    !     ! Local variables
-    !     real(real64), allocatable :: epsilonx, epsilony, epsilonz, &
-    !                                         sigmax, sigmay, sigmaz
+        ! Local variables
+        real(real64), allocatable :: epsilonx(:,:), epsilony(:,:), epsilonz(:,:), &
+                                        sigmax(:,:), sigmay(:,:), sigmaz(:,:)
 
-    !     ! real(real64) :: DT
-    !     real(real64) :: velocnorm
-    !     integer :: isource, jsource, ksource, i, j, k, it
+        ! real(real64) :: DT
+        real(real64) :: velocnorm
+        integer :: isource, jsource, ksource, i, j, k, it
 
-    !     ! Coefficients for the finite difference scheme
-    !     real(real64), allocatable :: caEx, cbEx, caEy, cbEy, caEz, cbEz
-    !     real(real64) :: daHx, dbHx, daHy, dbHy, daHz, dbHz
+        ! Coefficients for the finite difference scheme
+        real(real64), allocatable :: caEx(:,:), cbEx(:,:), caEy(:,:), cbEy(:,:), caEz(:,:), cbEz(:,:)
+        real(real64) :: daHx, dbHx, daHy, dbHy, daHz, dbHz
 
-    !     real(real64) :: dEx_dy, dEy_dx, dEy_dz, dEz_dy, dEz_dx, dEx_dz, &
-    !                     dHx_dy, dHx_dz, dHy_dx, dHy_dz, dHz_dy, dHz_dx
+        real(real64) :: dEx_dy, dEy_dx, dEy_dz, dEz_dy, dEz_dx, dEx_dz, &
+                        dHx_dy, dHx_dz, dHy_dx, dHy_dz, dHz_dy, dHz_dx
 
-    !     ! Source arrays
-    !     real(real64), dimension(source%time_steps) :: srcx, srcy, srcz
+        ! Source arrays
+        real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
 
-    !     ! 1D arrays for the damping profiles in each direction
-    !     real(real64), allocatable :: K_x(:), alpha_x(:), a_x(:), b_x(:), & 
-    !                     K_x_half(:), alpha_x_half(:), a_x_half(:), b_x_half(:)
-    !     real(real64), allocatable :: K_y(:), alpha_y(:), a_y(:), b_y(:), & 
-    !                     K_y_half(:), alpha_y_half(:), a_y_half(:), b_y_half(:)
-    !     real(real64), allocatable :: K_z(:), alpha_z(:), a_z(:), b_z(:), & 
-    !                     K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
+        ! 1D arrays for the damping profiles in each direction
+        real(real64), allocatable :: K_x(:), alpha_x(:), a_x(:), b_x(:), & 
+                        K_x_half(:), alpha_x_half(:), a_x_half(:), b_x_half(:)
+        real(real64), allocatable :: K_y(:), alpha_y(:), a_y(:), b_y(:), & 
+                        K_y_half(:), alpha_y_half(:), a_y_half(:), b_y_half(:)
+        real(real64), allocatable :: K_z(:), alpha_z(:), a_z(:), b_z(:), & 
+                        K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
         
-    !     real(real64), allocatable :: memory_dEx_dy(:,:,:), memory_dEy_dx(:,:,:), &
-    !                                 memory_dEx_dz(:,:,:), memory_dEz_dx(:,:,:), &
-    !                                 memory_dEz_dy(:,:,:), memory_dEy_dz(:,:,:)
-    !     real(real64), allocatable :: memory_dHz_dx(:,:,:), memory_dHx_dz(:,:,:), &
-    !                                 memory_dHz_dy(:,:,:), memory_dHy_dz(:,:,:), &
-    !                                 memory_dHx_dy(:,:,:), memory_dHy_dx(:,:,:)
+        real(real64), allocatable :: Ex(:,:,:), Ey(:,:,:), Ez(:,:,:), &
+                                    Hx(:,:,:), Hy(:,:,:), Hz(:,:,:) 
+        real(real64), allocatable :: memory_dEx_dy(:,:,:), memory_dEy_dx(:,:,:), &
+                                    memory_dEx_dz(:,:,:), memory_dEz_dx(:,:,:), &
+                                    memory_dEz_dy(:,:,:), memory_dEy_dz(:,:,:)
+        real(real64), allocatable :: memory_dHz_dx(:,:,:), memory_dHx_dz(:,:,:), &
+                                    memory_dHz_dy(:,:,:), memory_dHy_dz(:,:,:), &
+                                    memory_dHx_dy(:,:,:), memory_dHy_dx(:,:,:)
+        real(real64), allocatable :: eps11(:,:), eps12(:,:), eps13(:,:), &
+                                    eps22(:,:), eps23(:,:), eps33(:,:)
+        real(real64), allocatable :: sig11(:,:), sig12(:,:), sig13(:,:), &
+                                    sig22(:,:), sig23(:,:), sig33(:,:)
         
         
-    !     integer :: nx, ny, nz
-    !     real(real64) :: dx, dy, dz, dt   
+        integer :: nx, ny, nz
+        real(real64) :: dx, dy, dz, dt   
             
-    !     ! Boolean flag to save as double precision or single precision
-    !     logical :: SINGLE
+        ! Boolean flag to save as double precision or single precision
+        logical :: SINGLE
 
-    !     ! Check if SINGLE_OUTPUT is provided, default to single precision if not
-    !     if (present(SINGLE_OUTPUT)) then
-    !         SINGLE = SINGLE_OUTPUT
-    !     else
-    !         SINGLE = .TRUE.
-    !     endif
+        ! Check if SINGLE_OUTPUT is provided, default to single precision if not
+        if (present(SINGLE_OUTPUT)) then
+            SINGLE = SINGLE_OUTPUT
+        else
+            SINGLE = .TRUE.
+        endif
         
-    !     allocate(eps11(nx, nz), eps12(nx, nz), eps13(nx, nz),  &
-    !                 eps22(nx, nz), eps23(nx, nz), eps33(nx, nz))
-    !     allocate(sig11(nx, nz), sig12(nx,nz), sig13(nx, nz),  &
-    !                 sig22(nx, nz), sig23(nx, nz), sig33(nx, nz))
-    !     allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
-    !             K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
-    !     allocate(K_y(ny), alpha_y(ny), a_y(ny), b_y(ny), &
-    !             K_y_half(ny), alpha_y_half(ny), a_y_half(ny), b_y_half(ny))
-    !     allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
-    !             K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
-    !     allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         
-    !     ! Allocate more
-    !     allocate(epsilonx(nx, nz), epsilony(nx, nz), epsilonz(nx, nz))
-    !     allocate(sigmax(nx, nz), sigmay(nx, nz), sigmaz(nx, nz))
+        nx = domain%nx
+        ny = domain%ny
+        nz = domain%nz
+        dx = domain%dx
+        dy = domain%dy
+        dz = domain%dz
+        dt = source%dt
+        allocate(eps11(nx,nz), eps12(nx,nz), eps13(nx,nz), &
+                    eps22(nx,nz), eps23(nx,nz), eps33(nx,nz))
+        allocate(sig11(nx,nz), sig12(nx,nz), sig13(nx,nz), &
+                    sig22(nx,nz), sig23(nx,nz), sig33(nx,nz))
+        allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), K_x_half(nx), &
+                    alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
+        allocate(K_y(ny), alpha_y(ny), a_y(ny), b_y(ny), K_y_half(ny), &
+                    alpha_y_half(ny), a_y_half(ny), b_y_half(ny))
+        allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), K_z_half(nz), &
+                    alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
+        allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         
-    !     allocate( memory_dEx_dy(nx,ny,nz), memory_dEy_dx(nx,ny,nz), &
-    !                 memory_dEx_dz(nx,ny,nz), memory_dEz_dx(nx,ny,nz), &
-    !                 memory_dEz_dy(nx,ny,nz), memory_dEy_dz(nx,ny,nz) )
-    !     allocate(memory_dHz_dx(nx,ny,nz), memory_dHx_dz(nx,ny,nz), & 
-    !                 memory_dHz_dy(nx,ny,nz), memory_dHy_dz(nx,ny,nz), &
-    !                 memory_dHx_dy(nx,ny,nz), memory_dHy_dx(nx,ny,nz) )
+        ! Allocate more
+        allocate(epsilonx(nx, nz), epsilony(nx, nz), epsilonz(nx, nz))
+        allocate(sigmax(nx, nz), sigmay(nx, nz), sigmaz(nx, nz))
         
-    !     allocate(Ex(nx, ny, nz), Ey(nx, ny, nz), Ez(nx, ny, nz))
-    !     allocate(Hx(nx, ny, nz), Hy(nx, ny, nz), Hz(nx, ny, nz))
+        allocate( memory_dEx_dy(nx,ny,nz), memory_dEy_dx(nx,ny,nz), &
+                    memory_dEx_dz(nx,ny,nz), memory_dEz_dx(nx,ny,nz), &
+                    memory_dEz_dy(nx,ny,nz), memory_dEy_dz(nx,ny,nz) )
+        allocate(memory_dHz_dx(nx,ny,nz), memory_dHx_dz(nx,ny,nz), & 
+                    memory_dHz_dy(nx,ny,nz), memory_dHy_dz(nx,ny,nz), &
+                    memory_dHx_dy(nx,ny,nz), memory_dHy_dx(nx,ny,nz) )
         
-    !     ! ------------------------ Load Permittivity Coefficients ------------------------
-    !     ! Load Epsilon
-    !     call material_rw2('eps11.dat', eps11, .TRUE.)
-    !     call material_rw2('eps12.dat', eps12, .TRUE.)
-    !     call material_rw2('eps13.dat', eps13, .TRUE.)
-    !     call material_rw2('eps22.dat', eps22, .TRUE.)
-    !     call material_rw2('eps23.dat', eps23, .TRUE.)
-    !     call material_rw2('eps33.dat', eps33, .TRUE.)
-    !     ! Load Sigma
-    !     call material_rw2('sig11.dat', sig11, .TRUE.)
-    !     call material_rw2('sig12.dat', sig12, .TRUE.)
-    !     call material_rw2('sig13.dat', sig13, .TRUE.)
-    !     call material_rw2('sig22.dat', sig22, .TRUE.)
-    !     call material_rw2('sig23.dat', sig23, .TRUE.)
-    !     call material_rw2('sig33.dat', sig33, .TRUE.)
-
-    !     ! ------------------------ Assign some constants -----------------------
-    !     ! Assign the source location indices
-    !     isource = source%xind + domain%cpml
-    !     jsource = source%yind + cpml
-    !     ksource = source%zind + cpml
-
-    !     ! Define the 
-    !     ! DT = minval( (/dx, dy, dz/) )/ ( 2.0d0 * Clight/ sqrt( minval( (/ eps11, eps22, eps33 /) ) ) )
-
-    !     ! Compute the coefficients of the FD scheme. First scale the relative 
-    !     ! permittivity and permeabilities to get the absolute values 
-    !     epsilonx(:,:) = (eps11 + eps12 + eps13)*eps0 
-    !     epsilony(:,:) = (eps12 + eps22 + eps23)*eps0
-    !     epsilonz(:,:) = (eps13 + eps23 + eps33)*eps0
-    !     sigmax(:,:) = sig11 + sig12 + sig13
-    !     sigmay(:,:) = sig12 + sig22 + sig23
-    !     sigmaz(:,:) = sig13 + sig23 + sig33
-
-    !     caEx(:,:) = ( 1.0d0 - sigmax * dt / &
-    !                 (2.0d0 * epsilonx ) ) / &
-    !                 ( 1.0d0 + sigmax * dt / &
-    !                 (2.0d0 * epsilonx ) )
-    !     cbEx(:,:) = (dt / epsilonx ) / &
-    !                 ( 1.0d0 + sigmax * dt / &
-    !                 ( 2.0d0 * epsilonx ) )
-
-    !     caEy(:,:) = ( 1.0d0 - sigmay * dt / (2.0d0 * epsilony ) ) / &
-    !                 ( 1.0d0 + sigmay * dt / (2.0d0 * epsilony ) )
-    !     cbEy(:,:) = (dt / epsilony ) / &
-    !                 ( 1.0d0 + sigmay * dt / ( 2.0d0 * epsilony ) )
-
-    !     caEz(:,:) = ( 1.0d0 - sigmaz * dt / &
-    !                 ( 2.0d0 * epsilonz ) ) / &
-    !                 ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
-    !     cbEz(:,:) = (dt / epsilonz ) / &
-    !                 ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
-
-    !     daHx = dt/(4.0d0*mu0*mu)
-    !     dbHx = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
-    !     daHx = 1.0d0 ! (1-daHz)/(1+daHz) ! 
-
-    !     daHy = dt/(4.0d0*mu0*mu)
-    !     dbHy = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
-    !     daHy = 1.0d0 ! (1-daHz)/(1+daHz) ! 
-
-    !     daHz = dt/(4.0d0*mu0*mu)
-    !     dbHz = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
-    !     daHz = 1.0d0 ! (1-daHz)/(1+daHz) ! 
-
-
-    !     ! ----------------------------------------------------------------------
-    !     !---
-    !     !--- program starts here
-    !     !---
-
-    !     ! ================================ LOAD SOURCE ================================
-
-    !     call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
-    !     call loadsource('electromagneticsourcey.dat', source%time_steps, srcy)
-    !     call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
-
-    !     ! =============================================================================
-
-    !     !--- define profile of absorption in PML region
-
-    !     ! Initialize CPML damping variables
-    !     K_x(:) = 1.0d0
-    !     K_x_half(:) = 1.0d0
-    !     alpha_x(:) = 0.0d0
-    !     alpha_x_half(:) = 0.0d0
-    !     a_x(:) = 0.0d0
-    !     a_x_half(:) = 0.0d0
-    !     b_x(:) = 0.0d0 
-    !     b_x_half(:) = 0.0d0 
-
-    !     K_y(:) = 1.0d0
-    !     K_y_half(:) = 1.0d0
-    !     alpha_y(:) = 0.0d0
-    !     alpha_y_half(:) = 0.0d0
-    !     a_y(:) = 0.0d0
-    !     a_y_half(:) = 0.0d0
-    !     b_y(:) = 0.d0
-    !     K_z(:) = 1.0d0
-    !     K_z_half(:) = 1.0d0
-    !     alpha_z(:) = 0.0d0
-    !     alpha_z_half(:) = 0.0d0
-    !     a_z(:) = 0.0d0
-    !     a_z_half(:) = 0.0d0
-
-    !     ! ------------------------------ Load the boundary ----------------------------
-    !     call loadcpml('kappax_cpml.dat', K_x)
-    !     call loadcpml('alphax_cpml.dat', alpha_x)
-    !     call loadcpml('acoefx_cpml.dat', a_x)
-    !     call loadcpml('bcoefx_cpml.dat', b_x)
-
-    !     call loadcpml('kappay_cpml.dat', K_y)
-    !     call loadcpml('alphay_cpml.dat', alpha_y)
-    !     call loadcpml('acoefy_cpml.dat', a_y)
-    !     call loadcpml('bcoefy_cpml.dat', b_y)
-
-    !     call loadcpml('kappaz_cpml.dat', K_z)
-    !     call loadcpml('alphaz_cpml.dat', alpha_z)
-    !     call loadcpml('acoefz_cpml.dat', a_z)
-    !     call loadcpml('bcoefz_cpml.dat', b_z)
-
-    !     call loadcpml('kappax_half_cpml.dat', K_x_half)
-    !     call loadcpml('alphax_half_cpml.dat', alpha_x_half)
-    !     call loadcpml('acoefx_half_cpml.dat', a_x_half)
-    !     call loadcpml('bcoefx_half_cpml.dat', b_x_half)
-
-    !     call loadcpml('kappay_half_cpml.dat', K_y_half)
-    !     call loadcpml('alphay_half_cpml.dat', alpha_y_half)
-    !     call loadcpml('acoefy_half_cpml.dat', a_y_half)
-    !     call loadcpml('bcoefy_half_cpml.dat', b_y_half)
-
-    !     call loadcpml('kappaz_half_cpml.dat', K_z_half)
-    !     call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
-    !     call loadcpml('acoefz_half_cpml.dat', a_z_half)
-    !     call loadcpml('bcoefz_half_cpml.dat', b_z_half)
-
-    !     ! do i = 1,nz
-    !     !   print *, K_z(i), alpha_z(i), a_z(i), b_z(i)
-    !     ! enddo
-
-    !     ! -----------------------------------------------------------------------------
-    !     ! Load initial conditions
-    !     call material_rw3('initialconditionEx.dat', Ex, .TRUE.)
-    !     call material_rw3('initialconditionEy.dat', Ey, .TRUE.)
-    !     call material_rw3('initialconditionEz.dat', Ez, .TRUE.)
+        allocate(Ex(nx, ny, nz), Ey(nx, ny, nz), Ez(nx, ny, nz))
+        allocate(Hx(nx, ny, nz), Hy(nx, ny, nz), Hz(nx, ny, nz))
         
-    !     call material_rw3('initialconditionHx.dat', Hx, .TRUE.)
-    !     call material_rw3('initialconditionHy.dat', Hy, .TRUE.)
-    !     call material_rw3('initialconditionHz.dat', Hz, .TRUE.)
+        ! ------------------------ Load Permittivity Coefficients ------------------------
+        ! Load Epsilon
+        call material_rw2('eps11.dat', eps11, .TRUE.)
+        call material_rw2('eps12.dat', eps12, .TRUE.)
+        call material_rw2('eps13.dat', eps13, .TRUE.)
+        call material_rw2('eps22.dat', eps22, .TRUE.)
+        call material_rw2('eps23.dat', eps23, .TRUE.)
+        call material_rw2('eps33.dat', eps33, .TRUE.)
+        ! Load Sigma
+        call material_rw2('sig11.dat', sig11, .TRUE.)
+        call material_rw2('sig12.dat', sig12, .TRUE.)
+        call material_rw2('sig13.dat', sig13, .TRUE.)
+        call material_rw2('sig22.dat', sig22, .TRUE.)
+        call material_rw2('sig23.dat', sig23, .TRUE.)
+        call material_rw2('sig33.dat', sig33, .TRUE.)
 
-    !     ! PML
-    !     memory_dEx_dy(:,:,:) = 0.0d0
-    !     memory_dEy_dx(:,:,:) = 0.0d0
-    !     memory_dEx_dz(:,:,:) = 0.0d0
-    !     memory_dEz_dx(:,:,:) = 0.0d0
-    !     memory_dEz_dy(:,:,:) = 0.0d0
-    !     memory_dEy_dz(:,:,:) = 0.0d0
+        ! ------------------------ Assign some constants -----------------------
+        ! Assign the source location indices
+        isource = source%xind + domain%cpml
+        jsource = source%yind + domain%cpml
+        ksource = source%zind + domain%cpml
 
-    !     memory_dHz_dx(:,:,:) = 0.0d0
-    !     memory_dHx_dz(:,:,:) = 0.0d0
-    !     memory_dHz_dy(:,:,:) = 0.0d0
-    !     memory_dHy_dz(:,:,:) = 0.0d0
-    !     memory_dHx_dy(:,:,:) = 0.0d0
-    !     memory_dHy_dx(:,:,:) = 0.0d0
+        ! Define the 
+        ! DT = minval( (/dx, dy, dz/) )/ ( 2.0d0 * Clight/ sqrt( minval( (/ eps11, eps22, eps33 /) ) ) )
 
-    !     ! ---
-    !     ! ---  beginning of time loop
-    !     ! ---
-    !     do it = 1,source%time_steps
-    !         !--------------------------------------------------------
-    !         ! compute magnetic field and update memory variables for C-PML
-    !         !--------------------------------------------------------
-    !         ! Update Hx
-    !         do k = 1,nz-1
-    !             do i = 1,nx-1  
-    !                 do j = 1,ny-1
-    !                     ! Values needed for the magnetic field updates
-    !                     dEz_dy = ( Ez(i,j,k) - Ez(i,j+1,k) )/dy
-    !                     memory_dEz_dy(i,j,k) = b_y_half(j) * memory_dEz_dy(i,j,k) + a_y_half(j) * dEz_dy
-    !                     dEz_dy = dEz_dy/ K_y_half(j) + memory_dEz_dy(i,j,k)
+        ! Compute the coefficients of the FD scheme. First scale the relative 
+        ! permittivity and permeabilities to get the absolute values 
+        epsilonx(:,:) = (eps11 + eps12 + eps13)*eps0 
+        epsilony(:,:) = (eps12 + eps22 + eps23)*eps0
+        epsilonz(:,:) = (eps13 + eps23 + eps33)*eps0
+        sigmax(:,:) = sig11 + sig12 + sig13
+        sigmay(:,:) = sig12 + sig22 + sig23
+        sigmaz(:,:) = sig13 + sig23 + sig33
 
-    !                     ! The rest of the equation needed for agnetic field updates
-    !                     dEy_dz = ( Ey(i,j,k+1) - Ey(i,j,k) )/dz
-    !                     memory_dEy_dz(i,j,k) = b_z_half(k) * memory_dEy_dz(i,j,k) + a_z_half(k) * dEy_dz
-    !                     dEy_dz = dEy_dz/ K_z_half(k) + memory_dEy_dz(i,j,k)
+        caEx(:,:) = ( 1.0d0 - sigmax * dt / &
+                    (2.0d0 * epsilonx ) ) / &
+                    ( 1.0d0 + sigmax * dt / &
+                    (2.0d0 * epsilonx ) )
+        cbEx(:,:) = (dt / epsilonx ) / &
+                    ( 1.0d0 + sigmax * dt / &
+                    ( 2.0d0 * epsilonx ) )
 
-    !                     ! Now update the Magnetic field
-    !                     Hx(i,j,k) = daHx*Hx(i,j,k) + dbHx*( dEy_dz + dEz_dy )
-    !                 enddo
-    !             enddo  
-    !         enddo
+        caEy(:,:) = ( 1.0d0 - sigmay * dt / (2.0d0 * epsilony ) ) / &
+                    ( 1.0d0 + sigmay * dt / (2.0d0 * epsilony ) )
+        cbEy(:,:) = (dt / epsilony ) / &
+                    ( 1.0d0 + sigmay * dt / ( 2.0d0 * epsilony ) )
 
-    !             ! Update Hy
-    !         do k = 1,nz-1
-    !             do i = 1,nx-1      
-    !                 do j = 1,ny-1
+        caEz(:,:) = ( 1.0d0 - sigmaz * dt / &
+                    ( 2.0d0 * epsilonz ) ) / &
+                    ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
+        cbEz(:,:) = (dt / epsilonz ) / &
+                    ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
+
+        daHx = dt/(4.0d0*mu0*mu)
+        dbHx = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
+        daHx = 1.0d0 ! (1-daHz)/(1+daHz) ! 
+
+        daHy = dt/(4.0d0*mu0*mu)
+        dbHy = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
+        daHy = 1.0d0 ! (1-daHz)/(1+daHz) ! 
+
+        daHz = dt/(4.0d0*mu0*mu)
+        dbHz = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
+        daHz = 1.0d0 ! (1-daHz)/(1+daHz) ! 
+
+
+        ! ----------------------------------------------------------------------
+        !---
+        !--- program starts here
+        !---
+
+        ! ================================ LOAD SOURCE ================================
+
+        call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
+        call loadsource('electromagneticsourcey.dat', source%time_steps, srcy)
+        call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
+
+        ! =============================================================================
+
+        !--- define profile of absorption in PML region
+
+        ! Initialize CPML damping variables
+        K_x(:) = 1.0d0
+        K_x_half(:) = 1.0d0
+        alpha_x(:) = 0.0d0
+        alpha_x_half(:) = 0.0d0
+        a_x(:) = 0.0d0
+        a_x_half(:) = 0.0d0
+        b_x(:) = 0.0d0 
+        b_x_half(:) = 0.0d0 
+
+        K_y(:) = 1.0d0
+        K_y_half(:) = 1.0d0
+        alpha_y(:) = 0.0d0
+        alpha_y_half(:) = 0.0d0
+        a_y(:) = 0.0d0
+        a_y_half(:) = 0.0d0
+        b_y(:) = 0.d0
+        K_z(:) = 1.0d0
+        K_z_half(:) = 1.0d0
+        alpha_z(:) = 0.0d0
+        alpha_z_half(:) = 0.0d0
+        a_z(:) = 0.0d0
+        a_z_half(:) = 0.0d0
+
+        ! ------------------------------ Load the boundary ----------------------------
+        call loadcpml('kappax_cpml.dat', K_x)
+        call loadcpml('alphax_cpml.dat', alpha_x)
+        call loadcpml('acoefx_cpml.dat', a_x)
+        call loadcpml('bcoefx_cpml.dat', b_x)
+
+        call loadcpml('kappay_cpml.dat', K_y)
+        call loadcpml('alphay_cpml.dat', alpha_y)
+        call loadcpml('acoefy_cpml.dat', a_y)
+        call loadcpml('bcoefy_cpml.dat', b_y)
+
+        call loadcpml('kappaz_cpml.dat', K_z)
+        call loadcpml('alphaz_cpml.dat', alpha_z)
+        call loadcpml('acoefz_cpml.dat', a_z)
+        call loadcpml('bcoefz_cpml.dat', b_z)
+
+        call loadcpml('kappax_half_cpml.dat', K_x_half)
+        call loadcpml('alphax_half_cpml.dat', alpha_x_half)
+        call loadcpml('acoefx_half_cpml.dat', a_x_half)
+        call loadcpml('bcoefx_half_cpml.dat', b_x_half)
+
+        call loadcpml('kappay_half_cpml.dat', K_y_half)
+        call loadcpml('alphay_half_cpml.dat', alpha_y_half)
+        call loadcpml('acoefy_half_cpml.dat', a_y_half)
+        call loadcpml('bcoefy_half_cpml.dat', b_y_half)
+
+        call loadcpml('kappaz_half_cpml.dat', K_z_half)
+        call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
+        call loadcpml('acoefz_half_cpml.dat', a_z_half)
+        call loadcpml('bcoefz_half_cpml.dat', b_z_half)
+
+        ! do i = 1,nz
+        !   print *, K_z(i), alpha_z(i), a_z(i), b_z(i)
+        ! enddo
+
+        ! -----------------------------------------------------------------------------
+        ! Load initial conditions
+        call material_rw3('initialconditionEx.dat', Ex, .TRUE.)
+        call material_rw3('initialconditionEy.dat', Ey, .TRUE.)
+        call material_rw3('initialconditionEz.dat', Ez, .TRUE.)
+        
+        call material_rw3('initialconditionHx.dat', Hx, .TRUE.)
+        call material_rw3('initialconditionHy.dat', Hy, .TRUE.)
+        call material_rw3('initialconditionHz.dat', Hz, .TRUE.)
+
+        ! PML
+        memory_dEx_dy(:,:,:) = 0.0d0
+        memory_dEy_dx(:,:,:) = 0.0d0
+        memory_dEx_dz(:,:,:) = 0.0d0
+        memory_dEz_dx(:,:,:) = 0.0d0
+        memory_dEz_dy(:,:,:) = 0.0d0
+        memory_dEy_dz(:,:,:) = 0.0d0
+
+        memory_dHz_dx(:,:,:) = 0.0d0
+        memory_dHx_dz(:,:,:) = 0.0d0
+        memory_dHz_dy(:,:,:) = 0.0d0
+        memory_dHy_dz(:,:,:) = 0.0d0
+        memory_dHx_dy(:,:,:) = 0.0d0
+        memory_dHy_dx(:,:,:) = 0.0d0
+
+        ! ---
+        ! ---  beginning of time loop
+        ! ---
+        do it = 1,source%time_steps
+            !--------------------------------------------------------
+            ! compute magnetic field and update memory variables for C-PML
+            !--------------------------------------------------------
+            ! Update Hx
+            do k = 1,nz-1
+                do i = 1,nx-1  
+                    do j = 1,ny-1
+                        ! Values needed for the magnetic field updates
+                        dEz_dy = ( Ez(i,j,k) - Ez(i,j+1,k) )/dy
+                        memory_dEz_dy(i,j,k) = b_y_half(j) * memory_dEz_dy(i,j,k) + a_y_half(j) * dEz_dy
+                        dEz_dy = dEz_dy/ K_y_half(j) + memory_dEz_dy(i,j,k)
+
+                        ! The rest of the equation needed for agnetic field updates
+                        dEy_dz = ( Ey(i,j,k+1) - Ey(i,j,k) )/dz
+                        memory_dEy_dz(i,j,k) = b_z_half(k) * memory_dEy_dz(i,j,k) + a_z_half(k) * dEy_dz
+                        dEy_dz = dEy_dz/ K_z_half(k) + memory_dEy_dz(i,j,k)
+
+                        ! Now update the Magnetic field
+                        Hx(i,j,k) = daHx*Hx(i,j,k) + dbHx*( dEy_dz + dEz_dy )
+                    enddo
+                enddo  
+            enddo
+
+                ! Update Hy
+            do k = 1,nz-1
+                do i = 1,nx-1      
+                    do j = 1,ny-1
                     
-    !                     ! Values needed for the magnetic field updates
-    !                     dEx_dz = ( Ex(i,j,k) - Ex(i,j,k+1) )/dz
-    !                     memory_dEx_dz(i,j,k) = b_z(k) * memory_dEx_dz(i,j,k) + &
-    !                         a_z(k) * dEx_dz
-    !                     dEx_dz = dEx_dz/ K_z(k) + memory_dEx_dz(i,j,k)
+                        ! Values needed for the magnetic field updates
+                        dEx_dz = ( Ex(i,j,k) - Ex(i,j,k+1) )/dz
+                        memory_dEx_dz(i,j,k) = b_z(k) * memory_dEx_dz(i,j,k) + &
+                            a_z(k) * dEx_dz
+                        dEx_dz = dEx_dz/ K_z(k) + memory_dEx_dz(i,j,k)
 
-    !                     ! The rest of the equation needed for agnetic field updates
-    !                     dEz_dx = ( Ez(i+1,j,k) - Ez(i,j,k) )/dx
-    !                     memory_dEz_dx(i,j,k) = b_x(i) * memory_dEz_dx(i,j,k) + &
-    !                         a_x(i) * dEz_dx
-    !                     dEz_dx = dEz_dx/ K_x(i) + memory_dEz_dx(i,j,k)
+                        ! The rest of the equation needed for agnetic field updates
+                        dEz_dx = ( Ez(i+1,j,k) - Ez(i,j,k) )/dx
+                        memory_dEz_dx(i,j,k) = b_x(i) * memory_dEz_dx(i,j,k) + &
+                            a_x(i) * dEz_dx
+                        dEz_dx = dEz_dx/ K_x(i) + memory_dEz_dx(i,j,k)
 
-    !                     ! Now update the Magnetic field
-    !                     Hy(i,j,k) = daHy*Hy(i,j,k) + dbHy*( dEz_dx + dEx_dz )
+                        ! Now update the Magnetic field
+                        Hy(i,j,k) = daHy*Hy(i,j,k) + dbHy*( dEz_dx + dEx_dz )
 
-    !                 enddo
-    !             enddo  
-    !         enddo
+                    enddo
+                enddo  
+            enddo
 
-    !             ! Update Hz
-    !         do k = 2,nz-1
-    !             do i = 1,nx-1      
-    !                 do j = 1,ny-1
-    !                     ! Values needed for the magnetic field updates
-    !                     dEx_dy = ( Ex(i,j+1,k) - Ex(i,j,k) )/dy
-    !                     memory_dEx_dy(i,j,k) = b_y(j) * memory_dEx_dy(i,j,k) + & 
-    !                         a_y(j) * dEx_dy
-    !                     dEx_dy = dEx_dy/ K_y(j) + memory_dEx_dy(i,j,k)
+                ! Update Hz
+            do k = 2,nz-1
+                do i = 1,nx-1      
+                    do j = 1,ny-1
+                        ! Values needed for the magnetic field updates
+                        dEx_dy = ( Ex(i,j+1,k) - Ex(i,j,k) )/dy
+                        memory_dEx_dy(i,j,k) = b_y(j) * memory_dEx_dy(i,j,k) + & 
+                            a_y(j) * dEx_dy
+                        dEx_dy = dEx_dy/ K_y(j) + memory_dEx_dy(i,j,k)
 
-    !                     ! The rest of the equation needed for agnetic field updates
-    !                     dEy_dx = ( Ey(i,j,k) - Ey(i+1,j,k) )/dx
-    !                     memory_dEy_dx(i,j,k) = b_x(i) * memory_dEy_dx(i,j,k) + & 
-    !                         a_x(i) * dEy_dx
-    !                     dEy_dx = dEy_dx/ K_x(i) + memory_dEy_dx(i,j,k)
+                        ! The rest of the equation needed for agnetic field updates
+                        dEy_dx = ( Ey(i,j,k) - Ey(i+1,j,k) )/dx
+                        memory_dEy_dx(i,j,k) = b_x(i) * memory_dEy_dx(i,j,k) + & 
+                            a_x(i) * dEy_dx
+                        dEy_dx = dEy_dx/ K_x(i) + memory_dEy_dx(i,j,k)
 
-    !                     ! Now update the Magnetic field
-    !                     Hz(i,j,k) = daHz*Hz(i,j,k) + dbHz*( dEy_dx + dEx_dy )
-    !                 enddo
-    !             enddo  
-    !         enddo
+                        ! Now update the Magnetic field
+                        Hz(i,j,k) = daHz*Hz(i,j,k) + dbHz*( dEy_dx + dEx_dy )
+                    enddo
+                enddo  
+            enddo
 
-    !         !--------------------------------------------------------
-    !         ! compute electric field and update memory variables for C-PML
-    !         !--------------------------------------------------------
-    !         ! Compute the differences in the x-direction
-    !         do k = 2,nz-1
-    !             do i = 1,nx-1
-    !                 do j = 2,ny-1  
-    !                     ! Update the Ex field
-    !                     dHz_dy = ( Hz(i,j,k) - Hz(i,j-1,k) )/dy
-    !                     memory_dHz_dy(i,j,k) = b_y_half(j) * memory_dHz_dy(i,j,k) + & 
-    !                         a_y_half(j) * dHz_dy
-    !                     dHz_dy = dHz_dy/K_y_half(j) + memory_dHz_dy(i,j,k)
+            !--------------------------------------------------------
+            ! compute electric field and update memory variables for C-PML
+            !--------------------------------------------------------
+            ! Compute the differences in the x-direction
+            do k = 2,nz-1
+                do i = 1,nx-1
+                    do j = 2,ny-1  
+                        ! Update the Ex field
+                        dHz_dy = ( Hz(i,j,k) - Hz(i,j-1,k) )/dy
+                        memory_dHz_dy(i,j,k) = b_y_half(j) * memory_dHz_dy(i,j,k) + & 
+                            a_y_half(j) * dHz_dy
+                        dHz_dy = dHz_dy/K_y_half(j) + memory_dHz_dy(i,j,k)
 
-    !                     ! Changed from half to full node positions 
-    !                     dHy_dz = ( Hy(i,j,k-1) - Hy(i,j,k) )/dz
-    !                     memory_dHy_dz(i,j,k) = b_z(k) * memory_dHy_dz(i,j,k) + &
-    !                         a_z(k) * dHy_dz
-    !                     dHy_dz = dHy_dz/K_z(k) + memory_dHy_dz(i,j,k)
+                        ! Changed from half to full node positions 
+                        dHy_dz = ( Hy(i,j,k-1) - Hy(i,j,k) )/dz
+                        memory_dHy_dz(i,j,k) = b_z(k) * memory_dHy_dz(i,j,k) + &
+                            a_z(k) * dHy_dz
+                        dHy_dz = dHy_dz/K_z(k) + memory_dHy_dz(i,j,k)
                         
-    !                     Ex(i,j,k) = caEx(i,k)*Ex(i,j,k) + & 
-    !                     cbEx(i,k)*(dHz_dy + dHy_dz) 
-    !                 enddo
-    !             enddo
+                        Ex(i,j,k) = caEx(i,k)*Ex(i,j,k) + & 
+                        cbEx(i,k)*(dHz_dy + dHy_dz) 
+                    enddo
+                enddo
 
-    !             ! ! Compute the differences in the y-direction
-    !             do i = 2,nx-1 
-    !                 do j = 1,ny-1 
-    !                     ! Update the Ey field
-    !                     dHz_dx = ( Hz(i-1,j,k) - Hz(i,j,k) )/dx ! this is ny-1 length vector
-    !                     memory_dHz_dx(i,j,k) = b_x_half(i) * memory_dHz_dx(i,j,k) + & 
-    !                         a_x_half(i) * dHz_dx
-    !                     dHz_dx = dHz_dx/K_x_half(i) + memory_dHz_dx(i,j,k)
+                ! ! Compute the differences in the y-direction
+                do i = 2,nx-1 
+                    do j = 1,ny-1 
+                        ! Update the Ey field
+                        dHz_dx = ( Hz(i-1,j,k) - Hz(i,j,k) )/dx ! this is ny-1 length vector
+                        memory_dHz_dx(i,j,k) = b_x_half(i) * memory_dHz_dx(i,j,k) + & 
+                            a_x_half(i) * dHz_dx
+                        dHz_dx = dHz_dx/K_x_half(i) + memory_dHz_dx(i,j,k)
 
-    !                     dHx_dz = ( Hx(i,j,k) - Hx(i,j,k-1) )/dz ! this is ny-1 length vector
-    !                     memory_dHx_dz(i,j,k) = b_z_half(k) * memory_dHx_dz(i,j,k) + &
-    !                         a_z_half(k) * dHx_dz
-    !                     dHx_dz = dHx_dz/K_z_half(k) + memory_dHx_dz(i,j,k)
+                        dHx_dz = ( Hx(i,j,k) - Hx(i,j,k-1) )/dz ! this is ny-1 length vector
+                        memory_dHx_dz(i,j,k) = b_z_half(k) * memory_dHx_dz(i,j,k) + &
+                            a_z_half(k) * dHx_dz
+                        dHx_dz = dHx_dz/K_z_half(k) + memory_dHx_dz(i,j,k)
 
-    !                     ! Ey(i,j,k) = ( ( 4*caEy(i,k) + caEy(i-1,k) + caEy(i,k-1) )/6) * Ey(i,j,k) + & 
-    !                     ! ( ( 4*cbEy(i,k) + cbEy(i-1,k) + cbEy(i,k-1) )/6 ) * & 
-    !                     ! (dHz_dx + dHx_dz)
-    !                     Ey(i,j,k) = caEy(i,k) * Ey(i,j,k) + cbEy(i,k) * (dHz_dx + dHx_dz)
-    !                 enddo
-    !             enddo
-    !         enddo 
+                        ! Ey(i,j,k) = ( ( 4*caEy(i,k) + caEy(i-1,k) + caEy(i,k-1) )/6) * Ey(i,j,k) + & 
+                        ! ( ( 4*cbEy(i,k) + cbEy(i-1,k) + cbEy(i,k-1) )/6 ) * & 
+                        ! (dHz_dx + dHx_dz)
+                        Ey(i,j,k) = caEy(i,k) * Ey(i,j,k) + cbEy(i,k) * (dHz_dx + dHx_dz)
+                    enddo
+                enddo
+            enddo 
 
-    !             ! Compute the differences in the z-direction
-    !         do k = 1,nz-1
-    !             do i = 2,nx-1  
-    !                 do j = 2,ny-1
-    !                     ! Update the Ez field
-    !                     dHx_dy = ( Hx(i,j-1,k) - Hx(i,j,k) )/dy
-    !                     memory_dHx_dy(i,j,k) = b_y_half(j) * memory_dHx_dy(i,j,k) + &
-    !                         a_y_half(j) * dHx_dy
-    !                     dHx_dy = dHx_dy/K_y_half(j) + memory_dHx_dy(i,j,k)
+                ! Compute the differences in the z-direction
+            do k = 1,nz-1
+                do i = 2,nx-1  
+                    do j = 2,ny-1
+                        ! Update the Ez field
+                        dHx_dy = ( Hx(i,j-1,k) - Hx(i,j,k) )/dy
+                        memory_dHx_dy(i,j,k) = b_y_half(j) * memory_dHx_dy(i,j,k) + &
+                            a_y_half(j) * dHx_dy
+                        dHx_dy = dHx_dy/K_y_half(j) + memory_dHx_dy(i,j,k)
 
-    !                     dHy_dx = ( Hy(i,j,k) - Hy(i-1,j,k) )/dx
-    !                     memory_dHy_dx(i,j,k) = b_x_half(i) * memory_dHy_dx(i,j,k) + &
-    !                         a_x_half(i) * dHy_dx
-    !                     dHy_dx = dHy_dx/K_x_half(i) + memory_dHy_dx(i,j,k)
+                        dHy_dx = ( Hy(i,j,k) - Hy(i-1,j,k) )/dx
+                        memory_dHy_dx(i,j,k) = b_x_half(i) * memory_dHy_dx(i,j,k) + &
+                            a_x_half(i) * dHy_dx
+                        dHy_dx = dHy_dx/K_x_half(i) + memory_dHy_dx(i,j,k)
                         
-    !                     Ez(i,j,k) = ( ( 4*caEz(i,k) + caEz(i-1,k) + caEz(i,k+1) )/6 ) * &
-    !                         Ez(i,j,k) + ( ( 4*cbEz(i,k) + cbEz(i-1,k) + cbEz(i,k+1) )/6 ) * & 
-    !                     (dHx_dy + dHy_dx)
-    !                 enddo
-    !             enddo
-    !         enddo
+                        Ez(i,j,k) = ( ( 4*caEz(i,k) + caEz(i-1,k) + caEz(i,k+1) )/6 ) * &
+                            Ez(i,j,k) + ( ( 4*cbEz(i,k) + cbEz(i-1,k) + cbEz(i,k+1) )/6 ) * & 
+                        (dHx_dy + dHy_dx)
+                    enddo
+                enddo
+            enddo
 
 
-    !         ! add the source (force vector located at a given grid point)
-    !         Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
-    !                     srcx(it) * dt / eps11(isource,ksource)
-    !         Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
-    !                     srcy(it) * dt / eps22(isource,ksource) 
-    !         Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
-    !                     srcz(it) * dt / eps33(isource,ksource)
+            ! add the source (force vector located at a given grid point)
+            Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
+                        srcx(it) * dt / eps11(isource,ksource)
+            Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
+                        srcy(it) * dt / eps22(isource,ksource) 
+            Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
+                        srcz(it) * dt / eps33(isource,ksource)
             
-    !         ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-    !         Ex(1,:,:) = 0.0d0
-    !         Ex(:,1,:) = 0.0d0
-    !         Ex(:,:,1) = 0.0d0
-    !         Ex(nx,:,:) = 0.0d0
-    !         Ex(:,ny,:) = 0.0d0
-    !         Ex(:,:,nz) = 0.0d0 
+            ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
+            Ex(1,:,:) = 0.0d0
+            Ex(:,1,:) = 0.0d0
+            Ex(:,:,1) = 0.0d0
+            Ex(nx,:,:) = 0.0d0
+            Ex(:,ny,:) = 0.0d0
+            Ex(:,:,nz) = 0.0d0 
 
-    !         Ey(1,:,:) = 0.0d0
-    !         Ey(:,1,:) = 0.0d0
-    !         Ey(:,:,1) = 0.0d0
-    !         Ey(nx,:,:) = 0.0d0
-    !         Ey(:,ny,:) = 0.0d0
-    !         Ey(:,:,nz) = 0.0d0
+            Ey(1,:,:) = 0.0d0
+            Ey(:,1,:) = 0.0d0
+            Ey(:,:,1) = 0.0d0
+            Ey(nx,:,:) = 0.0d0
+            Ey(:,ny,:) = 0.0d0
+            Ey(:,:,nz) = 0.0d0
             
-    !         Ez(1,:,:) = 0.0d0
-    !         Ez(:,1,:) = 0.0d0
-    !         Ez(:,:,1) = 0.0d0
-    !         Ez(nx,:,:) = 0.0d0
-    !         Ez(:,ny,:) = 0.0d0
-    !         Ez(:,:,nz) = 0.0d0
+            Ez(1,:,:) = 0.0d0
+            Ez(:,1,:) = 0.0d0
+            Ez(:,:,1) = 0.0d0
+            Ez(nx,:,:) = 0.0d0
+            Ez(:,ny,:) = 0.0d0
+            Ez(:,:,nz) = 0.0d0
             
-    !         Hx(1,:,:) = 0.0d0
-    !         Hx(:,1,:) = 0.0d0
-    !         Hx(:,:,1) = 0.0d0
-    !         Hx(nx,:,:) = 0.0d0
-    !         Hx(:,ny,:) = 0.0d0
-    !         Hx(:,:,nz) = 0.0d0
+            Hx(1,:,:) = 0.0d0
+            Hx(:,1,:) = 0.0d0
+            Hx(:,:,1) = 0.0d0
+            Hx(nx,:,:) = 0.0d0
+            Hx(:,ny,:) = 0.0d0
+            Hx(:,:,nz) = 0.0d0
 
-    !         Hy(1,:,:) = 0.0d0
-    !         Hy(:,1,:) = 0.0d0
-    !         Hy(:,:,1) = 0.0d0
-    !         Hy(nx,:,:) = 0.0d0
-    !         Hy(:,ny,:) = 0.0d0
-    !         Hy(:,:,nz) = 0.0d0
+            Hy(1,:,:) = 0.0d0
+            Hy(:,1,:) = 0.0d0
+            Hy(:,:,1) = 0.0d0
+            Hy(nx,:,:) = 0.0d0
+            Hy(:,ny,:) = 0.0d0
+            Hy(:,:,nz) = 0.0d0
             
-    !         Hz(1,:,:) = 0.0d0
-    !         Hz(:,1,:) = 0.0d0
-    !         Hz(:,:,1) = 0.0d0
-    !         Hz(nx,:,:) = 0.0d0
-    !         Hz(:,ny,:) = 0.0d0
-    !         Hz(:,:,nz) = 0.0d0
+            Hz(1,:,:) = 0.0d0
+            Hz(:,1,:) = 0.0d0
+            Hz(:,:,1) = 0.0d0
+            Hz(nx,:,:) = 0.0d0
+            Hz(:,ny,:) = 0.0d0
+            Hz(:,:,nz) = 0.0d0
 
-    !         ! check norm of velocity to make sure the solution isn't diverging
-    !         velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )
-    !         if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
-    !         ! print *,'Max vals for Ex, Ey, Ez: ', maxval(Ex), maxval(Ey), maxval(Ez)
+            ! check norm of velocity to make sure the solution isn't diverging
+            velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )
+            if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
+            ! print *,'Max vals for Ex, Ey, Ez: ', maxval(Ex), maxval(Ey), maxval(Ez)
 
-    !         ! print *, maxval(Ex), maxval(Ey), maxval(Ez)
-    !         call write_image(Ex, domain, source, it, 'Ex', SINGLE)
-    !         call write_image(Ey, domain, source, it, 'Ey', SINGLE)
-    !         call write_image(Ez, domain, source, it, 'Ez', SINGLE)
+            ! print *, maxval(Ex), maxval(Ey), maxval(Ez)
+            call write_image(Ex, domain, source, it, 'Ex', SINGLE)
+            call write_image(Ey, domain, source, it, 'Ey', SINGLE)
+            call write_image(Ez, domain, source, it, 'Ez', SINGLE)
 
-    !     enddo   ! end of time loop
-    ! end subroutine electromag25
+        enddo   ! end of time loop
+    end subroutine electromag25
 
 
 
