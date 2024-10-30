@@ -35,15 +35,10 @@ module cpmlfdtd
         
         ! Model variables
         real(real64), allocatable :: vx(:,:),vz(:,:),sigmaxx(:,:),sigmazz(:,:),sigmaxz(:,:)
-        real(real64), allocatable :: &
-                memory_dvx_dx(:,:), &
-                memory_dvx_dz(:,:), &
-                memory_dvz_dx(:,:), &
-                memory_dvz_dz(:,:), &
-                memory_dsigmaxx_dx(:,:), &
-                memory_dsigmazz_dz(:,:), &
-                memory_dsigmaxz_dx(:,:), &
-                memory_dsigmaxz_dz(:,:)
+        real(real64), allocatable :: memory_dvx_dx(:,:), memory_dvx_dz(:,:), &
+                                     memory_dvz_dx(:,:), memory_dvz_dz(:,:), &
+                                     memory_dsigmaxx_dx(:,:), memory_dsigmazz_dz(:,:), &
+                                     memory_dsigmaxz_dx(:,:), memory_dsigmaxz_dz(:,:)
         
         integer :: nx, nz 
         real(real64) :: dx, dz, dt 
@@ -65,13 +60,13 @@ module cpmlfdtd
         dx = domain%dx 
         dz = domain%dz 
         
-        ! Allocate the arrays based on runtime values of domain%nx and domain%nz
+        ! Allocate the arrays based on runtime values of nx and nz
         allocate(c11(nx, nz), c13(nx, nz), c15(nx, nz), &
                  c33(nx, nz), c35(nx, nz), c55(nx, nz), rho(nx, nz))
         allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
                  K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
         allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
-                K_z_half(domain%nz), alpha_z_half(domain%nz), a_z_half(domain%nz), b_z_half(domain%nz))
+                K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
         allocate(gammax(nx, nz), gammaz(nx, nz))
         allocate(srcx(source%time_steps), srcz(source%time_steps))
         
@@ -81,9 +76,8 @@ module cpmlfdtd
         allocate(memory_dsigmaxx_dx(nx, nz), memory_dsigmazz_dz(nx, nz))
         allocate(memory_dsigmaxz_dx(nx, nz), memory_dsigmaxz_dz(nx, nz))
         allocate(vx(nx, nz), vz(nx, nz))
-        allocate(sigmaxx(nx, nz), sigmazz(nx, nz), &
-                 sigmaxz(nx, nz))
-            
+        allocate(sigmaxx(nx, nz), sigmazz(nx, nz), sigmaxz(nx, nz))
+        
         ! -------------------- Load Stiffness Coefficients --------------------
     
         call material_rw2('c11.dat', c11, .TRUE.)
@@ -99,7 +93,7 @@ module cpmlfdtd
         call material_rw2('gamma_z.dat', gammaz, .TRUE.)
         
         ! ------------------------ Assign some constants -----------------------
-
+        
         isource = source%xind + domain%cpml
         jsource = source%zind + domain%cpml
     
@@ -178,9 +172,9 @@ module cpmlfdtd
         
         do it = 1,source%time_steps
         
-            !------------------------------------------------------------
-            ! compute stress sigma and update memory variables for C-PML
-            !------------------------------------------------------------
+            ! ------------------------------------------------------------
+            !  compute stress sigma and update memory variables for C-PML
+            ! ------------------------------------------------------------
             !$omp parallel do private(i, j, deltarho, &
             ! value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz)
             do j = 2,nz
@@ -248,14 +242,13 @@ module cpmlfdtd
             enddo
             !$omp end parallel do
             
-            !--------------------------------------------------------
-            ! compute velocity and update memory variables for C-PML
-            !--------------------------------------------------------
-            !$omp parallel do private(i, j, deltarho, value_dsigmaxx_dx, value_dsigmazz_dz, &
-            !    value_dsigmaxz_dx, value_dsigmaxz_dz)
+            ! --------------------------------------------------------
+            !  compute velocity and update memory variables for C-PML
+            ! --------------------------------------------------------
+            !$omp parallel do private(i, j, deltarho, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
 
-            do j = 2,domain%nz
-                do i = 2,domain%nx
+            do j = 2,nz
+                do i = 2,nx
         
                     deltarho = ( 2*rho(i,j) + rho(i,j-1) + rho(i-1,j) )/4
 
@@ -277,12 +270,12 @@ module cpmlfdtd
                 enddo
             enddo
             
-            do j = 1,domain%nz-1
-                do i = 1,domain%nx-1
+            do j = 1,nz-1
+                do i = 1,nx-1
         
                     deltarho = ( 2*rho(i,j) + rho(i+1,j) + rho(i,j+1) )/4
-                    value_dsigmaxz_dx = (sigmaxz(i+1,j) - sigmaxz(i,j)) / domain%dx
-                    value_dsigmazz_dz = (sigmazz(i,j+1) - sigmazz(i,j)) / domain%dz
+                    value_dsigmaxz_dx = (sigmaxz(i+1,j) - sigmaxz(i,j)) / dx
+                    value_dsigmazz_dz = (sigmazz(i,j+1) - sigmazz(i,j)) / dz
             
                     memory_dsigmaxz_dx(i,j) = b_x_half(i) * memory_dsigmaxz_dx(i,j) + &
                                 a_x_half(i) * value_dsigmaxz_dx
@@ -297,7 +290,8 @@ module cpmlfdtd
         
                 enddo
             enddo
-            !$omp end parallel do
+            !$omp end do
+            !$omp end parallel
             
             ! Add the source term
             vx(isource,jsource) = vx(isource,jsource) + srcx(it) * dt / rho(isource,jsource)
@@ -339,862 +333,580 @@ module cpmlfdtd
         deallocate(vx, vz, sigmaxx, sigmazz, sigmaxz)
         
     end subroutine seismic2
-    
-    ! subroutine seismic2(nx, nz, dx, dz, npoints_pml, src, nstep, OUTPUT_SINGLE)
-
-    !     ! 2D elastic finite-difference code in velocity and stress formulation
-    !     ! with Convolutional-PML (C-PML) absorbing conditions for an 
-    !     ! anisotropic medium
-    !     !
-    !     ! If using this program please give credit to the following: 
-    !     !
-    !     ! Dimitri Komatitsch, University of Pau, France, April 2007.
-    !     ! Anisotropic implementation by Roland Martin and Dimitri Komatitsch, 
-    !     ! University of Pau, France, April 2007.
-        
-    !     ! The second-order staggered-grid formulation of Madariaga (1976) and 
-    !     ! Virieux (1986) is used:
-
-    !     ! INPUT
-    !     !   im (INTEGER)
-    !     !   nx, ny (INTEGER)
-    !     !   c11, c12, c22, c66, rho (REAL)
-    !     !   dx, dy (REAL)
-    !     !   npoints_pml (INTEGER) - the thickness of the pml
-    !     ! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        
-        
-    !         implicit none
-        
-    !         integer, parameter :: dp=kind(0.d0)
-
-    !         ! total number of grid points in each direction of the grid
-    !         integer, intent(in) :: nx
-    !         integer, intent(in) :: nz
-        
-    !         ! thickness of the PML layer in grid points
-    !         integer :: npoints_pml
-    !         ! integer, dimension(nx,nz)
-    !         real(real64), dimension(nx,nz) :: c11, c13, c15, c33, c35, c55, rho
-    !         real(real64) :: deltarho
-        
-    !         ! total number of time steps
-    !         integer :: nstep
-        
-    !         ! time step in seconds 
-    !         real(real64) :: DT
-    !         real(real64), intent(in) :: dx, dz 
-
-    !         ! source
-    !         integer,dimension(:) :: src
-    !         integer :: isource, jsource
-        
-    !         ! velocity threshold above which we consider that the code became unstable
-    !         real(real64), parameter :: STABILITY_THRESHOLD = 1.d+25
-        
-    !         ! main arrays
-    !         real(real64), dimension(nx,nz) :: vx,vz,sigmaxx,sigmazz,sigmaxz
-                    
-    !         ! arrays for the memory variables
-    !         ! could declare these arrays in PML only to save a lot of memory, but proof of concept only here
-    !         real(real64), dimension(NX,NZ) :: &
-    !             memory_dvx_dx, &
-    !             memory_dvx_dz, &
-    !             memory_dvz_dx, &
-    !             memory_dvz_dz, &
-    !             memory_dsigmaxx_dx, &
-    !             memory_dsigmazz_dz, &
-    !             memory_dsigmaxz_dx, &
-    !             memory_dsigmaxz_dz
-        
-    !         real(real64) :: &
-    !             value_dvx_dx, &
-    !             value_dvx_dz, &
-    !             value_dvz_dx, &
-    !             value_dvz_dz, &
-    !             value_dsigmaxx_dx, &
-    !             value_dsigmazz_dz, &
-    !             value_dsigmaxz_dx, &
-    !             value_dsigmaxz_dz
-        
-    !         ! 1D arrays for the damping profiles
-    !         real(real64), dimension(nx) :: K_x, alpha_x, a_x, b_x, &
-    !                                     K_x_half, alpha_x_half, &
-    !                                     a_x_half, b_x_half
-    !         real(real64), dimension(nz) :: K_z, alpha_z, a_z, b_z, &
-    !                                     K_z_half, alpha_z_half, &
-    !                                     a_z_half, b_z_half
-        
-    !         real(real64), dimension(nx,nz) :: gamma_x, gamma_z
-    !         ! for the source
-    !         real(real64),dimension(nstep) :: srcx, srcz
-        
-    !         integer :: i,j,it
-        
-    !         real(real64) :: velocnorm
-
-    !         ! Boolean flag to save as double precision or single precision 
-    !         logical :: SINGLE
-    !         logical, intent(in), optional :: OUTPUT_SINGLE 
-
-    !         ! The default data output is single precision unless OUTPUT_SINGLE is 
-    !         ! set to .FALSE.
-    !         if (present(OUTPUT_SINGLE)) then 
-    !             SINGLE = OUTPUT_SINGLE 
-    !         else
-    !             SINGLE = .TRUE.
-    !         endif
-        
-    !         ! -------------------- Load Stiffness Coefficients --------------------
-        
-    !         call material_rw('c11.dat', c11, .TRUE.)
-    !         call material_rw('c13.dat', c13, .TRUE.)
-    !         call material_rw('c15.dat', c15, .TRUE.)
-    !         call material_rw('c33.dat', c33, .TRUE.)
-    !         call material_rw('c35.dat', c35, .TRUE.)
-    !         call material_rw('c55.dat', c55, .TRUE.)
-    !         call material_rw('rho.dat', rho, .TRUE.)
-            
-    !         ! ------------------- Load Attenuation Coefficients --------------------
-    !         call material_rw('gamma_x.dat', gamma_x, .TRUE.)
-    !         call material_rw('gamma_z.dat', gamma_z, .TRUE.)
-            
-    !         ! ------------------------ Assign some constants -----------------------
-        
-    !         isource = src(1)+npoints_pml
-    !         jsource = src(2)+npoints_pml
-        
-    !         DT = minval( (/dx,dz/) )/ &
-    !             (sqrt( 3.d0*( maxval( (/ c11/rho, c33/rho /) ) ) ) ) 
-
-    !         ! ================================ LOAD SOURCE ================================
-        
-    !         call loadsource('seismicsourcex.dat', nstep, srcx)
-    !         ! We are using the coordinate names x, Z but the math computes the source in 
-    !         ! the x-z plane
-    !         call loadsource('seismicsourcez.dat', nstep, srcz)
-        
-    !         ! -----------------------------------------------------------------------------
-    !         !--- define profile of absorption in PML region
-
-    !         ! Initialize PML 
-    !         K_x(:) = 1.d0
-    !         K_x_half(:) = 1.d0
-    !         alpha_x(:) = 0.d0
-    !         alpha_x_half(:) = 0.d0
-    !         a_x(:) = 0.d0
-    !         a_x_half(:) = 0.d0
-    !         b_x(:) = 0.d0 
-    !         b_x_half(:) = 0.d0
-
-    !         K_z(:) = 1.d0
-    !         K_z_half(:) = 1.d0 
-    !         alpha_z(:) = 0.d0
-    !         alpha_z_half(:) = 0.d0
-    !         a_z(:) = 0.d0
-    !         a_z_half(:) = 0.d0
-    !         b_z(:) = 0.d0
-    !         b_z_half(:) = 0.d0
-
-    !     ! ------------------------------ Load the boundary ----------------------------        
-    !     call loadcpml('kappax_cpml.dat', K_x)
-    !     call loadcpml('alphax_cpml.dat', alpha_x)
-    !     call loadcpml('acoefx_cpml.dat', a_x)
-    !     call loadcpml('bcoefx_cpml.dat', b_x)
-        
-    !     call loadcpml('kappaz_cpml.dat', K_z)
-    !     call loadcpml('alphaz_cpml.dat', alpha_z)
-    !     call loadcpml('acoefz_cpml.dat', a_z)
-    !     call loadcpml('bcoefz_cpml.dat', b_z)
-        
-    !     call loadcpml('kappax_half_cpml.dat', K_x_half)
-    !     call loadcpml('alphax_half_cpml.dat', alpha_x_half)
-    !     call loadcpml('acoefx_half_cpml.dat', a_x_half)
-    !     call loadcpml('bcoefx_half_cpml.dat', b_x_half)
-        
-    !     call loadcpml('kappaz_half_cpml.dat', K_z_half)
-    !     call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
-    !     call loadcpml('acoefz_half_cpml.dat', a_z_half)
-    !     call loadcpml('bcoefz_half_cpml.dat', b_z_half)
-
-    !     ! =============================================================================
-
-
-    !     ! initialize arrays
-    !     vx(:,:) = 0.d0
-    !     vz(:,:) = 0.d0
-    !     sigmaxx(:,:) = 0.d0
-    !     sigmazz(:,:) = 0.d0
-    !     sigmaxz(:,:) = 0.d0
-
-    !     ! PML
-    !     memory_dvx_dx(:,:) = 0.d0
-    !     memory_dvx_dz(:,:) = 0.d0
-    !     memory_dvz_dx(:,:) = 0.d0
-    !     memory_dvz_dz(:,:) = 0.d0
-    !     memory_dsigmaxx_dx(:,:) = 0.d0
-    !     memory_dsigmazz_dz(:,:) = 0.d0
-    !     memory_dsigmaxz_dx(:,:) = 0.d0
-    !     memory_dsigmaxz_dz(:,:) = 0.d0
-
-    !     !---
-    !     !---  beginning of time loop
-    !     !---
-
-    !     do it = 1,NSTEP
-    !         !------------------------------------------------------------
-    !         ! compute stress sigma and update memory variables for C-PML
-    !         !------------------------------------------------------------
-    !         do j = 2,NZ
-    !             do i = 1,NX-1
-        
-    !                 value_dvx_dx = (vx(i+1,j) - vx(i,j)) / DX
-    !                 value_dvz_dz = (vz(i,j) - vz(i,j-1)) / DZ
-    !                 value_dvz_dx = (vz(i+1,j) - vz(i,j)) / DX
-    !                 value_dvx_dz = (vx(i,j) - vx(i,j-1)) / DZ
-
-    !                 memory_dvx_dx(i,j) = b_x_half(j) * memory_dvx_dx(i,j) + &
-    !                                         a_x_half(i) * value_dvx_dx
-    !                 memory_dvz_dz(i,j) = b_z(j) * memory_dvz_dz(i,j) + &
-    !                                         a_z(j) * value_dvz_dz
-    !                 memory_dvx_dz(i,j) = b_z_half(j) * memory_dvx_dz(i,j) + &
-    !                                         a_z_half(j) * value_dvx_dz 
-    !                 memory_dvz_dx(i,j) = b_x(i) * memory_dvz_dx(i,j) + &
-    !                                         a_x(i) * value_dvz_dx
-
-    !                 value_dvx_dx = value_dvx_dx / K_x_half(i) + memory_dvx_dx(i,j)
-    !                 value_dvz_dz = value_dvz_dz / K_z(j) + memory_dvz_dz(i,j)
-    !                 value_dvz_dx = value_dvz_dx / K_x(i) + memory_dvz_dx(i,j)
-    !                 value_dvx_dz = value_dvx_dz / K_z_half(j) + memory_dvx_dz(i,j)
-                    
-    !                 sigmaxx(i,j) = sigmaxx(i,j) + &
-    !                     (   c11(i,j) * value_dvx_dx + &
-    !                         c13(i,j) * value_dvz_dz + &
-    !                         c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * DT
-    !                 sigmazz(i,j) = sigmazz(i,j) + &
-    !                     (   c13(i,j) * value_dvx_dx + &
-    !                         c33(i,j) * value_dvz_dz + &
-    !                         c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * DT
-        
-    !             enddo
-    !         enddo
-        
-    !         do j = 1,NZ-1
-    !             do i = 2,NX
-        
-    !             value_dvx_dx = (vx(i,j) - vx(i-1,j)) / DX
-    !             value_dvz_dz = (vz(i,j+1) - vz(i,j)) / DZ
-    !             value_dvz_dx = (vz(i,j) - vz(i-1,j)) / DX
-    !             value_dvx_dz = (vx(i,j+1) - vx(i,j)) / DZ
-                
-    !             memory_dvx_dx(i,j) = b_x_half(i) * memory_dvx_dx(i,j) + &
-    !                                     a_x_half(i) * value_dvx_dx
-    !             memory_dvz_dz(i,j) = b_z(j) * memory_dvz_dz(i,j) + &
-    !                                     a_z(j) * value_dvz_dz
-    !             memory_dvx_dz(i,j) = b_z_half(j) * memory_dvx_dz(i,j) + &
-    !                                     a_z_half(j) * value_dvx_dz 
-    !             memory_dvz_dx(i,j) = b_x(i) * memory_dvz_dx(i,j) + &
-    !                                     a_x(i) * value_dvz_dx
-                
-    !             value_dvx_dx = value_dvx_dx / K_x_half(i) + memory_dvx_dx(i,j)
-    !             value_dvz_dz = value_dvz_dz / K_z(j) + memory_dvz_dz(i,j)
-    !             value_dvz_dx = value_dvz_dx / K_x(i) + memory_dvz_dx(i,j)
-    !             value_dvx_dz = value_dvx_dz / K_z_half(j) + memory_dvx_dz(i,j)
-        
-    !             sigmaxz(i,j) = sigmaxz(i,j) + &
-    !                 (   c15(i,j)  * value_dvx_dx + & 
-    !                     c35(i,j)  * value_dvz_dz + &
-    !                     c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * DT
-        
-    !             enddo
-    !         enddo
-        
-    !         !--------------------------------------------------------
-    !         ! compute velocity and update memory variables for C-PML
-    !         !--------------------------------------------------------
-    !         do j = 2,NZ
-    !             do i = 2,NX
-        
-    !             deltarho = ( rho(i,j) + rho(i,j-1) + rho(i-1,j) + rho(i-1,j-1) )/4
-
-    !             value_dsigmaxx_dx = (sigmaxx(i,j) - sigmaxx(i-1,j)) / DX
-    !             value_dsigmaxz_dz = (sigmaxz(i,j) - sigmaxz(i,j-1)) / DZ
-        
-    !             memory_dsigmaxx_dx(i,j) = b_x(i) * memory_dsigmaxx_dx(i,j) + &
-    !                         a_x(i) * value_dsigmaxx_dx
-    !             memory_dsigmaxz_dz(i,j) = b_z(j) * memory_dsigmaxz_dz(i,j) + &
-    !                         a_z(j) * value_dsigmaxz_dz
-        
-    !             value_dsigmaxx_dx = value_dsigmaxx_dx / K_x(i) + &
-    !                         memory_dsigmaxx_dx(i,j)
-    !             value_dsigmaxz_dz = value_dsigmaxz_dz / K_z(j) + &
-    !                         memory_dsigmaxz_dz(i,j)
-        
-    !             vx(i,j) = vx(i,j)*(1 - gamma_x(i,j) ) + (value_dsigmaxx_dx + value_dsigmaxz_dz) * DT / deltarho !rho(i,j)
-        
-    !             enddo
-    !         enddo
-        
-    !         do j = 1,NZ-1
-    !             do i = 1,NX-1
-        
-    !                 deltarho = ( 2*rho(i,j) + rho(i+1,j) + rho(i,j+1) )/4
-    !                 value_dsigmaxz_dx = (sigmaxz(i+1,j) - sigmaxz(i,j)) / DX
-    !                 value_dsigmazz_dz = (sigmazz(i,j+1) - sigmazz(i,j)) / DZ
-            
-    !                 memory_dsigmaxz_dx(i,j) = b_x_half(i) * memory_dsigmaxz_dx(i,j) + &
-    !                             a_x_half(i) * value_dsigmaxz_dx
-    !                 memory_dsigmazz_dz(i,j) = b_z_half(j) * memory_dsigmazz_dz(i,j) + &
-    !                             a_z_half(j) * value_dsigmazz_dz
-            
-    !                 value_dsigmaxz_dx = value_dsigmaxz_dx / K_x_half(i) + memory_dsigmaxz_dx(i,j)
-    !                 value_dsigmazz_dz = value_dsigmazz_dz / K_z_half(j) + memory_dsigmazz_dz(i,j)
-            
-    !                 vz(i,j) = vz(i,j)*(1 - gamma_z(i,j) ) + (value_dsigmaxz_dx + value_dsigmazz_dz) * DT / deltarho
-        
-    !             enddo
-    !         enddo
-
-    !         ! Add the source term
-    !         vx(isource,jsource) = vx(isource,jsource) + srcx(it) * DT / rho(isource,jsource)
-    !         vz(isource,jsource) = vz(isource,jsource) + srcz(it) * DT / rho(isource,jsource)
-        
-    !         ! Dirichlet conditions (rigid boundaries) on the edges or at the 
-    !         ! bottom of the PML layers
-    !         vx(1,:) = 0.d0
-    !         vx(NX,:) = 0.d0
-        
-    !         vx(:,1) = 0.d0
-    !         vx(:,NZ) = 0.d0
-        
-    !         vz(1,:) = 0.d0
-    !         vz(NX,:) = 0.d0
-        
-    !         vz(:,1) = 0.d0
-    !         vz(:,NZ) = 0.d0
-        
-    !         ! print maximum of norm of velocity
-    !         velocnorm = maxval(sqrt(vx**2 + vz**2))
-    !         if (velocnorm > STABILITY_THRESHOLD) stop 'code became unstable and blew up'
-        
-    !         call write_image2(vx, nx, nz, src, it, 'Vx', SINGLE)
-    !         call write_image2(vz, nx, nz, src, it, 'Vz', SINGLE)
-
-    !     enddo   ! end of time loop
-    ! end subroutine seismic2
 
     ! =========================================================================
-    ! subroutine seismic25(domain, source, seisvar, SINGLE_OUTPUT)
-    !     !--------------------------------------------------------------------------------------
-    !     use constants
+    subroutine seismic25(domain, source, SINGLE_OUTPUT)
+        !--------------------------------------------------------------------------------------
+        use constants
         
-    !     implicit none
+        implicit none
 
-    !     ! Input arguments
-    !     type(Domain_Type), intent(in) :: domain 
-    !     type(Source_Type), intent(in) :: source 
-    !     type(Seismic3_Variables_Type), intent(inout) :: seisvar
-    !     logical, intent(in), optional :: SINGLE_OUTPUT
-
-    !     ! Local variables
-    !     real(real64), dimension(domain%nx,domain%nz) :: c11, c12, c13, c14, c15, c16, &
-    !                                         c22, c23, c24, c25, c26, &
-    !                                         c33, c34, c35, c36, &
-    !                                         c44, c45, c46, &
-    !                                         c55, c56, &
-    !                                         c66, &
-    !                                         rho
-    !     real(real64) :: deltarho, velocnorm
-    !     ! real(real64) :: DT
-    !     integer :: i, j, k, it, isource, jsource, ksource
-
-    !     ! Values of the velocity and stress differentials
-    !     real(real64) :: dvx_dx, dvx_dy, dvx_dz, &
-    !                     dvy_dx, dvy_dy, dvy_dz, &
-    !                     dvz_dx, dvz_dy, dvz_dz, &
-    !                     dsigmaxx_dx, dsigmayy_dy, dsigmazz_dz, &
-    !                     dsigmaxy_dx, dsigmaxy_dy, &
-    !                     dsigmaxz_dx, dsigmaxz_dz, &
-    !                     dsigmayz_dy, dsigmayz_dz
-
-    !     ! 1D arrays for the damping profiles in each direction
-    !     real(real64), dimension(domain%nx) :: K_x, alpha_x, a_x, b_x, K_x_half, & 
-    !                                             alpha_x_half, a_x_half, b_x_half
-    !     real(real64), dimension(domain%ny) :: K_y, alpha_y, a_y, b_y, K_y_half, & 
-    !                                             alpha_y_half, a_y_half, b_y_half
-    !     real(real64), dimension(domain%nz) :: K_z, alpha_z, a_z, b_z, K_z_half, & 
-    !                                             alpha_z_half, a_z_half, b_z_half
-
-    !     ! Arrays for the PML damping factors
-    !     real(real64), dimension(domain%nx,domain%nz) :: gammax, gammay, gammaz
-
-    !     ! Source arrays
-    !     real(real64), dimension(source%time_steps) :: srcx, srcy, srcz
-
-    !     ! Boolean flag to save as double precision or single precision
-    !     logical :: SINGLE
-
-    !     ! The default data output is single precision unless SINGLE_OUTPUT is 
-    !     ! set to .FALSE.
-    !     if (present(SINGLE_OUTPUT)) then 
-    !         SINGLE = SINGLE_OUTPUT 
-    !     else
-    !         SINGLE = .TRUE.
-    !     endif
+        ! Input arguments
+        type(Domain_Type), intent(in) :: domain 
+        type(Source_Type), intent(in) :: source 
+        logical, intent(in), optional :: SINGLE_OUTPUT
         
-    !     ! ------------------------ Load Stiffness Coefficients ------------------------
-    !     call material_rw2('c11.dat', c11, .TRUE.)
-    !     call material_rw2('c12.dat', c12, .TRUE.)
-    !     call material_rw2('c13.dat', c13, .TRUE.)
-    !     call material_rw2('c14.dat', c14, .TRUE.)
-    !     call material_rw2('c15.dat', c15, .TRUE.)
-    !     call material_rw2('c16.dat', c16, .TRUE.)
-    !     call material_rw2('c22.dat', c22, .TRUE.)
-    !     call material_rw2('c23.dat', c23, .TRUE.)
-    !     call material_rw2('c24.dat', c24, .TRUE.)
-    !     call material_rw2('c25.dat', c25, .TRUE.)
-    !     call material_rw2('c26.dat', c26, .TRUE.)
-    !     call material_rw2('c33.dat', c33, .TRUE.)
-    !     call material_rw2('c34.dat', c34, .TRUE.)
-    !     call material_rw2('c35.dat', c35, .TRUE.)
-    !     call material_rw2('c36.dat', c36, .TRUE.)
-    !     call material_rw2('c44.dat', c44, .TRUE.)
-    !     call material_rw2('c45.dat', c45, .TRUE.)
-    !     call material_rw2('c46.dat', c46, .TRUE.)
-    !     call material_rw2('c55.dat', c55, .TRUE.)
-    !     call material_rw2('c56.dat', c56, .TRUE.)
-    !     call material_rw2('c66.dat', c66, .TRUE.)
-    !     call material_rw2('rho.dat', rho, .TRUE.)
+        ! Local variables
+        real(real64) :: deltarho, velocnorm
+
         
-    !     ! ------------------- Load Attenuation Coefficients --------------------
-    !     call material_rw2('gamma_x.dat', gammax, .TRUE.)
-    !     call material_rw2('gamma_z.dat', gammaz, .TRUE.)
-    !     call material_rw2('gamma_y.dat', gammay, .TRUE.)
+        real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c14(:,:), c15(:,:), c16(:,:), &
+                                    c22(:,:), c23(:,:), c24(:,:), c25(:,:), c26(:,:), &
+                                    c33(:,:), c34(:,:), c35(:,:), c36(:,:), &
+                                    c44(:,:), c45(:,:), c46(:,:), &
+                                    c55(:,:), c56(:,:), &
+                                    c66(:,:), &
+                                    rho(:,:)
+        ! real(real64) :: DT
+        integer :: i, j, k, it, isource, jsource, ksource
+
+        ! Values of the velocity and stress differentials
+        real(real64) :: dvx_dx, dvx_dy, dvx_dz, &
+                        dvy_dx, dvy_dy, dvy_dz, &
+                        dvz_dx, dvz_dy, dvz_dz, &
+                        dsigmaxx_dx, dsigmayy_dy, dsigmazz_dz, &
+                        dsigmaxy_dx, dsigmaxy_dy, &
+                        dsigmaxz_dx, dsigmaxz_dz, &
+                        dsigmayz_dy, dsigmayz_dz
+
+        ! 1D arrays for the damping profiles in each direction
+        real(real64), allocatable :: K_x(:), alpha_x(:), a_x(:), b_x(:), &
+                        K_x_half(:), alpha_x_half(:), a_x_half(:), b_x_half(:)
+        real(real64), allocatable :: K_y(:), alpha_y(:), a_y(:), b_y(:), &
+                        K_y_half(:), alpha_y_half(:), a_y_half(:), b_y_half(:)
+        real(real64), allocatable :: K_z(:), alpha_z(:), a_z(:), b_z(:), &
+                        K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
         
-    !     ! ------------------------ Assign some constants -----------------------
-    !     isource = source%xind + domain%cpml
-    !     jsource = source%yind + domain%cpml
-    !     ksource = source%zind + domain%cpml
-
-    !     ! ================================ LOAD SOURCE ================================
-
-    !     call loadsource('seismicsourcex.dat', source%time_steps, srcx)
-    !     call loadsource('seismicsourcey.dat', source%time_steps, srcy)
-    !     call loadsource('seismicsourcez.dat', source%time_steps, srcz)
-
-    !     ! ==================================== PML ====================================
-    !     ! Initialize PML 
-    !     K_x(:) = 1.d0
-    !     K_x_half(:) = 1.d0
-    !     alpha_x(:) = 0.d0
-    !     alpha_x_half(:) = 0.d0
-    !     a_x(:) = 0.d0
-    !     a_x_half(:) = 0.d0
-
-    !     K_y(:) = 1.d0
-    !     K_y_half(:) = 1.d0
-    !     alpha_y(:) = 0.d0
-    !     alpha_y_half(:) = 0.d0
-    !     a_y(:) = 0.d0
-    !     a_y_half(:) = 0.d0
-
-    !     K_z(:) = 1.d0
-    !     K_z_half(:) = 1.d0 
-    !     alpha_z(:) = 0.d0
-    !     alpha_z_half(:) = 0.d0
-    !     a_z(:) = 0.d0
-    !     a_z_half(:) = 0.d0
-
-    !     ! ------------------------- Boundary Conditions -------------------------
-    !     call loadcpml('kappax_cpml.dat', K_x)
-    !     call loadcpml('alphax_cpml.dat', alpha_x)
-    !     call loadcpml('acoefx_cpml.dat', a_x)
-    !     call loadcpml('bcoefx_cpml.dat', b_x)
-
-    !     call loadcpml('kappay_cpml.dat', K_y)
-    !     call loadcpml('alphay_cpml.dat', alpha_y)
-    !     call loadcpml('acoefy_cpml.dat', a_y)
-    !     call loadcpml('bcoefy_cpml.dat', b_y)
-
-    !     call loadcpml('kappaz_cpml.dat', K_z)
-    !     call loadcpml('alphaz_cpml.dat', alpha_z)
-    !     call loadcpml('acoefz_cpml.dat', a_z)
-    !     call loadcpml('bcoefz_cpml.dat', b_z)
-
-    !     call loadcpml('kappax_half_cpml.dat', K_x_half)
-    !     call loadcpml('alphax_half_cpml.dat', alpha_x_half)
-    !     call loadcpml('acoefx_half_cpml.dat', a_x_half)
-    !     call loadcpml('bcoefx_half_cpml.dat', b_x_half)
-
-    !     call loadcpml('kappay_half_cpml.dat', K_y_half)
-    !     call loadcpml('alphay_half_cpml.dat', alpha_y_half)
-    !     call loadcpml('acoefy_half_cpml.dat', a_y_half)
-    !     call loadcpml('bcoefy_half_cpml.dat', b_y_half)
-
-    !     call loadcpml('kappaz_half_cpml.dat', K_z_half)
-    !     call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
-    !     call loadcpml('acoefz_half_cpml.dat', a_z_half)
-    !     call loadcpml('bcoefz_half_cpml.dat', b_z_half)
-
-    !     ! =============================== Forward Model ===============================
-    !     ! Load initial condition
-    !     call material_rw3('initialconditionVx.dat', seisvar%vx, .TRUE.)
-    !     call material_rw3('initialconditionVy.dat', seisvar%vy, .TRUE.)
-    !     call material_rw3('initialconditionVz.dat', seisvar%vz, .TRUE.)
-
-    !     ! Initialize the stress values
-    !     seisvar%sigxx(:,:,:) = 0.d0
-    !     seisvar%sigyy(:,:,:) = 0.d0
-    !     seisvar%sigzz(:,:,:) = 0.d0
-    !     seisvar%sigxy(:,:,:) = 0.d0
-    !     seisvar%sigxz(:,:,:) = 0.d0
-    !     seisvar%sigyz(:,:,:) = 0.d0
-
-    !     ! PML
-    !     seisvar%memdvx_dx(:,:,:) = 0.d0
-    !     seisvar%memdvx_dy(:,:,:) = 0.d0
-    !     seisvar%memdvx_dz(:,:,:) = 0.d0
-
-    !     seisvar%memdvy_dx(:,:,:) = 0.d0
-    !     seisvar%memdvy_dy(:,:,:) = 0.d0
-    !     seisvar%memdvy_dz(:,:,:) = 0.d0
-
-    !     seisvar%memdvz_dx(:,:,:) = 0.d0
-    !     seisvar%memdvz_dy(:,:,:) = 0.d0 
-    !     seisvar%memdvz_dz(:,:,:) = 0.d0
-
-    !     seisvar%memdsigxx_dx(:,:,:) = 0.d0
-    !     seisvar%memdsigyy_dy(:,:,:) = 0.d0
-    !     seisvar%memdsigzz_dz(:,:,:) = 0.d0
-
-    !     seisvar%memdsigxy_dx(:,:,:) = 0.d0
-    !     seisvar%memdsigxy_dy(:,:,:) = 0.d0
-    !     seisvar%memdsigxz_dx(:,:,:) = 0.d0
-    !     seisvar%memdsigxz_dz(:,:,:) = 0.d0
-    !     seisvar%memdsigyz_dy(:,:,:) = 0.d0
-    !     seisvar%memdsigyz_dz(:,:,:) = 0.d0
-
-    !     ! Do it 
-    !     do it = 1,source%time_steps
-    !         !------------------------------------------------------------
-    !         ! compute stress sigma and update memory variables for C-PML
-    !         !------------------------------------------------------------
-    !         ! Update in the x direction
-    !         do k = 2,domain%nz
-    !             do j = 2,domain%ny
-    !                 do i = 1,domain%nx-1
-
-    !                     dvx_dx = (seisvar%vx(i+1,j,k) - seisvar%vx(i,j,k) ) / domain%dx
-    !                     dvy_dx = (seisvar%vy(i+1,j,k) - seisvar%vy(i,j,k) ) / domain%dx
-    !                     dvz_dx = (seisvar%vz(i+1,j,k) - seisvar%vz(i,j,k) ) / domain%dx 
-    !                     dvy_dy = (seisvar%vy(i,j,k) - seisvar%vy(i,j-1,k) ) / domain%dy
-    !                     dvx_dy = (seisvar%vx(i,j,k) - seisvar%vx(i,j-1,k) ) / domain%dy
-    !                     dvz_dy = (seisvar%vz(i,j,k) - seisvar%vz(i,j-1,k) ) / domain%dy
-    !                     dvz_dz = (seisvar%vz(i,j,k) - seisvar%vz(i,j,k-1) ) / domain%dz
-    !                     dvx_dz = (seisvar%vx(i,j,k) - seisvar%vx(i,j,k-1) ) / domain%dz
-    !                     dvy_dz = (seisvar%vy(i,j,k) - seisvar%vy(i,j,k-1) ) / domain%dz
-
-    !                     seisvar%memdvx_dx(i,j,k) = b_x_half(i) * seisvar%memdvx_dx(i,j,k) + a_x_half(i) * dvx_dx
-    !                     seisvar%memdvy_dx(i,j,k) = b_x_half(i) * seisvar%memdvy_dx(i,j,k) + a_x_half(i) * dvy_dx
-    !                     seisvar%memdvz_dx(i,j,k) = b_x_half(i) * seisvar%memdvz_dx(i,j,k) + a_x_half(i) * dvz_dx
-    !                     seisvar%memdvy_dy(i,j,k) = b_y(j) * seisvar%memdvy_dy(i,j,k) + a_y(j) * dvy_dy
-    !                     seisvar%memdvx_dy(i,j,k) = b_y(j) * seisvar%memdvx_dy(i,j,k) + a_y(j) * dvx_dy
-    !                     seisvar%memdvz_dy(i,j,k) = b_y(j) * seisvar%memdvz_dy(i,j,k) + a_y(j) * dvz_dy
-    !                     seisvar%memdvz_dz(i,j,k) = b_z(k) * seisvar%memdvz_dz(i,j,k) + a_z(k) * dvz_dz
-    !                     seisvar%memdvx_dz(i,j,k) = b_z(k) * seisvar%memdvx_dz(i,j,k) + a_z(k) * dvx_dz
-    !                     seisvar%memdvy_dz(i,j,k) = b_z(k) * seisvar%memdvy_dz(i,j,k) + a_z(k) * dvy_dz
-
-    !                     dvx_dx = dvx_dx / K_x_half(i) + seisvar%memdvx_dx(i,j,k)
-    !                     dvy_dx = dvy_dx / K_x_half(i) + seisvar%memdvy_dx(i,j,k)
-    !                     dvz_dx = dvz_dx / K_x_half(i) + seisvar%memdvz_dx(i,j,k)
-    !                     dvy_dy = dvy_dy / K_y(j) + seisvar%memdvy_dy(i,j,k)
-    !                     dvx_dy = dvx_dy / K_y(j) + seisvar%memdvx_dy(i,j,k)
-    !                     dvz_dy = dvz_dy / K_y(j) + seisvar%memdvz_dy(i,j,k)
-    !                     dvz_dz = dvz_dz / K_z(k) + seisvar%memdvz_dz(i,j,k)
-    !                     dvx_dz = dvx_dz / K_z(k) + seisvar%memdvx_dz(i,j,k)
-    !                     dvy_dz = dvy_dz / K_z(k) + seisvar%memdvy_dz(i,j,k)
-
-    !                     seisvar%sigxx(i,j,k) = seisvar%sigxx(i,j,k) + &
-    !                     (   c11(i,k) * dvx_dx + c12(i,k) * dvy_dy + c13(i,k) * dvz_dz + &
-    !                         c14(i,k) * (dvy_dz + dvz_dy) + c15(i,k) * (dvx_dz + dvz_dx) + &
-    !                         c16(i,k) * (dvx_dy + dvz_dy) ) * source%dt
-
-    !                     ! Full 3D will need a gradient in the y-direction
-    !                     seisvar%sigyy(i,j,k) = seisvar%sigyy(i,j,k) + &
-    !                     (   c12(i,k) * dvx_dx + c22(i,k) * dvy_dy + c23(i,k) * dvz_dz + &
-    !                         c24(i,k) * (dvy_dz + dvz_dy) + c25(i,k) * (dvx_dz + dvz_dx) + &
-    !                         c26(i,k) * (dvy_dx + dvx_dy) ) * source%dt
-
-    !                     seisvar%sigzz(i,j,k) = seisvar%sigzz(i,j,k) + &
-    !                     (   c13(i,k) * dvx_dx + c23(i,k) * dvy_dy + c33(i,k) * dvz_dz + &
-    !                         c34(i,k) * (dvy_dz + dvz_dy) + c35(i,k) * (dvx_dz + dvz_dx) + &
-    !                         c36(i,k) * (dvy_dx + dvx_dy) ) * source%dt
-
-    !                 enddo
-    !             enddo
-    !         enddo
-
-    !         ! Update sigmaxy, x-direction is full nodes
-    !         do k = 2,domain%nz
-    !             do j = 1,domain%ny-1
-    !                 do i = 2,domain%nx
-
-    !                     dvx_dx = (seisvar%vx(i,j,k) - seisvar%vx(i-1,j,k)) / domain%dx
-    !                     dvy_dx = (seisvar%vy(i,j,k) - seisvar%vy(i-1,j,k)) / domain%dx
-    !                     dvz_dx = (seisvar%vz(i,j,k) - seisvar%vz(i-1,j,k)) / domain%dx
-    !                     dvy_dy = (seisvar%vy(i,j+1,k) - seisvar%vy(i,j,k)) / domain%dy
-    !                     dvx_dy = (seisvar%vx(i,j+1,k) - seisvar%vx(i,j,k)) / domain%dy
-    !                     dvz_dy = (seisvar%vz(i,j+1,k) - seisvar%vz(i,j,k)) / domain%dy
-    !                     dvz_dz = (seisvar%vz(i,j,k) - seisvar%vz(i,j,k-1)) / domain%dz
-    !                     dvx_dz = (seisvar%vx(i,j,k) - seisvar%vx(i,j,k-1)) / domain%dz
-    !                     dvy_dz = (seisvar%vy(i,j,k) - seisvar%vy(i,j,k-1)) / domain%dz
-
-    !                     seisvar%memdvx_dx(i,j,k) = b_x(i) * seisvar%memdvx_dx(i,j,k) + a_x(i) * dvx_dx
-    !                     seisvar%memdvy_dx(i,j,k) = b_x(i) * seisvar%memdvy_dx(i,j,k) + a_x(i) * dvy_dx
-    !                     seisvar%memdvz_dx(i,j,k) = b_x(i) * seisvar%memdvz_dx(i,j,k) + a_x(i) * dvz_dx
-    !                     seisvar%memdvy_dy(i,j,k) = b_y_half(j) * seisvar%memdvy_dy(i,j,k) + a_y_half(j) * dvy_dy
-    !                     seisvar%memdvx_dy(i,j,k) = b_y_half(j) * seisvar%memdvx_dy(i,j,k) + a_y_half(j) * dvx_dy
-    !                     seisvar%memdvz_dy(i,j,k) = b_y_half(j) * seisvar%memdvz_dy(i,j,k) + a_y_half(j) * dvz_dy
-    !                     seisvar%memdvz_dz(i,j,k) = b_z_half(k) * seisvar%memdvz_dz(i,j,k) + a_z_half(k) * dvz_dz
-    !                     seisvar%memdvx_dz(i,j,k) = b_z_half(k) * seisvar%memdvx_dz(i,j,k) + a_z_half(k) * dvx_dz
-    !                     seisvar%memdvy_dz(i,j,k) = b_z_half(k) * seisvar%memdvy_dz(i,j,k) + a_z_half(k) * dvy_dz
-
-    !                     dvx_dx = dvx_dx / K_x(i) + seisvar%memdvx_dx(i,j,k)
-    !                     dvy_dx = dvy_dx / K_x(i) + seisvar%memdvy_dx(i,j,k)
-    !                     dvy_dy = dvy_dy / K_y_half(j) + seisvar%memdvy_dy(i,j,k)
-    !                     dvx_dy = dvx_dy / K_y_half(j) + seisvar%memdvx_dy(i,j,k)
-    !                     dvz_dy = dvz_dy / K_y_half(j) + seisvar%memdvz_dy(i,j,k)
-    !                     dvz_dz = dvz_dz / K_z_half(k) + seisvar%memdvz_dz(i,j,k)
-    !                     dvy_dz = dvy_dz / K_z_half(k) + seisvar%memdvy_dz(i,j,k)
-
-    !                     seisvar%sigxy(i,j,k) = seisvar%sigxy(i,j,k) + &
-    !                     (   c16(i,k) * dvx_dx + c26(i,k) * dvy_dy + c36(i,k) * dvz_dz + &
-    !                         c46(i,k) * (dvz_dy + dvy_dz) + c56(i,k) * (dvz_dx + dvx_dz) + &
-    !                         c66(i,k) * (dvy_dx + dvx_dy) ) * source%dt
-
-    !                 enddo
-    !             enddo
-    !         enddo
-
-    !         ! Update sigmaxz, z-direction is full nodes
-    !         do k = 1,domain%nz-1
-    !             do j = 2,domain%ny
-    !                 do i = 2,domain%nx
-
-    !                     dvx_dx = (seisvar%vx(i,j,k) - seisvar%vx(i-1,j,k)) / domain%dx
-    !                     dvy_dx = (seisvar%vy(i,j,k) - seisvar%vy(i-1,j,k)) / domain%dx
-    !                     dvz_dx = (seisvar%vz(i,j,k) - seisvar%vz(i-1,j,k)) / domain%dx
-    !                     dvy_dy = (seisvar%vy(i,j,k) - seisvar%vy(i,j-1,k)) / domain%dy
-    !                     dvz_dy = (seisvar%vz(i,j,k) - seisvar%vz(i,j-1,k)) / domain%dy
-    !                     dvx_dy = (seisvar%vx(i,j,k) - seisvar%vx(i,j-1,k)) / domain%dy
-    !                     dvz_dz = (seisvar%vz(i,j,k+1) - seisvar%vz(i,j,k)) / domain%dz
-    !                     dvx_dz = (seisvar%vx(i,j,k+1) - seisvar%vx(i,j,k)) / domain%dz
-    !                     dvy_dz = (seisvar%vy(i,j,k+1) - seisvar%vy(i,j,k)) / domain%dz
-
-    !                     seisvar%memdvx_dx(i,j,k) = b_x(i) * seisvar%memdvx_dx(i,j,k) + a_x(i) * dvx_dx
-    !                     seisvar%memdvy_dx(i,j,k) = b_x(i) * seisvar%memdvy_dx(i,j,k) + a_x(i) * dvy_dx
-    !                     seisvar%memdvz_dx(i,j,k) = b_x(i) * seisvar%memdvz_dx(i,j,k) + a_x(i) * dvz_dx
-    !                     seisvar%memdvy_dy(i,j,k) = b_y(j) * seisvar%memdvy_dy(i,j,k) + a_y(j) * dvy_dy
-    !                     seisvar%memdvx_dy(i,j,k) = b_y(j) * seisvar%memdvx_dy(i,j,k) + a_y(j) * dvx_dy
-    !                     seisvar%memdvz_dy(i,j,k) = b_y(j) * seisvar%memdvz_dy(i,j,k) + a_y(j) * dvz_dy
-    !                     seisvar%memdvz_dz(i,j,k) = b_z_half(k) * seisvar%memdvz_dz(i,j,k) + a_z_half(k) * dvz_dz
-    !                     seisvar%memdvx_dz(i,j,k) = b_z_half(k) * seisvar%memdvx_dz(i,j,k) + a_z_half(k) * dvx_dz
-    !                     seisvar%memdvy_dz(i,j,k) = b_z_half(k) * seisvar%memdvy_dz(i,j,k) + a_z_half(k) * dvy_dz
-
-    !                     dvx_dx = dvx_dx / K_x(i) + seisvar%memdvx_dx(i,j,k)
-    !                     dvy_dx = dvy_dx / K_x(i) + seisvar%memdvy_dx(i,j,k)
-    !                     dvz_dx = dvz_dx / K_x(i) + seisvar%memdvz_dx(i,j,k) 
-    !                     dvy_dy = dvy_dy / K_y(j) + seisvar%memdvy_dy(i,j,k)
-    !                     dvx_dy = dvx_dy / K_y(j) + seisvar%memdvx_dy(i,j,k)
-    !                     dvz_dy = dvz_dy / K_y(j) + seisvar%memdvz_dy(i,j,k)
-    !                     dvz_dz = dvz_dz / K_z_half(k) + seisvar%memdvz_dz(i,j,k)
-    !                     dvx_dz = dvx_dz / K_z_half(k) + seisvar%memdvx_dz(i,j,k)
-    !                     dvy_dz = dvy_dz / K_z_half(k) + seisvar%memdvy_dz(i,j,k)
-
-    !                     seisvar%sigxz(i,j,k) = seisvar%sigxz(i,j,k) + &
-    !                         (   c15(i,k) * dvx_dx + c25(i,k) * dvy_dy + c35(i,k) * dvz_dz + &
-    !                             c45(i,k) * ( dvx_dz + dvz_dx) + c55(i,k) * ( dvx_dz + dvz_dx) + &
-    !                             c56(i,k) * ( dvx_dy + dvy_dx) ) * source%dt 
-
-    !                 enddo
-    !             enddo
-
-    !             !   ! update sigmayz, y-direction is full nodes
-    !             do j = 1,domain%ny-1
-    !                 do i = 1,domain%nx-1
-
-    !                     dvx_dx = (seisvar%vx(i+1,j,k) - seisvar%vx(i,j,k)) / domain%DX
-    !                     dvy_dx = (seisvar%vy(i+1,j,k) - seisvar%vy(i,j,k)) / domain%DX
-    !                     dvz_dx = (seisvar%vz(i+1,j,k) - seisvar%vz(i,j,k)) / domain%DX
-    !                     dvy_dy = (seisvar%vy(i,j+1,k) - seisvar%vy(i,j,k)) / domain%DY
-    !                     dvx_dy = (seisvar%vx(i,j+1,k) - seisvar%vx(i,j,k)) / domain%DY
-    !                     dvz_dy = (seisvar%vz(i,j+1,k) - seisvar%vz(i,j,k)) / domain%DY
-    !                     dvz_dz = (seisvar%vz(i,j,k+1) - seisvar%vz(i,j,k)) / domain%DZ
-    !                     dvx_dz = (seisvar%vx(i,j,k+1) - seisvar%vx(i,j,k)) / domain%DZ 
-    !                     dvy_dz = (seisvar%vy(i,j,k+1) - seisvar%vy(i,j,k)) / domain%DZ
-
-    !                     seisvar%memdvx_dx(i,j,k) = b_x_half(i) * seisvar%memdvx_dx(i,j,k) + a_x_half(i) * dvx_dx
-    !                     seisvar%memdvy_dx(i,j,k) = b_x_half(i) * seisvar%memdvy_dx(i,j,k) + a_x_half(i) * dvy_dx
-    !                     seisvar%memdvz_dx(i,j,k) = b_x_half(i) * seisvar%memdvz_dx(i,j,k) + a_x_half(i) * dvz_dx
-    !                     seisvar%memdvy_dy(i,j,k) = b_y_half(j) * seisvar%memdvy_dy(i,j,k) + a_y_half(j) * dvy_dy
-    !                     seisvar%memdvx_dy(i,j,k) = b_y_half(j) * seisvar%memdvx_dy(i,j,k) + a_y_half(j) * dvx_dy
-    !                     seisvar%memdvz_dy(i,j,k) = b_y_half(j) * seisvar%memdvz_dy(i,j,k) + a_y_half(j) * dvz_dy
-    !                     seisvar%memdvz_dz(i,j,k) = b_z_half(k) * seisvar%memdvz_dz(i,j,k) + a_z_half(k) * dvz_dz
-    !                     seisvar%memdvx_dz(i,j,k) = b_z_half(k) * seisvar%memdvx_dz(i,j,k) + a_z_half(k) * dvx_dz
-    !                     seisvar%memdvy_dz(i,j,k) = b_z_half(k) * seisvar%memdvy_dz(i,j,k) + a_z_half(k) * dvy_dz
-
-    !                     dvx_dx = dvx_dx / K_x_half(i) + seisvar%memdvx_dx(i,j,k)
-    !                     dvy_dx = dvy_dx / K_x_half(i) + seisvar%memdvy_dx(i,j,k)
-    !                     dvz_dx = dvz_dx / K_x_half(i) + seisvar%memdvz_dx(i,j,k)
-    !                     dvy_dy = dvy_dy / K_y_half(j) + seisvar%memdvy_dy(i,j,k)
-    !                     dvx_dy = dvx_dy / K_y_half(j) + seisvar%memdvx_dy(i,j,k)
-    !                     dvz_dy = dvz_dy / K_y_half(j) + seisvar%memdvz_dy(i,j,k)
-    !                     dvz_dz = dvz_dz / K_z_half(k) + seisvar%memdvz_dz(i,j,k)
-    !                     dvx_dz = dvx_dz / K_z_half(k) + seisvar%memdvx_dz(i,j,k)
-    !                     dvy_dz = dvy_dz / K_z_half(k) + seisvar%memdvy_dz(i,j,k)
-
-    !                     seisvar%sigyz(i,j,k) = seisvar%sigyz(i,j,k)  + &
-    !                         (   c14(i,k) * dvx_dx + c24(i,k) * dvy_dy + c34(i,k) * dvz_dz + &
-    !                             c44(i,k) * ( dvy_dz + dvz_dy) + c45(i,k) * ( dvx_dz + dvz_dx) + &
-    !                             c46(i,k) * ( dvy_dx + dvx_dy) ) * source%dt 
-    !                 enddo
-    !             enddo
-    !         enddo
-
-    !         !--------------------------------------------------------
-    !         ! compute velocity and update memory variables for C-PML
-    !         !--------------------------------------------------------
-    !         do k = 2,domain%nz
-    !             do j = 2,domain%ny
-    !                 do i = 2,domain%nx
-    !                     ! ds1/dx, ds6/dy, ds5,dz
-    !                     deltarho = (4 * rho(i,k) + rho(i-1,k) + rho(i,k-1) )/6
-
-    !                     dsigmaxx_dx = (seisvar%sigxx(i,j,k) - seisvar%sigxx(i-1,j,k) ) / domain%dx
-    !                     dsigmaxy_dy = (seisvar%sigxy(i,j,k) - seisvar%sigxy(i,j-1,k) ) / domain%dy
-    !                     dsigmaxz_dz = (seisvar%sigxz(i,j,k) - seisvar%sigxz(i,j,k-1) ) / domain%dz
-
-    !                     seisvar%memdsigxx_dx(i,j,k) = b_x(i) * &
-    !                         seisvar%memdsigxx_dx(i,j,k) + a_x(i) * dsigmaxx_dx
-    !                     seisvar%memdsigxy_dy(i,j,k) = b_y(j) * &
-    !                         seisvar%memdsigxy_dy(i,j,k) + a_y(j) * dsigmaxy_dy
-    !                     seisvar%memdsigxz_dz(i,j,k) = b_z(k) * &
-    !                         seisvar%memdsigxz_dz(i,j,k) + a_z(k) * dsigmaxz_dz
-
-    !                     dsigmaxx_dx = dsigmaxx_dx / K_x(i) + seisvar%memdsigxx_dx(i,j,k)
-    !                     dsigmaxy_dy = dsigmaxy_dy / K_y(j) + seisvar%memdsigxy_dy(i,j,k)
-    !                     dsigmaxz_dz = dsigmaxz_dz / K_z(k) + seisvar%memdsigxz_dz(i,j,k) 
-
-    !                     seisvar%vx(i,j,k) = seisvar%vx(i,j,k) * (1 - gammax(i,j) ) + &
-    !                         (dsigmaxx_dx + dsigmaxy_dy + dsigmaxz_dz) * &
-    !                         source%dt / deltarho !rho(i,k)
-    !                 enddo
-    !             enddo
-
-    !             do j = 1,domain%ny-1
-    !                 do i = 1,domain%nx-1
-    !                     ! ds6/dx, ds2/dy, ds4/dz
-    !                     deltarho = (4*rho(i,k) + rho(i+1,k) + rho(i,k-1) )/6
-
-    !                     dsigmaxy_dx = ( seisvar%sigxy(i+1,j,k) - seisvar%sigxy(i,j,k) ) / domain%dx
-    !                     dsigmayy_dy = ( seisvar%sigyy(i,j+1,k) - seisvar%sigyy(i,j,k) ) / domain%dy
-    !                     dsigmayz_dz = ( seisvar%sigyz(i,j,k) - seisvar%sigyz(i,j,k-1) ) / domain%dz
-
-    !                     seisvar%memdsigxy_dx(i,j,k) = b_x_half(i) * seisvar%memdsigxy_dx(i,j,k) + a_x_half(i) * dsigmaxy_dx
-    !                     seisvar%memdsigyy_dy(i,j,k) = b_y_half(j) * seisvar%memdsigyy_dy(i,j,k) + a_y_half(j) * dsigmayy_dy
-    !                     seisvar%memdsigyz_dz(i,j,k) = b_z(k) * seisvar%memdsigyz_dz(i,j,k) + a_z(k) * dsigmayz_dz
-
-    !                     dsigmaxy_dx = dsigmaxy_dx / K_x_half(i) + seisvar%memdsigxy_dx(i,j,k)
-    !                     dsigmayy_dy = dsigmayy_dy / K_y_half(j) + seisvar%memdsigyy_dy(i,j,k)
-    !                     dsigmayz_dz = dsigmayz_dz / K_z(k) + seisvar%memdsigyz_dz(i,j,k)
-
-    !                     seisvar%vy(i,j,k) = seisvar%vy(i,j,k) * (1 - gammay(i,j) )+ &
-    !                         (dsigmaxy_dx + dsigmayy_dy + dsigmayz_dz) * &
-    !                         source%dt / deltarho !rho(i,k)
-    !                 enddo
-    !             enddo
-    !         enddo
-
-    !         do k = 1,domain%nz-1
-    !             do j = 2,domain%ny
-    !                 do i = 1,domain%nx-1
-    !                     ! ds5/dx, ds4/dy, ds3/dz
-    !                     deltarho = ( rho(i+1,k) + rho(i,k+1) + 4*rho(i,k) )/6
-
-    !                     dsigmaxz_dx = ( seisvar%sigxz(i+1,j,k) - seisvar%sigxz(i,j,k) ) / domain%dx
-    !                     dsigmayz_dy = ( seisvar%sigyz(i,j,k) - seisvar%sigyz(i,j-1,k) ) / domain%dy
-    !                     dsigmazz_dz = ( seisvar%sigzz(i,j,k+1) - seisvar%sigzz(i,j,k) ) / domain%dz
-
-    !                     seisvar%memdsigxz_dx(i,j,k) = b_x_half(i) * seisvar%memdsigxz_dx(i,j,k) + a_x_half(i) * dsigmaxz_dx
-    !                     seisvar%memdsigyz_dy(i,j,k) = b_y(j) * seisvar%memdsigyz_dy(i,j,k) + a_y(j) * dsigmayz_dy
-    !                     seisvar%memdsigzz_dz(i,j,k) = b_z_half(k) * seisvar%memdsigzz_dz(i,j,k) + a_z_half(k) * dsigmazz_dz
-
-    !                     dsigmaxz_dx = dsigmaxz_dx / K_x_half(i) + seisvar%memdsigxz_dx(i,j,k)
-    !                     dsigmayz_dy = dsigmayz_dy / K_y(j) + seisvar%memdsigyz_dy(i,j,k)
-    !                     dsigmazz_dz = dsigmazz_dz / K_z_half(k) + seisvar%memdsigzz_dz(i,j,k)
-
-    !                     seisvar%vz(i,j,k) = seisvar%vz(i,j,k) * (1 - gammaz(i,j) )+ &
-    !                         (dsigmaxz_dx + dsigmayz_dy + dsigmazz_dz) * &
-    !                         source%dt / deltarho !rho(i,k)
-
-    !                 enddo
-    !             enddo
-    !         enddo
-
-    !         seisvar%vx(isource,jsource,ksource) = seisvar%vx(isource,jsource,ksource) + &
-    !                 srcx(it) * source%dt / rho(isource,ksource)
-    !         seisvar%vy(isource,jsource,ksource) = seisvar%vy(isource,jsource,ksource) + &
-    !                 srcy(it) * source%dt / rho(isource,ksource)
-    !         seisvar%vz(isource,jsource,ksource) = seisvar%vz(isource,jsource,ksource) + &
-    !                 srcz(it) * source%dt / rho(isource,ksource)
-
-    !         ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-    !         seisvar%vx(1,:,:) = 0.d0
-    !         seisvar%vy(1,:,:) = 0.d0
-    !         seisvar%vz(1,:,:) = 0.d0
-
-    !         seisvar%vx(:,1,:) = 0.d0
-    !         seisvar%vy(:,1,:) = 0.d0
-    !         seisvar%vz(:,1,:) = 0.d0
-
-    !         seisvar%vx(:,:,1) = 0.d0
-    !         seisvar%vy(:,:,1) = 0.d0
-    !         seisvar%vz(:,:,1) = 0.d0
-
-    !         seisvar%vx(domain%nx,:,:) = 0.d0
-    !         seisvar%vy(domain%nx,:,:) = 0.d0
-    !         seisvar%vz(domain%nx,:,:) = 0.d0
-
-    !         seisvar%vx(:,domain%ny,:) = 0.d0
-    !         seisvar%vy(:,domain%ny,:) = 0.d0
-    !         seisvar%vz(:,domain%ny,:) = 0.d0
-
-    !         seisvar%vx(:,:,domain%nz) = 0.d0
-    !         seisvar%vy(:,:,domain%nz) = 0.d0
-    !         seisvar%vz(:,:,domain%nz) = 0.d0
-
-    !         ! check norm of velocity to make sure the solution isn't diverging
-    !         velocnorm = maxval( sqrt(seisvar%vx**2 + seisvar%vy**2 + seisvar%vz**2) )
-    !         ! print *,'Time step # ',it,' out of ',time_step
-    !         ! print *,'Time: ',(it-1)*DT,' seconds'
-    !         ! print *,'Max vals for vx, vy, vz: ', maxval(vx), maxval(vy), maxval(vz)
-
-    !         if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
-
-    !         ! Write the velocity values to an unformatted binary file
-    !         call write_image3(seisvar%vx, domain%nx, domain%ny, domain%nz, source, it, 'Vx', SINGLE)
-    !         call write_image3(seisvar%vy, domain%nx, domain%ny, domain%nz, source, it, 'Vy', SINGLE)
-    !         call write_image3(seisvar%vz, domain%nx, domain%ny, domain%nz, source, it, 'Vz', SINGLE)
-    !         ! Now write the stress Values
-    !         ! call write_image3(sigmaxx, nx, ny, nz, it, 'S1')
-    !         ! call write_image3(sigmayy, nx, ny, nz, it, 'S2')
-    !         ! call write_image3(sigmazz, nx, ny, nz, it, 'S3')
-    !         ! call write_image3(sigmaxy, nx, ny, nz, it, 'S6')
-    !         ! call write_image3(sigmayz, nx, ny, nz, it, 'S4')
-    !         ! call write_image3(sigmaxz, nx, ny, nz, it, 'S5')
-
-    !     enddo   ! end of time loop
-    ! end subroutine seismic25
+        ! Arrays for the PML damping factors
+        real(real64), allocatable :: gammax(:,:), gammay(:,:), gammaz(:,:)
+
+        ! Source arrays
+        real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
+        
+        real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), &
+                        sigmaxx(:,:,:), sigmaxy(:,:,:), sigmaxz(:,:,:), &
+                        sigmayy(:,:,:), sigmayz(:,:,:), sigmazz(:,:,:)
+        real(real64), allocatable :: &
+                memory_dvx_dx(:,:,:), memory_dvx_dy(:,:,:), memory_dvx_dz(:,:,:), &
+                memory_dvy_dx(:,:,:), memory_dvy_dy(:,:,:), memory_dvy_dz(:,:,:), &
+                memory_dvz_dx(:,:,:), memory_dvz_dy(:,:,:), memory_dvz_dz(:,:,:), &
+                memory_dsigmaxx_dx(:,:,:), memory_dsigmayy_dy(:,:,:), memory_dsigmazz_dz(:,:,:), &
+                memory_dsigmaxy_dx(:,:,:), memory_dsigmaxy_dy(:,:,:), memory_dsigmaxz_dx(:,:,:), &
+                memory_dsigmaxz_dz(:,:,:), memory_dsigmayz_dy(:,:,:), memory_dsigmayz_dz(:,:,:)
+        
+        integer :: nx, ny, nz
+        real(real64) :: dx, dy, dz, dt    
+        
+        ! Boolean flag to save as double precision or single precision
+        logical :: SINGLE
+    
+        ! The default data output is single precision unless SINGLE_OUTPUT is 
+        ! set to .FALSE.
+        if (present(SINGLE_OUTPUT)) then 
+            SINGLE = SINGLE_OUTPUT 
+        else
+            SINGLE = .TRUE.
+        endif
+        
+         
+        
+        nx = domain%nx
+        ny = domain%ny 
+        nz = domain%nz 
+        dt = dt 
+        dx = domain%dx
+        dy = domain%dy 
+        dz = domain%dz
+        
+        ! ----------------------- Allocate Arrays ----------------------------
+        allocate(c11(nx, nz), c12(nx, nz), c13(nx,nz), c14(nx,nz), c15(nx,nz), c16(nx,nz), &
+                              c22(nx, nz), c23(nx,nz), c24(nx,nz), c25(nx,nz), c26(nx,nz), &
+                                           c33(nx,nz), c34(nx,nz), c35(nx,nz), c36(nx,nz), &
+                                                       c44(nx,nz), c45(nx,nz), c46(nx,nz), &
+                                                                   c55(nx,nz), c56(nx,nz), &
+                                                                               c66(nx,nz) )
+                
+        allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
+                K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
+        allocate(K_y(ny), alpha_y(ny), a_y(ny), b_y(ny), &
+                K_y_half(ny), alpha_y_half(ny), a_y_half(ny), b_y_half(ny))
+        allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
+                K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
+        allocate(gammax(nx, nz), gammay(nx, nz), gammaz(nx, nz))
+        allocate(srcx(source%time_steps), srcz(source%time_steps))
+                
+        ! Allocate more
+        allocate(memory_dvx_dx(nx, ny, nz), memory_dvx_dz(nx, ny, nz))
+        allocate(memory_dvz_dx(nx, ny, nz), memory_dvz_dz(nx, ny, nz))
+        allocate(memory_dsigmaxx_dx(nx, ny, nz), memory_dsigmazz_dz(nx, ny, nz))
+        allocate(memory_dsigmaxz_dx(nx, ny, nz), memory_dsigmaxz_dz(nx, ny, nz))
+        
+        allocate(memory_dvx_dx(nx,ny,nz), memory_dvx_dy(nx,ny,nz), memory_dvx_dz(nx,ny,nz) )
+        allocate(memory_dvy_dx(nx,ny,nz), memory_dvy_dy(nx,ny,nz), memory_dvy_dz(nx,ny,nz) )
+        allocate(memory_dvz_dx(nx,ny,nz), memory_dvz_dy(nx,ny,nz), memory_dvz_dz(nx,ny,nz) )
+        allocate(memory_dsigmaxx_dx(nx,ny,nz), memory_dsigmayy_dy(nx,ny,nz), memory_dsigmazz_dz(nx,ny,nz) )
+        allocate(memory_dsigmaxy_dx(nx,ny,nz), memory_dsigmaxy_dy(nx,ny,nz), memory_dsigmaxz_dx(nx,ny,nz) )
+        allocate(memory_dsigmaxz_dz(nx,ny,nz), memory_dsigmayz_dy(nx,ny,nz), memory_dsigmayz_dz(nx,ny,nz) )
+        
+        
+        allocate(vx(nx, ny, nz), vy(nx, ny, nz), vz(nx, ny, nz))
+        allocate(sigmaxx(nx, ny, nz), sigmaxy(nx, ny, nz), sigmaxz(nx, ny, nz))
+        allocate(sigmayy(nx, ny, nz), sigmayz(nx, ny, nz), sigmazz(nx, ny, nz))
+                
+        
+        ! ------------------------ Load Stiffness Coefficients ------------------------
+            call material_rw2('c11.dat', c11, .TRUE.)
+            call material_rw2('c12.dat', c12, .TRUE.)
+            call material_rw2('c13.dat', c13, .TRUE.)
+            call material_rw2('c14.dat', c14, .TRUE.)
+            call material_rw2('c15.dat', c15, .TRUE.)
+            call material_rw2('c16.dat', c16, .TRUE.)
+            call material_rw2('c22.dat', c22, .TRUE.)
+            call material_rw2('c23.dat', c23, .TRUE.)
+            call material_rw2('c24.dat', c24, .TRUE.)
+            call material_rw2('c25.dat', c25, .TRUE.)
+            call material_rw2('c26.dat', c26, .TRUE.)
+            call material_rw2('c33.dat', c33, .TRUE.)
+            call material_rw2('c34.dat', c34, .TRUE.)
+            call material_rw2('c35.dat', c35, .TRUE.)
+            call material_rw2('c36.dat', c36, .TRUE.)
+            call material_rw2('c44.dat', c44, .TRUE.)
+            call material_rw2('c45.dat', c45, .TRUE.)
+            call material_rw2('c46.dat', c46, .TRUE.)
+            call material_rw2('c55.dat', c55, .TRUE.)
+            call material_rw2('c56.dat', c56, .TRUE.)
+            call material_rw2('c66.dat', c66, .TRUE.)
+            call material_rw2('rho.dat', rho, .TRUE.)
+        
+        ! ------------------- Load Attenuation Coefficients --------------------
+            call material_rw2('gamma_x.dat', gammax, .TRUE.)
+            call material_rw2('gamma_z.dat', gammaz, .TRUE.)
+            call material_rw2('gamma_y.dat', gammay, .TRUE.)
+        
+        ! ------------------------ Assign some constants -----------------------
+        isource = source%xind + domain%cpml
+        jsource = source%yind + domain%cpml
+        ksource = source%zind + domain%cpml
+
+        ! ================================ LOAD SOURCE ================================
+
+            call loadsource('seismicsourcex.dat', source%time_steps, srcx)
+            call loadsource('seismicsourcey.dat', source%time_steps, srcy)
+            call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+
+        ! ==================================== PML ====================================
+        ! Initialize PML 
+            K_x(:) = 1.d0
+            K_x_half(:) = 1.d0
+            alpha_x(:) = 0.d0
+            alpha_x_half(:) = 0.d0
+            a_x(:) = 0.d0
+            a_x_half(:) = 0.d0
+
+            K_y(:) = 1.d0
+            K_y_half(:) = 1.d0
+            alpha_y(:) = 0.d0
+            alpha_y_half(:) = 0.d0
+            a_y(:) = 0.d0
+            a_y_half(:) = 0.d0
+
+            K_z(:) = 1.d0
+            K_z_half(:) = 1.d0 
+            alpha_z(:) = 0.d0
+            alpha_z_half(:) = 0.d0
+            a_z(:) = 0.d0
+            a_z_half(:) = 0.d0
+
+        ! ------------------------- Boundary Conditions -------------------------
+            call loadcpml('kappax_cpml.dat', K_x)
+            call loadcpml('alphax_cpml.dat', alpha_x)
+            call loadcpml('acoefx_cpml.dat', a_x)
+            call loadcpml('bcoefx_cpml.dat', b_x)
+
+            call loadcpml('kappay_cpml.dat', K_y)
+            call loadcpml('alphay_cpml.dat', alpha_y)
+            call loadcpml('acoefy_cpml.dat', a_y)
+            call loadcpml('bcoefy_cpml.dat', b_y)
+
+            call loadcpml('kappaz_cpml.dat', K_z)
+            call loadcpml('alphaz_cpml.dat', alpha_z)
+            call loadcpml('acoefz_cpml.dat', a_z)
+            call loadcpml('bcoefz_cpml.dat', b_z)
+
+            call loadcpml('kappax_half_cpml.dat', K_x_half)
+            call loadcpml('alphax_half_cpml.dat', alpha_x_half)
+            call loadcpml('acoefx_half_cpml.dat', a_x_half)
+            call loadcpml('bcoefx_half_cpml.dat', b_x_half)
+
+            call loadcpml('kappay_half_cpml.dat', K_y_half)
+            call loadcpml('alphay_half_cpml.dat', alpha_y_half)
+            call loadcpml('acoefy_half_cpml.dat', a_y_half)
+            call loadcpml('bcoefy_half_cpml.dat', b_y_half)
+
+            call loadcpml('kappaz_half_cpml.dat', K_z_half)
+            call loadcpml('alphaz_half_cpml.dat', alpha_z_half)
+            call loadcpml('acoefz_half_cpml.dat', a_z_half)
+            call loadcpml('bcoefz_half_cpml.dat', b_z_half)
+
+        ! Load initial condition
+            call material_rw3('initialconditionVx.dat', vx, .TRUE.)
+            call material_rw3('initialconditionVy.dat', vy, .TRUE.)
+            call material_rw3('initialconditionVz.dat', vz, .TRUE.)
+
+        ! Initialize the stress values
+            sigmaxx(:,:,:) = 0.d0
+            sigmayy(:,:,:) = 0.d0
+            sigmazz(:,:,:) = 0.d0
+            sigmaxy(:,:,:) = 0.d0
+            sigmaxz(:,:,:) = 0.d0
+            sigmayz(:,:,:) = 0.d0
+
+            ! PML
+            memory_dvx_dx(:,:,:) = 0.d0
+            memory_dvx_dy(:,:,:) = 0.d0
+            memory_dvx_dz(:,:,:) = 0.d0
+
+            memory_dvy_dx(:,:,:) = 0.d0
+            memory_dvy_dy(:,:,:) = 0.d0
+            memory_dvy_dz(:,:,:) = 0.d0
+
+            memory_dvz_dx(:,:,:) = 0.d0
+            memory_dvz_dy(:,:,:) = 0.d0 
+            memory_dvz_dz(:,:,:) = 0.d0
+
+            memory_dsigmaxx_dx(:,:,:) = 0.d0
+            memory_dsigmayy_dy(:,:,:) = 0.d0
+            memory_dsigmazz_dz(:,:,:) = 0.d0
+            memory_dsigmaxy_dx(:,:,:) = 0.d0
+            memory_dsigmaxy_dy(:,:,:) = 0.d0
+            memory_dsigmaxz_dx(:,:,:) = 0.d0
+            memory_dsigmaxz_dz(:,:,:) = 0.d0
+            memory_dsigmayz_dy(:,:,:) = 0.d0
+            memory_dsigmayz_dz(:,:,:) = 0.d0
+
+        ! Do it 
+        
+        ! =============================== Forward Model ===============================
+        do it = 1,source%time_steps
+            !------------------------------------------------------------
+            ! compute stress sigma and update memory variables for C-PML
+            !------------------------------------------------------------
+            ! Update in the x direction
+            do k = 2,nz
+                do j = 2,ny
+                    do i = 1,nx-1
+
+                        dvx_dx = (vx(i+1,j,k) - vx(i,j,k) ) / dx
+                        dvy_dx = (vy(i+1,j,k) - vy(i,j,k) ) / dx
+                        dvz_dx = (vz(i+1,j,k) - vz(i,j,k) ) / dx 
+                        dvy_dy = (vy(i,j,k) - vy(i,j-1,k) ) / dy
+                        dvx_dy = (vx(i,j,k) - vx(i,j-1,k) ) / dy
+                        dvz_dy = (vz(i,j,k) - vz(i,j-1,k) ) / dy
+                        dvz_dz = (vz(i,j,k) - vz(i,j,k-1) ) / dz
+                        dvx_dz = (vx(i,j,k) - vx(i,j,k-1) ) / dz
+                        dvy_dz = (vy(i,j,k) - vy(i,j,k-1) ) / dz
+
+                        memory_dvx_dx(i,j,k) = b_x_half(i) * memory_dvx_dx(i,j,k) + a_x_half(i) * dvx_dx
+                        memory_dvy_dx(i,j,k) = b_x_half(i) * memory_dvy_dx(i,j,k) + a_x_half(i) * dvy_dx
+                        memory_dvz_dx(i,j,k) = b_x_half(i) * memory_dvz_dx(i,j,k) + a_x_half(i) * dvz_dx
+                        memory_dvy_dy(i,j,k) = b_y(j) * memory_dvy_dy(i,j,k) + a_y(j) * dvy_dy
+                        memory_dvx_dy(i,j,k) = b_y(j) * memory_dvx_dy(i,j,k) + a_y(j) * dvx_dy
+                        memory_dvz_dy(i,j,k) = b_y(j) * memory_dvz_dy(i,j,k) + a_y(j) * dvz_dy
+                        memory_dvz_dz(i,j,k) = b_z(k) * memory_dvz_dz(i,j,k) + a_z(k) * dvz_dz
+                        memory_dvx_dz(i,j,k) = b_z(k) * memory_dvx_dz(i,j,k) + a_z(k) * dvx_dz
+                        memory_dvy_dz(i,j,k) = b_z(k) * memory_dvy_dz(i,j,k) + a_z(k) * dvy_dz
+
+                        dvx_dx = dvx_dx / K_x_half(i) + memory_dvx_dx(i,j,k)
+                        dvy_dx = dvy_dx / K_x_half(i) + memory_dvy_dx(i,j,k)
+                        dvz_dx = dvz_dx / K_x_half(i) + memory_dvz_dx(i,j,k)
+                        dvy_dy = dvy_dy / K_y(j) + memory_dvy_dy(i,j,k)
+                        dvx_dy = dvx_dy / K_y(j) + memory_dvx_dy(i,j,k)
+                        dvz_dy = dvz_dy / K_y(j) + memory_dvz_dy(i,j,k)
+                        dvz_dz = dvz_dz / K_z(k) + memory_dvz_dz(i,j,k)
+                        dvx_dz = dvx_dz / K_z(k) + memory_dvx_dz(i,j,k)
+                        dvy_dz = dvy_dz / K_z(k) + memory_dvy_dz(i,j,k)
+
+                        sigmaxx(i,j,k) = sigmaxx(i,j,k) + &
+                        (   c11(i,k) * dvx_dx + c12(i,k) * dvy_dy + c13(i,k) * dvz_dz + &
+                            c14(i,k) * (dvy_dz + dvz_dy) + c15(i,k) * (dvx_dz + dvz_dx) + &
+                            c16(i,k) * (dvx_dy + dvz_dy) ) * dt
+
+                        ! Full 3D will need a gradient in the y-direction
+                        sigmayy(i,j,k) = sigmayy(i,j,k) + &
+                        (   c12(i,k) * dvx_dx + c22(i,k) * dvy_dy + c23(i,k) * dvz_dz + &
+                            c24(i,k) * (dvy_dz + dvz_dy) + c25(i,k) * (dvx_dz + dvz_dx) + &
+                            c26(i,k) * (dvy_dx + dvx_dy) ) * dt
+
+                        sigmazz(i,j,k) = sigmazz(i,j,k) + &
+                        (   c13(i,k) * dvx_dx + c23(i,k) * dvy_dy + c33(i,k) * dvz_dz + &
+                            c34(i,k) * (dvy_dz + dvz_dy) + c35(i,k) * (dvx_dz + dvz_dx) + &
+                            c36(i,k) * (dvy_dx + dvx_dy) ) * dt
+
+                    enddo
+                enddo
+            enddo
+
+            ! Update sigmaxy, x-direction is full nodes
+            do k = 2,nz
+                do j = 1,ny-1
+                    do i = 2,nx
+
+                        dvx_dx = (vx(i,j,k) - vx(i-1,j,k)) / dx
+                        dvy_dx = (vy(i,j,k) - vy(i-1,j,k)) / dx
+                        dvz_dx = (vz(i,j,k) - vz(i-1,j,k)) / dx
+                        dvy_dy = (vy(i,j+1,k) - vy(i,j,k)) / dy
+                        dvx_dy = (vx(i,j+1,k) - vx(i,j,k)) / dy
+                        dvz_dy = (vz(i,j+1,k) - vz(i,j,k)) / dy
+                        dvz_dz = (vz(i,j,k) - vz(i,j,k-1)) / dz
+                        dvx_dz = (vx(i,j,k) - vx(i,j,k-1)) / dz
+                        dvy_dz = (vy(i,j,k) - vy(i,j,k-1)) / dz
+
+                        memory_dvx_dx(i,j,k) = b_x(i) * memory_dvx_dx(i,j,k) + a_x(i) * dvx_dx
+                        memory_dvy_dx(i,j,k) = b_x(i) * memory_dvy_dx(i,j,k) + a_x(i) * dvy_dx
+                        memory_dvz_dx(i,j,k) = b_x(i) * memory_dvz_dx(i,j,k) + a_x(i) * dvz_dx
+                        memory_dvy_dy(i,j,k) = b_y_half(j) * memory_dvy_dy(i,j,k) + a_y_half(j) * dvy_dy
+                        memory_dvx_dy(i,j,k) = b_y_half(j) * memory_dvx_dy(i,j,k) + a_y_half(j) * dvx_dy
+                        memory_dvz_dy(i,j,k) = b_y_half(j) * memory_dvz_dy(i,j,k) + a_y_half(j) * dvz_dy
+                        memory_dvz_dz(i,j,k) = b_z_half(k) * memory_dvz_dz(i,j,k) + a_z_half(k) * dvz_dz
+                        memory_dvx_dz(i,j,k) = b_z_half(k) * memory_dvx_dz(i,j,k) + a_z_half(k) * dvx_dz
+                        memory_dvy_dz(i,j,k) = b_z_half(k) * memory_dvy_dz(i,j,k) + a_z_half(k) * dvy_dz
+
+                        dvx_dx = dvx_dx / K_x(i) + memory_dvx_dx(i,j,k)
+                        dvy_dx = dvy_dx / K_x(i) + memory_dvy_dx(i,j,k)
+                        dvy_dy = dvy_dy / K_y_half(j) + memory_dvy_dy(i,j,k)
+                        dvx_dy = dvx_dy / K_y_half(j) + memory_dvx_dy(i,j,k)
+                        dvz_dy = dvz_dy / K_y_half(j) + memory_dvz_dy(i,j,k)
+                        dvz_dz = dvz_dz / K_z_half(k) + memory_dvz_dz(i,j,k)
+                        dvy_dz = dvy_dz / K_z_half(k) + memory_dvy_dz(i,j,k)
+
+                        sigmaxy(i,j,k) = sigmaxy(i,j,k) + &
+                        (   c16(i,k) * dvx_dx + c26(i,k) * dvy_dy + c36(i,k) * dvz_dz + &
+                            c46(i,k) * (dvz_dy + dvy_dz) + c56(i,k) * (dvz_dx + dvx_dz) + &
+                            c66(i,k) * (dvy_dx + dvx_dy) ) * dt
+
+                    enddo
+                enddo
+            enddo
+
+            ! Update sigmaxz, z-direction is full nodes
+            do k = 1,nz-1
+                do j = 2,ny
+                    do i = 2,nx
+
+                        dvx_dx = (vx(i,j,k) - vx(i-1,j,k)) / dx
+                        dvy_dx = (vy(i,j,k) - vy(i-1,j,k)) / dx
+                        dvz_dx = (vz(i,j,k) - vz(i-1,j,k)) / dx
+                        dvy_dy = (vy(i,j,k) - vy(i,j-1,k)) / dy
+                        dvz_dy = (vz(i,j,k) - vz(i,j-1,k)) / dy
+                        dvx_dy = (vx(i,j,k) - vx(i,j-1,k)) / dy
+                        dvz_dz = (vz(i,j,k+1) - vz(i,j,k)) / dz
+                        dvx_dz = (vx(i,j,k+1) - vx(i,j,k)) / dz
+                        dvy_dz = (vy(i,j,k+1) - vy(i,j,k)) / dz
+
+                        memory_dvx_dx(i,j,k) = b_x(i) * memory_dvx_dx(i,j,k) + a_x(i) * dvx_dx
+                        memory_dvy_dx(i,j,k) = b_x(i) * memory_dvy_dx(i,j,k) + a_x(i) * dvy_dx
+                        memory_dvz_dx(i,j,k) = b_x(i) * memory_dvz_dx(i,j,k) + a_x(i) * dvz_dx
+                        memory_dvy_dy(i,j,k) = b_y(j) * memory_dvy_dy(i,j,k) + a_y(j) * dvy_dy
+                        memory_dvx_dy(i,j,k) = b_y(j) * memory_dvx_dy(i,j,k) + a_y(j) * dvx_dy
+                        memory_dvz_dy(i,j,k) = b_y(j) * memory_dvz_dy(i,j,k) + a_y(j) * dvz_dy
+                        memory_dvz_dz(i,j,k) = b_z_half(k) * memory_dvz_dz(i,j,k) + a_z_half(k) * dvz_dz
+                        memory_dvx_dz(i,j,k) = b_z_half(k) * memory_dvx_dz(i,j,k) + a_z_half(k) * dvx_dz
+                        memory_dvy_dz(i,j,k) = b_z_half(k) * memory_dvy_dz(i,j,k) + a_z_half(k) * dvy_dz
+
+                        dvx_dx = dvx_dx / K_x(i) + memory_dvx_dx(i,j,k)
+                        dvy_dx = dvy_dx / K_x(i) + memory_dvy_dx(i,j,k)
+                        dvz_dx = dvz_dx / K_x(i) + memory_dvz_dx(i,j,k) 
+                        dvy_dy = dvy_dy / K_y(j) + memory_dvy_dy(i,j,k)
+                        dvx_dy = dvx_dy / K_y(j) + memory_dvx_dy(i,j,k)
+                        dvz_dy = dvz_dy / K_y(j) + memory_dvz_dy(i,j,k)
+                        dvz_dz = dvz_dz / K_z_half(k) + memory_dvz_dz(i,j,k)
+                        dvx_dz = dvx_dz / K_z_half(k) + memory_dvx_dz(i,j,k)
+                        dvy_dz = dvy_dz / K_z_half(k) + memory_dvy_dz(i,j,k)
+
+                        sigmaxz(i,j,k) = sigmaxz(i,j,k) + &
+                            (   c15(i,k) * dvx_dx + c25(i,k) * dvy_dy + c35(i,k) * dvz_dz + &
+                                c45(i,k) * ( dvx_dz + dvz_dx) + c55(i,k) * ( dvx_dz + dvz_dx) + &
+                                c56(i,k) * ( dvx_dy + dvy_dx) ) * dt 
+
+                    enddo
+                enddo
+
+                !   ! update sigmayz, y-direction is full nodes
+                do j = 1,ny-1
+                    do i = 1,nx-1
+
+                        dvx_dx = (vx(i+1,j,k) - vx(i,j,k)) / dx
+                        dvy_dx = (vy(i+1,j,k) - vy(i,j,k)) / dx
+                        dvz_dx = (vz(i+1,j,k) - vz(i,j,k)) / dx
+                        dvy_dy = (vy(i,j+1,k) - vy(i,j,k)) / dy
+                        dvx_dy = (vx(i,j+1,k) - vx(i,j,k)) / dy
+                        dvz_dy = (vz(i,j+1,k) - vz(i,j,k)) / dy
+                        dvz_dz = (vz(i,j,k+1) - vz(i,j,k)) / dz
+                        dvx_dz = (vx(i,j,k+1) - vx(i,j,k)) / dz 
+                        dvy_dz = (vy(i,j,k+1) - vy(i,j,k)) / dz
+
+                        memory_dvx_dx(i,j,k) = b_x_half(i) * memory_dvx_dx(i,j,k) + a_x_half(i) * dvx_dx
+                        memory_dvy_dx(i,j,k) = b_x_half(i) * memory_dvy_dx(i,j,k) + a_x_half(i) * dvy_dx
+                        memory_dvz_dx(i,j,k) = b_x_half(i) * memory_dvz_dx(i,j,k) + a_x_half(i) * dvz_dx
+                        memory_dvy_dy(i,j,k) = b_y_half(j) * memory_dvy_dy(i,j,k) + a_y_half(j) * dvy_dy
+                        memory_dvx_dy(i,j,k) = b_y_half(j) * memory_dvx_dy(i,j,k) + a_y_half(j) * dvx_dy
+                        memory_dvz_dy(i,j,k) = b_y_half(j) * memory_dvz_dy(i,j,k) + a_y_half(j) * dvz_dy
+                        memory_dvz_dz(i,j,k) = b_z_half(k) * memory_dvz_dz(i,j,k) + a_z_half(k) * dvz_dz
+                        memory_dvx_dz(i,j,k) = b_z_half(k) * memory_dvx_dz(i,j,k) + a_z_half(k) * dvx_dz
+                        memory_dvy_dz(i,j,k) = b_z_half(k) * memory_dvy_dz(i,j,k) + a_z_half(k) * dvy_dz
+
+                        dvx_dx = dvx_dx / K_x_half(i) + memory_dvx_dx(i,j,k)
+                        dvy_dx = dvy_dx / K_x_half(i) + memory_dvy_dx(i,j,k)
+                        dvz_dx = dvz_dx / K_x_half(i) + memory_dvz_dx(i,j,k)
+                        dvy_dy = dvy_dy / K_y_half(j) + memory_dvy_dy(i,j,k)
+                        dvx_dy = dvx_dy / K_y_half(j) + memory_dvx_dy(i,j,k)
+                        dvz_dy = dvz_dy / K_y_half(j) + memory_dvz_dy(i,j,k)
+                        dvz_dz = dvz_dz / K_z_half(k) + memory_dvz_dz(i,j,k)
+                        dvx_dz = dvx_dz / K_z_half(k) + memory_dvx_dz(i,j,k)
+                        dvy_dz = dvy_dz / K_z_half(k) + memory_dvy_dz(i,j,k)
+
+                        sigmayz(i,j,k) = sigmayz(i,j,k)  + &
+                            (   c14(i,k) * dvx_dx + c24(i,k) * dvy_dy + c34(i,k) * dvz_dz + &
+                                c44(i,k) * ( dvy_dz + dvz_dy) + c45(i,k) * ( dvx_dz + dvz_dx) + &
+                                c46(i,k) * ( dvy_dx + dvx_dy) ) * dt 
+                    enddo
+                enddo
+            enddo
+
+            !--------------------------------------------------------
+            ! compute velocity and update memory variables for C-PML
+            !--------------------------------------------------------
+            do k = 2,nz
+                do j = 2,ny
+                    do i = 2,nx
+                        ! ds1/dx, ds6/dy, ds5,dz
+                        deltarho = (4 * rho(i,k) + rho(i-1,k) + rho(i,k-1) )/6
+
+                        dsigmaxx_dx = (sigmaxx(i,j,k) - sigmaxx(i-1,j,k) ) / dx
+                        dsigmaxy_dy = (sigmaxy(i,j,k) - sigmaxy(i,j-1,k) ) / dy
+                        dsigmaxz_dz = (sigmaxz(i,j,k) - sigmaxz(i,j,k-1) ) / dz
+
+                        memory_dsigmaxx_dx(i,j,k) = b_x(i) * &
+                            memory_dsigmaxx_dx(i,j,k) + a_x(i) * dsigmaxx_dx
+                        memory_dsigmaxy_dy(i,j,k) = b_y(j) * &
+                            memory_dsigmaxy_dy(i,j,k) + a_y(j) * dsigmaxy_dy
+                        memory_dsigmaxz_dz(i,j,k) = b_z(k) * &
+                            memory_dsigmaxz_dz(i,j,k) + a_z(k) * dsigmaxz_dz
+
+                        dsigmaxx_dx = dsigmaxx_dx / K_x(i) + memory_dsigmaxx_dx(i,j,k)
+                        dsigmaxy_dy = dsigmaxy_dy / K_y(j) + memory_dsigmaxy_dy(i,j,k)
+                        dsigmaxz_dz = dsigmaxz_dz / K_z(k) + memory_dsigmaxz_dz(i,j,k) 
+
+                        vx(i,j,k) = vx(i,j,k) * (1 - gammax(i,j) ) + &
+                            (dsigmaxx_dx + dsigmaxy_dy + dsigmaxz_dz) * &
+                            dt / deltarho !rho(i,k)
+                    enddo
+                enddo
+
+                do j = 1,ny-1
+                    do i = 1,nx-1
+                        ! ds6/dx, ds2/dy, ds4/dz
+                        deltarho = (4*rho(i,k) + rho(i+1,k) + rho(i,k-1) )/6
+
+                        dsigmaxy_dx = ( sigmaxy(i+1,j,k) - sigmaxy(i,j,k) ) / dx
+                        dsigmayy_dy = ( sigmayy(i,j+1,k) - sigmayy(i,j,k) ) / dy
+                        dsigmayz_dz = ( sigmayz(i,j,k) - sigmayz(i,j,k-1) ) / dz
+
+                        memory_dsigmaxy_dx(i,j,k) = b_x_half(i) * memory_dsigmaxy_dx(i,j,k) + a_x_half(i) * dsigmaxy_dx
+                        memory_dsigmayy_dy(i,j,k) = b_y_half(j) * memory_dsigmayy_dy(i,j,k) + a_y_half(j) * dsigmayy_dy
+                        memory_dsigmayz_dz(i,j,k) = b_z(k) * memory_dsigmayz_dz(i,j,k) + a_z(k) * dsigmayz_dz
+
+                        dsigmaxy_dx = dsigmaxy_dx / K_x_half(i) + memory_dsigmaxy_dx(i,j,k)
+                        dsigmayy_dy = dsigmayy_dy / K_y_half(j) + memory_dsigmayy_dy(i,j,k)
+                        dsigmayz_dz = dsigmayz_dz / K_z(k) + memory_dsigmayz_dz(i,j,k)
+
+                        vy(i,j,k) = vy(i,j,k) * (1 - gammay(i,j) )+ &
+                            (dsigmaxy_dx + dsigmayy_dy + dsigmayz_dz) * &
+                            dt / deltarho !rho(i,k)
+                    enddo
+                enddo
+            enddo
+
+            do k = 1,nz-1
+                do j = 2,ny
+                    do i = 1,nx-1
+                        ! ds5/dx, ds4/dy, ds3/dz
+                        deltarho = ( rho(i+1,k) + rho(i,k+1) + 4*rho(i,k) )/6
+
+                        dsigmaxz_dx = ( sigmaxz(i+1,j,k) - sigmaxz(i,j,k) ) / dx
+                        dsigmayz_dy = ( sigmayz(i,j,k) - sigmayz(i,j-1,k) ) / dy
+                        dsigmazz_dz = ( sigmazz(i,j,k+1) - sigmazz(i,j,k) ) / dz
+
+                        memory_dsigmaxz_dx(i,j,k) = b_x_half(i) * memory_dsigmaxz_dx(i,j,k) + a_x_half(i) * dsigmaxz_dx
+                        memory_dsigmayz_dy(i,j,k) = b_y(j) * memory_dsigmayz_dy(i,j,k) + a_y(j) * dsigmayz_dy
+                        memory_dsigmazz_dz(i,j,k) = b_z_half(k) * memory_dsigmazz_dz(i,j,k) + a_z_half(k) * dsigmazz_dz
+
+                        dsigmaxz_dx = dsigmaxz_dx / K_x_half(i) + memory_dsigmaxz_dx(i,j,k)
+                        dsigmayz_dy = dsigmayz_dy / K_y(j) + memory_dsigmayz_dy(i,j,k)
+                        dsigmazz_dz = dsigmazz_dz / K_z_half(k) + memory_dsigmazz_dz(i,j,k)
+
+                        vz(i,j,k) = vz(i,j,k) * (1 - gammaz(i,j) )+ &
+                            (dsigmaxz_dx + dsigmayz_dy + dsigmazz_dz) * &
+                            dt / deltarho !rho(i,k)
+
+                    enddo
+                enddo
+            enddo
+
+            vx(isource,jsource,ksource) = vx(isource,jsource,ksource) + &
+                    srcx(it) * dt / rho(isource,ksource)
+            vy(isource,jsource,ksource) = vy(isource,jsource,ksource) + &
+                    srcy(it) * dt / rho(isource,ksource)
+            vz(isource,jsource,ksource) = vz(isource,jsource,ksource) + &
+                    srcz(it) * dt / rho(isource,ksource)
+
+            ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
+            vx(1,:,:) = 0.d0
+            vy(1,:,:) = 0.d0
+            vz(1,:,:) = 0.d0
+
+            vx(:,1,:) = 0.d0
+            vy(:,1,:) = 0.d0
+            vz(:,1,:) = 0.d0
+
+            vx(:,:,1) = 0.d0
+            vy(:,:,1) = 0.d0
+            vz(:,:,1) = 0.d0
+
+            vx(nx,:,:) = 0.d0
+            vy(nx,:,:) = 0.d0
+            vz(nx,:,:) = 0.d0
+
+            vx(:,ny,:) = 0.d0
+            vy(:,ny,:) = 0.d0
+            vz(:,ny,:) = 0.d0
+
+            vx(:,:,nz) = 0.d0
+            vy(:,:,nz) = 0.d0
+            vz(:,:,nz) = 0.d0
+
+            ! check norm of velocity to make sure the solution isn't diverging
+            velocnorm = maxval( sqrt(vx**2 + vy**2 + vz**2) )
+            ! print *,'Time step # ',it,' out of ',time_step
+            ! print *,'Time: ',(it-1)*DT,' seconds'
+            ! print *,'Max vals for vx, vy, vz: ', maxval(vx), maxval(vy), maxval(vz)
+
+            if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
+
+            ! Write the velocity values to an unformatted binary file
+            call write_image3(vx, nx, ny, nz, source, it, 'Vx', SINGLE)
+            call write_image3(vy, nx, ny, nz, source, it, 'Vy', SINGLE)
+            call write_image3(vz, nx, ny, nz, source, it, 'Vz', SINGLE)
+            ! Now write the stress Values
+            ! call write_image3(sigmaxx, nx, ny, nz, it, 'S1')
+            ! call write_image3(sigmayy, nx, ny, nz, it, 'S2')
+            ! call write_image3(sigmazz, nx, ny, nz, it, 'S3')
+            ! call write_image3(sigmaxy, nx, ny, nz, it, 'S6')
+            ! call write_image3(sigmayz, nx, ny, nz, it, 'S4')
+            ! call write_image3(sigmaxz, nx, ny, nz, it, 'S5')
+
+        enddo   ! end of time loop
+    end subroutine seismic25
 
     ! =========================================================================
     ! FORWARD AND BACKWARD DIFFERENCE SCHEME
@@ -1225,8 +937,8 @@ module cpmlfdtd
         integer :: isource, jsource, i, j, it
 
         ! Coefficients for the finite difference scheme
-        real(real64), dimension(domain%nx,domain%nz) :: caEx, cbEx
-        real(real64), dimension(domain%nx,domain%nz) :: caEz, cbEz
+        real(real64), allocatable :: caEx(:,:), cbEx(:,:)
+        real(real64), allocatable :: caEz(:,:), cbEz(:,:)
         real(real64) :: daHy, dbHy
         real(real64) :: value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx
 
@@ -1242,7 +954,10 @@ module cpmlfdtd
                                             sig11(:,:), sig13(:,:), sig33(:,:)
         ! Velocity normalization factor
         real(real64) :: velocnorm
-
+        
+        integer :: nx, nz
+        real(real64) :: dx, dz, dt   
+        
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
 
@@ -1254,23 +969,29 @@ module cpmlfdtd
         endif
         
         ! ----------------------------------------------------------------------
-        allocate(eps11(domain%nx, domain%nz), eps13(domain%nx, domain%nz),  &
-                    eps33(domain%nx, domain%nz))
-        allocate(sig11(domain%nx, domain%nz), sig13(domain%nx, domain%nz),  &
-                    sig33(domain%nx, domain%nz))
-        allocate(K_x(domain%nx), alpha_x(domain%nx), a_x(domain%nx), b_x(domain%nx), &
-                K_x_half(domain%nx), alpha_x_half(domain%nx), a_x_half(domain%nx), b_x_half(domain%nx))
-        allocate(K_z(domain%nz), alpha_z(domain%nz), a_z(domain%nz), b_z(domain%nz), &
-                K_z_half(domain%nz), alpha_z_half(domain%nz), a_z_half(domain%nz), b_z_half(domain%nz))
-        allocate(srcx(source%time_steps), srcz(source%time_steps))
-        
-        ! Allocate more
-        allocate(epsilonx(domain%nx, domain%nz), epsilonz(domain%nx, domain%nz))
-        allocate(sigmax(domain%nx, domain%nz), sigmaz(domain%nx, domain%nz))
-        allocate(memory_dEz_dx(domain%nx, domain%nz), memory_dEx_dz(domain%nx, domain%nz))
-        allocate(memory_dHy_dx(domain%nx, domain%nz), memory_dHy_dz(domain%nx, domain%nz))
-        allocate(Ex(domain%nx, domain%nz), Ez(domain%nx, domain%nz))
-        allocate(Hy(domain%nx, domain%nz))
+            nx = domain%nx 
+            nz = domain%nz 
+            dx = domain%dx 
+            dz = domain%dz 
+            dt = source%dt
+            
+            allocate(eps11(nx, nz), eps13(nx, nz),  &
+                        eps33(nx, nz))
+            allocate(sig11(nx, nz), sig13(nx, nz),  &
+                        sig33(nx, nz))
+            allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
+                    K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
+            allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
+                    K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
+            allocate(srcx(source%time_steps), srcz(source%time_steps))
+            
+            ! Allocate more
+            allocate(epsilonx(nx, nz), epsilonz(nx, nz))
+            allocate(sigmax(nx, nz), sigmaz(nx, nz))
+            allocate(memory_dEz_dx(nx, nz), memory_dEx_dz(nx, nz))
+            allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
+            allocate(Ex(nx, nz), Ez(nx, nz))
+            allocate(Hy(nx, nz))
             
         ! ======================================================================
         ! ----------------------- Load Permittivity Coefficients ----------------------
@@ -1349,23 +1070,15 @@ module cpmlfdtd
         sigmaz(:,:) = sig13 + sig33 
 
         ! We need to change sigma to dsigma, same for epsilon
-        caEx(:,:) = ( 1.0d0 - sigmax * source%dt / &
-                    ( 2.0d0 * epsilonx ) ) / &
-                    ( 1.0d0 + sigmax * source%dt / &
-                    (2.0d0 * epsilonx ) )
-        cbEx(:,:) = (source%dt / epsilonx ) / &
-                    ( 1.0d0 + sigmax * source%dt / &
-                    ( 2.0d0 * epsilonx ) )
+        caEx(:,:) = ( 1.0d0 - sigmax * dt / ( 2.0d0 * epsilonx ) ) / &
+                    ( 1.0d0 + sigmax * dt / (2.0d0 * epsilonx ) )
+        cbEx(:,:) = (dt / epsilonx ) / ( 1.0d0 + sigmax * dt / ( 2.0d0 * epsilonx ) )
 
-        caEz(:,:) = ( 1.0d0 - sigmaz * source%dt / &
-                    ( 2.0d0 * epsilonz ) ) / &
-                    ( 1.0d0 + sigmaz * source%dt / &
-                    (2.0d0 * epsilonz ) )
-        cbEz(:,:) = (source%dt / epsilonz ) / &
-                    ( 1.0d0 + sigmaz * source%dt / &
-                    ( 2.0d0 * epsilonz ) )
-        daHy = source%dt/(4.0d0*mu0*mu)
-        dbHy = source%dt/mu0 !dt/(mu*mu*dx*(1+daHy) ) 
+        caEz(:,:) = ( 1.0d0 - sigmaz * dt / ( 2.0d0 * epsilonz ) ) / &
+                    ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
+        cbEz(:,:) = (dt / epsilonz ) / ( 1.0d0 + sigmaz * dt / ( 2.0d0 * epsilonz ) )
+        daHy = dt/(4.0d0*mu0*mu)
+        dbHy = dt/mu0 !dt/(mu*mu*dx*(1+daHy) ) 
         daHy = 1.0d0 ! (1-daHy)/(1+daHy) ! 
         
         !---
@@ -1375,16 +1088,16 @@ module cpmlfdtd
             !--------------------------------------------------------
             ! compute magnetic field and update memory variables for C-PML
             !--------------------------------------------------------
-            do j = 1,domain%nz-1  
-                do i = 1,domain%nx-1
+            do j = 1,nz-1  
+                do i = 1,nx-1
                 
                     ! Values needed for the magnetic field updates
-                    value_dEx_dz = ( Ex(i,j+1) - Ex(i,j) )/domain%dz
+                    value_dEx_dz = ( Ex(i,j+1) - Ex(i,j) )/dz
                     memory_dEx_dz(i,j) = b_z(j) * memory_dEx_dz(i,j) + a_z(j) * value_dEx_dz
                     value_dEx_dz = value_dEx_dz/ K_z(j) + memory_dEx_dz(i,j)
 
                     ! The rest of the equation needed for agnetic field updates
-                    value_dEz_dx = ( Ez(i+1,j) - Ez(i,j) )/domain%dx
+                    value_dEz_dx = ( Ez(i+1,j) - Ez(i,j) )/dx
                     memory_dEz_dx(i,j) = b_x(i) * memory_dEz_dx(i,j) + a_x(i) * value_dEz_dx
                     value_dEz_dx = value_dEz_dx/ K_x(i) + memory_dEz_dx(i,j)
 
@@ -1398,10 +1111,10 @@ module cpmlfdtd
             ! compute electric field and update memory variables for C-PML
             !--------------------------------------------------------
             ! Compute the differences in the y-direction
-            do j = 2,domain%nz
-                do i = 1,domain%nx
+            do j = 2,nz
+                do i = 1,nx
                     ! Update the Ex field
-                    value_dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/domain%dz ! this is nz-1 length vector
+                    value_dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
                     memory_dHy_dz(i,j) = b_z(j) * memory_dHy_dz(i,j) + a_z(j) * value_dHy_dz
                     value_dHy_dz = value_dHy_dz/K_z(j) + memory_dHy_dz(i,j)
 
@@ -1411,10 +1124,10 @@ module cpmlfdtd
                 enddo
             enddo
 
-            do j = 1,domain%nz
-                do i = 2,domain%nx
+            do j = 1,nz
+                do i = 2,nx
                     ! Update the Ez field
-                    value_dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/domain%dx
+                    value_dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
                     memory_dHy_dx(i,j) = b_x_half(i) * memory_dHy_dx(i,j) + a_x_half(i) * value_dHy_dx
                     value_dHy_dx = value_dHy_dx/K_x_half(i) + memory_dHy_dx(i,j)
                     
@@ -1426,32 +1139,32 @@ module cpmlfdtd
 
             !----------------------------------------------------------------------------
             Ex(isource,jsource) = Ex(isource,jsource) + &
-                            srcx(it) * source%dt / eps11(isource,jsource)
+                            srcx(it) * dt / eps11(isource,jsource)
             Ez(isource,jsource) = Ez(isource,jsource) + &
-                            srcz(it) * source%dt / eps33(isource,jsource) 
+                            srcz(it) * dt / eps33(isource,jsource) 
             
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             Ex(1,:) = 0.d0
-            Ex(domain%nx,:) = 0.d0
+            Ex(nx,:) = 0.d0
             Ex(:,1) = 0.d0
-            Ex(:,domain%nz) = 0.d0
+            Ex(:,nz) = 0.d0
 
             Ez(1,:) = 0.d0
-            Ez(domain%nx,:) = 0.d0
+            Ez(nx,:) = 0.d0
             Ez(:,1) = 0.d0
-            Ez(:,domain%nz) = 0.d0
+            Ez(:,nz) = 0.d0
 
             Hy(1,:) = 0.d0
-            Hy(domain%nx,:) = 0.d0
+            Hy(nx,:) = 0.d0
             Hy(:,1) = 0.d0
-            Hy(:,domain%nz) = 0.d0
+            Hy(:,nz) = 0.d0
 
             ! print maximum of norm of velocity
             velocnorm = maxval(sqrt(Ex**2 + Ez**2))
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
 
-            call write_image2(Ex, domain%nx, domain%nz, source, it, 'Ex', SINGLE)
-            call write_image2(Ez, domain%nx, domain%nz, source, it, 'Ez', SINGLE)
+            call write_image2(Ex, nx, nz, source, it, 'Ex', SINGLE)
+            call write_image2(Ez, nx, nz, source, it, 'Ez', SINGLE)
         enddo
         
         
@@ -1465,7 +1178,7 @@ module cpmlfdtd
 
 
     ! =========================================================================
-    ! subroutine electromag25(domain, source, emvar, SINGLE_OUTPUT)
+    ! subroutine electromag25(domain, source, SINGLE_OUTPUT)
     !     !--------------------------------------------------------------------------------------
     !     ! Electromagnetic wave propagation in a 3D grid with Convolutional-PML (C-PML)
     !     ! absorbing conditions for an anisotropic medium.
@@ -1486,7 +1199,7 @@ module cpmlfdtd
     !     logical, intent(in), optional :: SINGLE_OUTPUT
         
     !     ! Local variables
-    !     real(real64), dimension(domain%nx,domain%nz) :: epsilonx, epsilony, epsilonz, &
+    !     real(real64), allocatable :: epsilonx, epsilony, epsilonz, &
     !                                         sigmax, sigmay, sigmaz
 
     !     ! real(real64) :: DT
@@ -1494,21 +1207,34 @@ module cpmlfdtd
     !     integer :: isource, jsource, ksource, i, j, k, it
 
     !     ! Coefficients for the finite difference scheme
-    !     real(real64), dimension(domain%nx,domain%nz) :: caEx, cbEx, caEy, cbEy, caEz, cbEz
+    !     real(real64), allocatable :: caEx, cbEx, caEy, cbEy, caEz, cbEz
     !     real(real64) :: daHx, dbHx, daHy, dbHy, daHz, dbHz
 
     !     real(real64) :: dEx_dy, dEy_dx, dEy_dz, dEz_dy, dEz_dx, dEx_dz, &
     !                     dHx_dy, dHx_dz, dHy_dx, dHy_dz, dHz_dy, dHz_dx
 
-
     !     ! Source arrays
     !     real(real64), dimension(source%time_steps) :: srcx, srcy, srcz
 
     !     ! 1D arrays for the damping profiles in each direction
-    !     real(real64), dimension(domain%nx) :: K_x, alpha_x, a_x, b_x, K_x_half, alpha_x_half, a_x_half, b_x_half
-    !     real(real64), dimension(domain%ny) :: K_y, alpha_y, a_y, b_y, K_y_half, alpha_y_half, a_y_half, b_y_half
-    !     real(real64), dimension(domain%nz) :: K_z, alpha_z, a_z, b_z, K_z_half, alpha_z_half, a_z_half, b_z_half
-
+    !     real(real64), allocatable :: K_x(:), alpha_x(:), a_x(:), b_x(:), & 
+    !                     K_x_half(:), alpha_x_half(:), a_x_half(:), b_x_half(:)
+    !     real(real64), allocatable :: K_y(:), alpha_y(:), a_y(:), b_y(:), & 
+    !                     K_y_half(:), alpha_y_half(:), a_y_half(:), b_y_half(:)
+    !     real(real64), allocatable :: K_z(:), alpha_z(:), a_z(:), b_z(:), & 
+    !                     K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
+        
+    !     real(real64), allocatable :: memory_dEx_dy(:,:,:), memory_dEy_dx(:,:,:), &
+    !                                 memory_dEx_dz(:,:,:), memory_dEz_dx(:,:,:), &
+    !                                 memory_dEz_dy(:,:,:), memory_dEy_dz(:,:,:)
+    !     real(real64), allocatable :: memory_dHz_dx(:,:,:), memory_dHx_dz(:,:,:), &
+    !                                 memory_dHz_dy(:,:,:), memory_dHy_dz(:,:,:), &
+    !                                 memory_dHx_dy(:,:,:), memory_dHy_dx(:,:,:)
+        
+        
+    !     integer :: nx, ny, nz
+    !     real(real64) :: dx, dy, dz, dt   
+            
     !     ! Boolean flag to save as double precision or single precision
     !     logical :: SINGLE
 
@@ -1518,6 +1244,32 @@ module cpmlfdtd
     !     else
     !         SINGLE = .TRUE.
     !     endif
+        
+    !     allocate(eps11(nx, nz), eps12(nx, nz), eps13(nx, nz),  &
+    !                 eps22(nx, nz), eps23(nx, nz), eps33(nx, nz))
+    !     allocate(sig11(nx, nz), sig12(nx,nz), sig13(nx, nz),  &
+    !                 sig22(nx, nz), sig23(nx, nz), sig33(nx, nz))
+    !     allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
+    !             K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
+    !     allocate(K_y(ny), alpha_y(ny), a_y(ny), b_y(ny), &
+    !             K_y_half(ny), alpha_y_half(ny), a_y_half(ny), b_y_half(ny))
+    !     allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
+    !             K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
+    !     allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
+        
+    !     ! Allocate more
+    !     allocate(epsilonx(nx, nz), epsilony(nx, nz), epsilonz(nx, nz))
+    !     allocate(sigmax(nx, nz), sigmay(nx, nz), sigmaz(nx, nz))
+        
+    !     allocate( memory_dEx_dy(nx,ny,nz), memory_dEy_dx(nx,ny,nz), &
+    !                 memory_dEx_dz(nx,ny,nz), memory_dEz_dx(nx,ny,nz), &
+    !                 memory_dEz_dy(nx,ny,nz), memory_dEy_dz(nx,ny,nz) )
+    !     allocate(memory_dHz_dx(nx,ny,nz), memory_dHx_dz(nx,ny,nz), & 
+    !                 memory_dHz_dy(nx,ny,nz), memory_dHy_dz(nx,ny,nz), &
+    !                 memory_dHx_dy(nx,ny,nz), memory_dHy_dx(nx,ny,nz) )
+        
+    !     allocate(Ex(nx, ny, nz), Ey(nx, ny, nz), Ez(nx, ny, nz))
+    !     allocate(Hx(nx, ny, nz), Hy(nx, ny, nz), Hz(nx, ny, nz))
         
     !     ! ------------------------ Load Permittivity Coefficients ------------------------
     !     ! Load Epsilon
@@ -1538,8 +1290,8 @@ module cpmlfdtd
     !     ! ------------------------ Assign some constants -----------------------
     !     ! Assign the source location indices
     !     isource = source%xind + domain%cpml
-    !     jsource = source%yind + domain%cpml
-    !     ksource = source%zind + domain%cpml
+    !     jsource = source%yind + cpml
+    !     ksource = source%zind + cpml
 
     !     ! Define the 
     !     ! DT = minval( (/dx, dy, dz/) )/ ( 2.0d0 * Clight/ sqrt( minval( (/ eps11, eps22, eps33 /) ) ) )
@@ -1553,35 +1305,35 @@ module cpmlfdtd
     !     sigmay(:,:) = sig12 + sig22 + sig23
     !     sigmaz(:,:) = sig13 + sig23 + sig33
 
-    !     caEx(:,:) = ( 1.0d0 - sigmax * source%dt / &
+    !     caEx(:,:) = ( 1.0d0 - sigmax * dt / &
     !                 (2.0d0 * epsilonx ) ) / &
-    !                 ( 1.0d0 + sigmax * source%dt / &
+    !                 ( 1.0d0 + sigmax * dt / &
     !                 (2.0d0 * epsilonx ) )
-    !     cbEx(:,:) = (source%dt / epsilonx ) / &
-    !                 ( 1.0d0 + sigmax * source%dt / &
+    !     cbEx(:,:) = (dt / epsilonx ) / &
+    !                 ( 1.0d0 + sigmax * dt / &
     !                 ( 2.0d0 * epsilonx ) )
 
-    !     caEy(:,:) = ( 1.0d0 - sigmay * source%dt / (2.0d0 * epsilony ) ) / &
-    !                 ( 1.0d0 + sigmay * source%dt / (2.0d0 * epsilony ) )
-    !     cbEy(:,:) = (source%dt / epsilony ) / &
-    !                 ( 1.0d0 + sigmay * source%dt / ( 2.0d0 * epsilony ) )
+    !     caEy(:,:) = ( 1.0d0 - sigmay * dt / (2.0d0 * epsilony ) ) / &
+    !                 ( 1.0d0 + sigmay * dt / (2.0d0 * epsilony ) )
+    !     cbEy(:,:) = (dt / epsilony ) / &
+    !                 ( 1.0d0 + sigmay * dt / ( 2.0d0 * epsilony ) )
 
-    !     caEz(:,:) = ( 1.0d0 - sigmaz * source%dt / &
+    !     caEz(:,:) = ( 1.0d0 - sigmaz * dt / &
     !                 ( 2.0d0 * epsilonz ) ) / &
-    !                 ( 1.0d0 + sigmaz * source%dt / (2.0d0 * epsilonz ) )
-    !     cbEz(:,:) = (source%dt / epsilonz ) / &
-    !                 ( 1.0d0 + sigmaz * source%dt / (2.0d0 * epsilonz ) )
+    !                 ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
+    !     cbEz(:,:) = (dt / epsilonz ) / &
+    !                 ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
 
-    !     daHx = source%dt/(4.0d0*mu0*mu)
-    !     dbHx = source%dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
+    !     daHx = dt/(4.0d0*mu0*mu)
+    !     dbHx = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
     !     daHx = 1.0d0 ! (1-daHz)/(1+daHz) ! 
 
-    !     daHy = source%dt/(4.0d0*mu0*mu)
-    !     dbHy = source%dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
+    !     daHy = dt/(4.0d0*mu0*mu)
+    !     dbHy = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
     !     daHy = 1.0d0 ! (1-daHz)/(1+daHz) ! 
 
-    !     daHz = source%dt/(4.0d0*mu0*mu)
-    !     dbHz = source%dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
+    !     daHz = dt/(4.0d0*mu0*mu)
+    !     dbHz = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
     !     daHz = 1.0d0 ! (1-daHz)/(1+daHz) ! 
 
 
@@ -1692,16 +1444,16 @@ module cpmlfdtd
     !         ! compute magnetic field and update memory variables for C-PML
     !         !--------------------------------------------------------
     !         ! Update Hx
-    !         do k = 1,domain%nz-1
-    !             do i = 1,domain%nx-1  
-    !                 do j = 1,domain%ny-1
+    !         do k = 1,nz-1
+    !             do i = 1,nx-1  
+    !                 do j = 1,ny-1
     !                     ! Values needed for the magnetic field updates
-    !                     dEz_dy = ( Ez(i,j,k) - Ez(i,j+1,k) )/domain%dy
+    !                     dEz_dy = ( Ez(i,j,k) - Ez(i,j+1,k) )/dy
     !                     memory_dEz_dy(i,j,k) = b_y_half(j) * memory_dEz_dy(i,j,k) + a_y_half(j) * dEz_dy
     !                     dEz_dy = dEz_dy/ K_y_half(j) + memory_dEz_dy(i,j,k)
 
     !                     ! The rest of the equation needed for agnetic field updates
-    !                     dEy_dz = ( Ey(i,j,k+1) - Ey(i,j,k) )/domain%dz
+    !                     dEy_dz = ( Ey(i,j,k+1) - Ey(i,j,k) )/dz
     !                     memory_dEy_dz(i,j,k) = b_z_half(k) * memory_dEy_dz(i,j,k) + a_z_half(k) * dEy_dz
     !                     dEy_dz = dEy_dz/ K_z_half(k) + memory_dEy_dz(i,j,k)
 
@@ -1712,18 +1464,18 @@ module cpmlfdtd
     !         enddo
 
     !             ! Update Hy
-    !         do k = 1,domain%nz-1
-    !             do i = 1,domain%nx-1      
-    !                 do j = 1,domain%ny-1
+    !         do k = 1,nz-1
+    !             do i = 1,nx-1      
+    !                 do j = 1,ny-1
                     
     !                     ! Values needed for the magnetic field updates
-    !                     dEx_dz = ( Ex(i,j,k) - Ex(i,j,k+1) )/domain%dz
+    !                     dEx_dz = ( Ex(i,j,k) - Ex(i,j,k+1) )/dz
     !                     memory_dEx_dz(i,j,k) = b_z(k) * memory_dEx_dz(i,j,k) + &
     !                         a_z(k) * dEx_dz
     !                     dEx_dz = dEx_dz/ K_z(k) + memory_dEx_dz(i,j,k)
 
     !                     ! The rest of the equation needed for agnetic field updates
-    !                     dEz_dx = ( Ez(i+1,j,k) - Ez(i,j,k) )/domain%dx
+    !                     dEz_dx = ( Ez(i+1,j,k) - Ez(i,j,k) )/dx
     !                     memory_dEz_dx(i,j,k) = b_x(i) * memory_dEz_dx(i,j,k) + &
     !                         a_x(i) * dEz_dx
     !                     dEz_dx = dEz_dx/ K_x(i) + memory_dEz_dx(i,j,k)
@@ -1736,17 +1488,17 @@ module cpmlfdtd
     !         enddo
 
     !             ! Update Hz
-    !         do k = 2,domain%nz-1
-    !             do i = 1,domain%nx-1      
-    !                 do j = 1,domain%ny-1
+    !         do k = 2,nz-1
+    !             do i = 1,nx-1      
+    !                 do j = 1,ny-1
     !                     ! Values needed for the magnetic field updates
-    !                     dEx_dy = ( Ex(i,j+1,k) - Ex(i,j,k) )/domain%dy
+    !                     dEx_dy = ( Ex(i,j+1,k) - Ex(i,j,k) )/dy
     !                     memory_dEx_dy(i,j,k) = b_y(j) * memory_dEx_dy(i,j,k) + & 
     !                         a_y(j) * dEx_dy
     !                     dEx_dy = dEx_dy/ K_y(j) + memory_dEx_dy(i,j,k)
 
     !                     ! The rest of the equation needed for agnetic field updates
-    !                     dEy_dx = ( Ey(i,j,k) - Ey(i+1,j,k) )/domain%dx
+    !                     dEy_dx = ( Ey(i,j,k) - Ey(i+1,j,k) )/dx
     !                     memory_dEy_dx(i,j,k) = b_x(i) * memory_dEy_dx(i,j,k) + & 
     !                         a_x(i) * dEy_dx
     !                     dEy_dx = dEy_dx/ K_x(i) + memory_dEy_dx(i,j,k)
@@ -1761,17 +1513,17 @@ module cpmlfdtd
     !         ! compute electric field and update memory variables for C-PML
     !         !--------------------------------------------------------
     !         ! Compute the differences in the x-direction
-    !         do k = 2,domain%nz-1
-    !             do i = 1,domain%nx-1
-    !                 do j = 2,domain%ny-1  
+    !         do k = 2,nz-1
+    !             do i = 1,nx-1
+    !                 do j = 2,ny-1  
     !                     ! Update the Ex field
-    !                     dHz_dy = ( Hz(i,j,k) - Hz(i,j-1,k) )/domain%dy
+    !                     dHz_dy = ( Hz(i,j,k) - Hz(i,j-1,k) )/dy
     !                     memory_dHz_dy(i,j,k) = b_y_half(j) * memory_dHz_dy(i,j,k) + & 
     !                         a_y_half(j) * dHz_dy
     !                     dHz_dy = dHz_dy/K_y_half(j) + memory_dHz_dy(i,j,k)
 
     !                     ! Changed from half to full node positions 
-    !                     dHy_dz = ( Hy(i,j,k-1) - Hy(i,j,k) )/domain%dz
+    !                     dHy_dz = ( Hy(i,j,k-1) - Hy(i,j,k) )/dz
     !                     memory_dHy_dz(i,j,k) = b_z(k) * memory_dHy_dz(i,j,k) + &
     !                         a_z(k) * dHy_dz
     !                     dHy_dz = dHy_dz/K_z(k) + memory_dHy_dz(i,j,k)
@@ -1782,15 +1534,15 @@ module cpmlfdtd
     !             enddo
 
     !             ! ! Compute the differences in the y-direction
-    !             do i = 2,domain%nx-1 
-    !                 do j = 1,domain%ny-1 
+    !             do i = 2,nx-1 
+    !                 do j = 1,ny-1 
     !                     ! Update the Ey field
-    !                     dHz_dx = ( Hz(i-1,j,k) - Hz(i,j,k) )/domain%dx ! this is ny-1 length vector
+    !                     dHz_dx = ( Hz(i-1,j,k) - Hz(i,j,k) )/dx ! this is ny-1 length vector
     !                     memory_dHz_dx(i,j,k) = b_x_half(i) * memory_dHz_dx(i,j,k) + & 
     !                         a_x_half(i) * dHz_dx
     !                     dHz_dx = dHz_dx/K_x_half(i) + memory_dHz_dx(i,j,k)
 
-    !                     dHx_dz = ( Hx(i,j,k) - Hx(i,j,k-1) )/domain%dz ! this is ny-1 length vector
+    !                     dHx_dz = ( Hx(i,j,k) - Hx(i,j,k-1) )/dz ! this is ny-1 length vector
     !                     memory_dHx_dz(i,j,k) = b_z_half(k) * memory_dHx_dz(i,j,k) + &
     !                         a_z_half(k) * dHx_dz
     !                     dHx_dz = dHx_dz/K_z_half(k) + memory_dHx_dz(i,j,k)
@@ -1804,16 +1556,16 @@ module cpmlfdtd
     !         enddo 
 
     !             ! Compute the differences in the z-direction
-    !         do k = 1,domain%nz-1
-    !             do i = 2,domain%nx-1  
-    !                 do j = 2,domain%ny-1
+    !         do k = 1,nz-1
+    !             do i = 2,nx-1  
+    !                 do j = 2,ny-1
     !                     ! Update the Ez field
-    !                     dHx_dy = ( Hx(i,j-1,k) - Hx(i,j,k) )/domain%dy
+    !                     dHx_dy = ( Hx(i,j-1,k) - Hx(i,j,k) )/dy
     !                     memory_dHx_dy(i,j,k) = b_y_half(j) * memory_dHx_dy(i,j,k) + &
     !                         a_y_half(j) * dHx_dy
     !                     dHx_dy = dHx_dy/K_y_half(j) + memory_dHx_dy(i,j,k)
 
-    !                     dHy_dx = ( Hy(i,j,k) - Hy(i-1,j,k) )/domain%dx
+    !                     dHy_dx = ( Hy(i,j,k) - Hy(i-1,j,k) )/dx
     !                     memory_dHy_dx(i,j,k) = b_x_half(i) * memory_dHy_dx(i,j,k) + &
     !                         a_x_half(i) * dHy_dx
     !                     dHy_dx = dHy_dx/K_x_half(i) + memory_dHy_dx(i,j,k)
@@ -1828,54 +1580,54 @@ module cpmlfdtd
 
     !         ! add the source (force vector located at a given grid point)
     !         Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
-    !                     srcx(it) * source%dt / eps11(isource,ksource)
+    !                     srcx(it) * dt / eps11(isource,ksource)
     !         Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
-    !                     srcy(it) * source%dt / eps22(isource,ksource) 
+    !                     srcy(it) * dt / eps22(isource,ksource) 
     !         Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
-    !                     srcz(it) * source%dt / eps33(isource,ksource)
+    !                     srcz(it) * dt / eps33(isource,ksource)
             
     !         ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
     !         Ex(1,:,:) = 0.0d0
     !         Ex(:,1,:) = 0.0d0
     !         Ex(:,:,1) = 0.0d0
-    !         Ex(domain%nx,:,:) = 0.0d0
-    !         Ex(:,domain%ny,:) = 0.0d0
-    !         Ex(:,:,domain%nz) = 0.0d0 
+    !         Ex(nx,:,:) = 0.0d0
+    !         Ex(:,ny,:) = 0.0d0
+    !         Ex(:,:,nz) = 0.0d0 
 
     !         Ey(1,:,:) = 0.0d0
     !         Ey(:,1,:) = 0.0d0
     !         Ey(:,:,1) = 0.0d0
-    !         Ey(domain%nx,:,:) = 0.0d0
-    !         Ey(:,domain%ny,:) = 0.0d0
-    !         Ey(:,:,domain%nz) = 0.0d0
+    !         Ey(nx,:,:) = 0.0d0
+    !         Ey(:,ny,:) = 0.0d0
+    !         Ey(:,:,nz) = 0.0d0
             
     !         Ez(1,:,:) = 0.0d0
     !         Ez(:,1,:) = 0.0d0
     !         Ez(:,:,1) = 0.0d0
-    !         Ez(domain%nx,:,:) = 0.0d0
-    !         Ez(:,domain%ny,:) = 0.0d0
-    !         Ez(:,:,domain%nz) = 0.0d0
+    !         Ez(nx,:,:) = 0.0d0
+    !         Ez(:,ny,:) = 0.0d0
+    !         Ez(:,:,nz) = 0.0d0
             
     !         Hx(1,:,:) = 0.0d0
     !         Hx(:,1,:) = 0.0d0
     !         Hx(:,:,1) = 0.0d0
-    !         Hx(domain%nx,:,:) = 0.0d0
-    !         Hx(:,domain%ny,:) = 0.0d0
-    !         Hx(:,:,domain%nz) = 0.0d0
+    !         Hx(nx,:,:) = 0.0d0
+    !         Hx(:,ny,:) = 0.0d0
+    !         Hx(:,:,nz) = 0.0d0
 
     !         Hy(1,:,:) = 0.0d0
     !         Hy(:,1,:) = 0.0d0
     !         Hy(:,:,1) = 0.0d0
-    !         Hy(domain%nx,:,:) = 0.0d0
-    !         Hy(:,domain%ny,:) = 0.0d0
-    !         Hy(:,:,domain%nz) = 0.0d0
+    !         Hy(nx,:,:) = 0.0d0
+    !         Hy(:,ny,:) = 0.0d0
+    !         Hy(:,:,nz) = 0.0d0
             
     !         Hz(1,:,:) = 0.0d0
     !         Hz(:,1,:) = 0.0d0
     !         Hz(:,:,1) = 0.0d0
-    !         Hz(domain%nx,:,:) = 0.0d0
-    !         Hz(:,domain%ny,:) = 0.0d0
-    !         Hz(:,:,domain%nz) = 0.0d0
+    !         Hz(nx,:,:) = 0.0d0
+    !         Hz(:,ny,:) = 0.0d0
+    !         Hz(:,:,nz) = 0.0d0
 
     !         ! check norm of velocity to make sure the solution isn't diverging
     !         velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )

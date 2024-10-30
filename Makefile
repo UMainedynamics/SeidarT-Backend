@@ -1,3 +1,7 @@
+# 'make USE_OPENMP=1' will compile with the openmp directives. Default 'make' 
+# will compile without OpenMP. 
+#
+
 CONDA_PREFIX := $(shell conda info --base)/envs/seidart
 INCLUDE_PATH := $(CONDA_PREFIX)/include
 LIB_PATH := $(CONDA_PREFIX)/lib
@@ -11,6 +15,12 @@ FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ff
 SRC_DIR := src/fortran
 SOURCES := $(SRC_DIR)/constants.f08 $(SRC_DIR)/seidart_types.f08 $(SRC_DIR)/seidartio.f08 $(SRC_DIR)/cpmlfdtd.f08 $(SRC_DIR)/main.f08
 EXECUTABLE := seidartfdtd 
+
+# OpenMP support (conditionally add -fopenmp flag)
+USE_OPENMP ?= 0
+ifeq ($(USE_OPENMP), 1)
+    FFLAGS += -fopenmp
+endif
 
 # Default target
 all: $(EXECUTABLE) install clean
