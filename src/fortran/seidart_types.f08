@@ -3,7 +3,7 @@ module seidart_types
     
     implicit none 
     
-    public :: Domain_Type, Time_Parameters_Type
+    public :: Domain_Type
     public :: Attenuation_Type, Stiffness_Type 
     public :: Source_Type, Permittivity_Type, Conductivity_Type
     
@@ -18,14 +18,10 @@ module seidart_types
         character(len=:), allocatable :: image_file 
     end type Domain_Type
     
-    ! Time parameters for Seismic and Electromagnetic sources
-    type :: Time_Parameters_Type
-        real(real64) :: dt
-        integer :: time_steps
-    end type Time_Parameters_Type
-    
-    ! Seismic Source
+    ! Seismic and Electromagnetic Source
     type :: Source_Type
+        real(real64) :: dt 
+        integer :: time_steps
         real(real64) :: x, y, z
         integer :: xind, yind, zind
         real(real64) :: source_frequency

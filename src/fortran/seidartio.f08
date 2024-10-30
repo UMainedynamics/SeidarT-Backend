@@ -16,147 +16,61 @@ module seidartio
     ! --------------------- Subroutine Definitions -----------------------------
     contains 
     
-    subroutine parse_json(file_name, domain, seismic_source, &
-                        seismic_stiffness, seismic_attenuation, &
-                        electromagnetic_permittivity, electromagnetic_conductivity, &
-                        electromagnetic_source)
+    subroutine parse_json(file_name, domain, seismic_source, electromagnetic_source)
     
         implicit none 
         character(len=*), intent(in) :: file_name
         type(Domain_Type), intent(out) :: domain
-        ! type(Time_Parameters_Type), intent(out) :: seismic_time_parameters 
-        ! type(Time_Parameters_Type), intent(out) :: electromagnetic_time_parameters
         type(Source_Type), intent(out) :: seismic_source
         type(Source_Type), intent(out) :: electromagnetic_source
-        type(Stiffness_Type), intent(out), allocatable :: seismic_stiffness(:)
-        type(Attenuation_Type), intent(out), allocatable :: seismic_attenuation(:)
-        type(Permittivity_Type), intent(out), allocatable :: electromagnetic_permittivity(:)
-        type(Conductivity_Type), intent(out), allocatable :: electromagnetic_conductivity(:)
-        
 
-        type(json_file) :: json 
-        integer :: i 
-        character(len=10) :: i_str
-        
+        type(json_file) :: json
+
         ! --------------------- End Declarations -------------------------------
-        
         call json%initialize()
         call json%load_file(trim(file_name))
-        
+
         ! Parse the domain data
-        call json%get('Domain/dim', domain%dim)
-        call json%get('Domain/nx', domain%nx)
-        call json%get('Domain/ny', domain%ny)
-        call json%get('Domain/nz', domain%nz)
-        call json%get('Domain/dx', domain%dx)
-        call json%get('Domain/dy', domain%dy)
-        call json%get('Domain/dz', domain%dz)
-        call json%get('Domain/cpml', domain%cpml)
-        call json%get('Domain/nmats', domain%nmats)
-        call json%get('Domain/image_file', domain%image_file)
+        call json%get('Domain.dim', domain%dim)
+        call json%get('Domain.nx', domain%nx)
+        call json%get('Domain.ny', domain%ny)
+        call json%get('Domain.nz', domain%nz)
+        call json%get('Domain.dx', domain%dx)
+        call json%get('Domain.dy', domain%dy)
+        call json%get('Domain.dz', domain%dz)
+        call json%get('Domain.cpml', domain%cpml)
+        call json%get('Domain.nmats', domain%nmats)
+        call json%get('Domain.image_file', domain%image_file)
     
-        
         ! Parse the Seismic Source
-        call json%get('Seismic/Source/x', seismic_source%x)
-        call json%get('Seismic/Source/y', seismic_source%y)
-        call json%get('Seismic/Source/z', seismic_source%z)
-        call json%get('Seismic/Source/source_frequency', seismic_source%source_frequency)
-        call json%get('Seismic/Source/x-z_rotation', seismic_source%x_z_rotation)
-        call json%get('Seismic/Source/x-y_rotation', seismic_source%x_y_rotation)
-        call json%get('Seismic/Source/amplitude', seismic_source%amplitude)
-        call json%get('Seismic/Source/source_type', seismic_source%source_type)
+        call json%get('Seismic.Source.x', seismic_source%x)
+        call json%get('Seismic.Source.y', seismic_source%y)
+        call json%get('Seismic.Source.z', seismic_source%z)
+        call json%get('Seismic.Source.xind', seismic_source%xind)
+        call json%get('Seismic.Source.yind', seismic_source%yind)
+        call json%get('Seismic.Source.zind', seismic_source%zind)
+        call json%get('Seismic.Source.source_frequency', seismic_source%source_frequency)
+        call json%get('Seismic.Source.x-z_rotation', seismic_source%x_z_rotation)
+        call json%get('Seismic.Source.x-y_rotation', seismic_source%x_y_rotation)
+        call json%get('Seismic.Source.amplitude', seismic_source%amplitude)
+        call json%get('Seismic.Source.source_type', seismic_source%source_type)
+        call json%get('Seismic.Source.dt', seismic_source%dt)
+        call json%get('Seismic.Source.time_steps', seismic_source%time_steps)
         
         ! Parse the EM Source
-        call json%get('Electromagnetic/Source/x', electromagnetic_source%x)
-        call json%get('Electromagnetic/Source/y', electromagnetic_source%y)
-        call json%get('Electromagnetic/Source/z', electromagnetic_source%z)
-        call json%get('Electromagnetic/Source/source_frequency', electromagnetic_source%source_frequency)
-        call json%get('Electromagnetic/Source/x-z_rotation', electromagnetic_source%x_z_rotation)
-        call json%get('Electromagnetic/Source/x-y_rotation', electromagnetic_source%x_y_rotation)
-        call json%get('Electromagnetic/Source/amplitude', electromagnetic_source%amplitude)
-        call json%get('Electromagnetic/Source/source_type', electromagnetic_source%source_type)
-
-        ! Allocate and parse all tensor coefficients. This one's a doozy.
-        allocate(seismic_stiffness(domain%nmats))
-        allocate(seismic_attenuation(domain%nmats))
-        allocate(electromagnetic_permittivity(domain%nmats))
-        allocate(electromagnetic_conductivity(domain%nmats))
-        
-        do i = 1, domain%nmats
-             write(i_str, '(I0)') i  ! Convert integer i to a string without leading zeros
-             
-            ! Seismic
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/id', &
-                            seismic_stiffness(i)%id)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c11', &
-                            seismic_stiffness(i)%c11)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c12', &
-                            seismic_stiffness(i)%c12)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c13', &
-                            seismic_stiffness(i)%c13)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c14', &
-                            seismic_stiffness(i)%c14)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c15', &
-                            seismic_stiffness(i)%c15)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c16', &
-                            seismic_stiffness(i)%c16)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c22', &
-                            seismic_stiffness(i)%c22)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c23', &
-                            seismic_stiffness(i)%c23)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c24', &
-                            seismic_stiffness(i)%c24)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c25', &
-                            seismic_stiffness(i)%c25)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c26', &
-                            seismic_stiffness(i)%c26)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c33', &
-                            seismic_stiffness(i)%c33)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c34', &
-                            seismic_stiffness(i)%c34)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c35', &
-                            seismic_stiffness(i)%c35)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c36', &
-                            seismic_stiffness(i)%c36)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c44', &
-                            seismic_stiffness(i)%c44)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c45', &
-                            seismic_stiffness(i)%c45)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c46', &
-                            seismic_stiffness(i)%c46)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c55', &
-                            seismic_stiffness(i)%c55)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c56', &
-                            seismic_stiffness(i)%c56)
-            call json%get('Seismic/Stiffness_Coefficients('//trim(adjustl(i_str))//')/c66', &
-                            seismic_stiffness(i)%c66) 
-            ! EM      
-            call json%get('Electromagnetic/Permittivity_Coefficients('//trim(adjustl(i_str))//')/e11',&
-                            electromagnetic_permittivity(i)%e11)         
-            call json%get('Electromagnetic/Permittivity_Coefficients('//trim(adjustl(i_str))//')/e12',&
-                            electromagnetic_permittivity(i)%e12)         
-            call json%get('Electromagnetic/Permittivity_Coefficients('//trim(adjustl(i_str))//')/e13',&
-                            electromagnetic_permittivity(i)%e13)    
-            call json%get('Electromagnetic/Permittivity_Coefficients('//trim(adjustl(i_str))//')/e22',&
-                            electromagnetic_permittivity(i)%e22)   
-            call json%get('Electromagnetic/Permittivity_Coefficients('//trim(adjustl(i_str))//')/e23',&
-                            electromagnetic_permittivity(i)%e23)   
-            call json%get('Electromagnetic/Permittivity_Coefficients('//trim(adjustl(i_str))//')/e33',&
-                            electromagnetic_permittivity(i)%e33)   
-            call json%get('Electromagnetic/Conductivity_Coefficients('//trim(adjustl(i_str))//')/s11',&
-                            electromagnetic_conductivity(i)%s11)   
-            call json%get('Electromagnetic/Conductivity_Coefficients('//trim(adjustl(i_str))//')/s12',&
-                            electromagnetic_conductivity(i)%s12)   
-            call json%get('Electromagnetic/Conductivity_Coefficients('//trim(adjustl(i_str))//')/s13',&
-                            electromagnetic_conductivity(i)%s13)
-            call json%get('Electromagnetic/Conductivity_Coefficients('//trim(adjustl(i_str))//')/s22',&
-                            electromagnetic_conductivity(i)%s22)   
-            call json%get('Electromagnetic/Conductivity_Coefficients('//trim(adjustl(i_str))//')/s23',&
-                            electromagnetic_conductivity(i)%s23)   
-            call json%get('Electromagnetic/Conductivity_Coefficients('//trim(adjustl(i_str))//')/s33',&
-                            electromagnetic_conductivity(i)%s33)   
-            
-        end do
+        call json%get('Electromagnetic.Source.x', electromagnetic_source%x)
+        call json%get('Electromagnetic.Source.y', electromagnetic_source%y)
+        call json%get('Electromagnetic.Source.z', electromagnetic_source%z)
+        call json%get('Electromagnetic.Source.xind', electromagnetic_source%xind)
+        call json%get('Electromagnetic.Source.yind', electromagnetic_source%yind)
+        call json%get('Electromagnetic.Source.zind', electromagnetic_source%zind)
+        call json%get('Electromagnetic.Source.source_frequency', electromagnetic_source%source_frequency)
+        call json%get('Electromagnetic.Source.x-z_rotation', electromagnetic_source%x_z_rotation)
+        call json%get('Electromagnetic.Source.x-y_rotation', electromagnetic_source%x_y_rotation)
+        call json%get('Electromagnetic.Source.amplitude', electromagnetic_source%amplitude)
+        call json%get('Electromagnetic.Source.source_type', electromagnetic_source%source_type)
+        call json%get('Electromagnetic.Source.dt', electromagnetic_source%dt)
+        call json%get('Electromagnetic.Source.time_steps', electromagnetic_source%time_steps)
 
         call json%destroy()
     end subroutine parse_json
@@ -170,7 +84,6 @@ module seidartio
         type(Domain_Type), intent(in) :: domain 
         integer, allocatable, intent(out) :: geometry(:,:)
         
-        integer :: i,j 
         integer :: nx, nz 
         integer :: io_status 
         integer :: unit_number 
@@ -183,8 +96,8 @@ module seidartio
         allocate(geometry(nx, nz))
         
         ! Open the geometry.dat file for reading
-        open(newunit=unit_number, file=file_name, status = 'old', action = 'read', &
-            iostat = io_status)
+        open(newunit=unit_number, file=trim(file_name), form='unformatted', &
+                status='old', iostat=io_status)
         
         if (io_status /= 0) then 
             print *, "Error opening file: ", file_name 
@@ -192,15 +105,11 @@ module seidartio
         end if
         
         ! Read the nx-by-nz array from the file
-        do j = 1, nz
-            do i = 1, nx
-            read(unit_number, *, iostat=io_status) geometry(i, j)
-            if (io_status /= 0) then
-                print *, "Error reading geometry data"
-                stop
-            end if
-            end do
-        end do
+        read(unit_number) geometry
+        if (io_status /= 0) then
+            print *, "Error reading geometry data"
+            stop
+        end if
         
         ! Close the file 
         close(unit_number)
@@ -225,7 +134,7 @@ module seidartio
         integer :: unit_number, io_status 
         
         character(len=7) :: stiffness_fn
-        character(len=10) :: attenuation_fn
+        ! character(len=10) :: attenuation_fn
         character(len=3), dimension(22) :: scoef_names = (/ &
                                             'c11', 'c12', 'c13', 'c14', 'c15', &
                                             'c16', 'c22', 'c23', 'c24', 'c25', &
@@ -233,7 +142,8 @@ module seidartio
                                             'c44', 'c45', 'c46', 'c55', 'c56', &
                                             'c66', 'rho' /)
         
-        character(len=6), dimension(3) :: acoef_names = (/ 'gammax', 'gammay', 'gammaz'/)
+        character(len=10), dimension(3) :: attenuation_fn = (/ &
+                                    'gammax.dat', 'gammay.dat', 'gammaz.dat'/)
         
         ! Extract domain dimensions and cpml
         nx = domain%nx
@@ -247,10 +157,10 @@ module seidartio
         ! Allocate the extended stiffness array with extra CPML padding
         allocate(extended_stiffness(nx_ext, nz_ext, 22))
         allocate(extended_attenuation(nx_ext, nz_ext, 3))  
-        allocate(density_gradient(nx_ext, nz_ext))
+        allocate(density_gradient(nx, nz))
         
         ! Load the density gradient 
-        call material_rw('density_gradient.dat', density_gradient, .TRUE. )
+        call material_rw2('density_gradient.dat', density_gradient, .TRUE. )
         
         extended_stiffness(:,:,:) = 0.0 
         extended_attenuation(:,:,:) = 0.0
@@ -258,7 +168,7 @@ module seidartio
          ! Loop over the geometry array and assign stiffness coefficients
         do j = 1, nz
             do i = 1, nx
-                id_value = geometry(i, j)  ! Get the material id from geometry
+                id_value = geometry(i, j) + 1  ! Get the material id from geometry
 
                 ! Assign stiffness coefficients based on id_value from geometry
                 extended_stiffness(i + cpml, j + cpml, 1) = stiffness(id_value)%c11
@@ -290,62 +200,62 @@ module seidartio
             end do
         end do
         
+        ! Scale the density by the gradient that was calculated around air boundaries
+        extended_stiffness(cpml+1:nx+cpml,cpml+1:nz+cpml,22) = extended_stiffness(cpml+1:nx+cpml,cpml+1:nz+cpml,22) * density_gradient
+        
         ! Extend the values at 1 + cpml to the 1 to cpml indices
         do k = 1, 21
             ! Extend along x-direction (rows)
             do j = 1, nz_ext
                 do i = 1, cpml
                     extended_stiffness(i, j, k) = extended_stiffness(1 + cpml, j, k)
-                    extended_attenuation(i, j, k) = extended_attenuation(1 + cpml, j, k)
                     extended_stiffness(nx_ext - i + 1, j, k) = extended_stiffness(nx_ext - cpml, j, k)
-                    extended_attenuation(nx_ext - i + 1, j, k) = extended_attenuation(nx_ext - cpml, j, k)
                 end do
             end do
-            
             
             ! Extend along z-direction (columns)
             do i = 1, nx_ext
                 do j = 1, cpml
                     extended_stiffness(i, j, k) = extended_stiffness(i, 1 + cpml, k)
-                    extended_attenuation(i, j, k) = extended_attenuation(i, 1 + cpml, k)
                     extended_stiffness(i, nz_ext - j + 1, k) = extended_stiffness(i, nz_ext - cpml, k)
+                end do
+            end do
+        end do
+        
+        do k = 1, 3
+            ! Extend along x-direction (rows)
+            do j = 1, nz_ext
+                do i = 1, cpml
+                    extended_attenuation(i, j, k) = extended_attenuation(1 + cpml, j, k)
+                    extended_attenuation(nx_ext - i + 1, j, k) = extended_attenuation(nx_ext - cpml, j, k)
+                end do
+            end do
+            
+            ! Extend along z-direction (columns)
+            do i = 1, nx_ext
+                do j = 1, cpml
+                    extended_attenuation(i, j, k) = extended_attenuation(i, 1 + cpml, k)
                     extended_attenuation(i, nz_ext - j + 1, k) = extended_attenuation(i, nz_ext - cpml, k)
                 end do
             end do
         end do
         
-        ! Scale the density by the gradient that was calculated around air boundaries
-        extended_stiffness(:,:,22) = extended_stiffness(:,:,22) * density_gradient
-        
         ! Write each 2D array (stiffness coefficients) to separate files
         do k = 1, 22
             ! Create filename based on coefficient name (e.g., 'c11.dat')
             write(stiffness_fn, '(A3, ".dat")') scoef_names(k)
-
-            ! Open the file to write the 2D array
-            open(newunit=unit_number, file=stiffness_fn, form='unformatted', &
-                access='stream', status='replace', iostat=io_status)
-            if (io_status /= 0) then
-                print *, "Error opening file for writing: ", stiffness_fn
-                stop
-            end if
-
-            ! Write the 2D array to the binary file
-            write(unit_number) extended_stiffness(:,:,k)
-
-            ! Close the file
-            close(unit_number)
+            call material_rw2(stiffness_fn, extended_stiffness(:,:,k), .FALSE.)
         end do
         
         do k = 1, 3
             ! Create filename based on coefficient name (e.g., 'c11.dat')
-            write(attenuation_fn, '(A3, ".dat")') acoef_names(k)
+            ! write(attenuation_fn, '(A3, ".dat")') acoef_names(k)
 
             ! Open the file to write the 2D array
-            open(newunit=unit_number, file=attenuation_fn, form='unformatted', &
+            open(newunit=unit_number, file=attenuation_fn(k), form='unformatted', &
                 access='stream', status='replace', iostat=io_status)
             if (io_status /= 0) then
-                print *, "Error opening file for writing: ", attenuation_fn
+                print *, "Error opening file for writing: ", attenuation_fn(k)
                 stop
             end if
 
@@ -443,7 +353,7 @@ module seidartio
         
         do k = 1, 6
             ! Create filename based on coefficient name (e.g., 'c11.dat')
-            write(permittivity_fn, '(A3, ".dat")') pcoef_names(k)
+            write(permittivity_fn, '(A5, ".dat")') pcoef_names(k)
 
             ! Open the file to write the 2D array
             open(newunit=unit_number, file=permittivity_fn, form='unformatted', &
@@ -513,45 +423,67 @@ module seidartio
 
         implicit none
         
-        ! Arguments
-        character(len=*), intent(in) :: filename
-        real(real64), dimension(..), intent(inout) :: image_data
-        logical, intent(in) :: readfile
-        
-        ! Local variables
         integer :: unit_number
-        integer :: io_status
-
-        ! Open the file with a dynamic unit number
-        open(newunit=unit_number, file=trim(filename), form="unformatted", &
-            status="old", action="readwrite", iostat=io_status)
+        character(len=*) :: filename
+        real(real64),dimension(:,:) :: image_data
+        logical :: readfile
         
-        ! Check if the file opened successfully
-        if (io_status /= 0) then
-            print *, 'Error opening file: ', filename
-            stop
-        end if
+        open(newunit=unit_number, form="unformatted", file = trim(filename))
         
-        ! Read or write based on the value of readfile
-        select rank(image_data)
-        rank(2)
-            if (readfile) then
-                read(unit_number) image_data
-            else
-                write(unit_number) image_data
-            end if
-        rank(3)
-            if (readfile) then
-                read(unit_number) image_data
-            else
-                write(unit_number) image_data
-            end if
-        end select
+        if ( readfile ) then
+            read(unit_number) image_data
+        else
+            write(unit_number) image_data
+        endif
         
-        ! Close the file
-        close(unit_number)
+        close(unit = unit_number)
 
     end subroutine material_rw
+    
+    ! --------------------------------------------------------------------------
+    subroutine material_rw2(filename, image_data, readfile)
+
+        implicit none
+        
+        character(len=*) :: filename
+        real(real64),dimension(:,:) :: image_data
+        logical :: readfile
+        integer :: unit_number
+        
+        
+        open(newunit = unit_number, form="unformatted", file = trim(filename) )
+        
+        if ( readfile ) then
+            read(unit_number) image_data
+        else
+            write(unit_number) image_data
+        endif
+        
+        close(unit_number)
+
+    end subroutine material_rw2
+    
+    ! --------------------------------------------------------------------------
+    subroutine material_rw3(filename, image_data, readfile)
+
+        implicit none
+        
+        character(len=*) :: filename
+        real(real64),dimension(:,:,:) :: image_data
+        logical :: readfile
+        integer :: unit_number
+        
+        open(newunit = unit_number, form="unformatted", file = trim(filename))
+        
+        if ( readfile ) then
+            read(unit_number) image_data
+        else
+            write(unit_number) image_data
+        endif
+        
+        close(unit_number)
+
+    end subroutine material_rw3
     
     ! --------------------------------------------------------------------------
     subroutine write_image(image_data, domain, source, it, channel, SINGLE)
@@ -575,7 +507,7 @@ module seidartio
 
         ! Write the filename based on the rank of the src array
         if (domain%dim == 2) then
-            WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a1, a4)" ) &
+            WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a4)" ) &
                     channel, '.', it, '.', source%xind, '.', source%zind, '.dat'
         else if (domain%dim == 2.5) then
             WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a1, i0, a4)" ) &
@@ -623,6 +555,97 @@ module seidartio
         close(unit_number)
 
     end subroutine write_image
+    
+    ! --------------------------------------------------------------------------
+    subroutine write_image2(image_data, nx, nz, source, it, channel, SINGLE)
+    
+        implicit none
+
+        integer :: unit_number, io_status
+        integer :: nx, nz, it
+        type(Source_Type), intent(in) :: source
+        real(real64), intent(in) :: image_data(nx, nz)
+        character(len=2) :: channel
+        character(len=100) :: filename
+        logical :: SINGLE
+
+        ! WRITE (filename, "(a2, i6.6, '.dat')" ) channel, it
+        WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a4)" ) &
+            channel, '.', it, '.', source%xind, '.', source%zind, '.dat'
+        open(newunit = unit_number, form = 'unformatted', action="write", &
+                file = trim(filename), access="sequential", iostat=io_status)
+
+        if (io_status /= 0) then
+            print *, "Error opening file"
+            stop
+        end if
+        
+        if (SINGLE) then
+            write(unit_number) sngl(image_data)
+        else
+            write(unit_number) image_data 
+        end if 
+        
+        flush(unit_number)
+        close(unit_number)
+
+    end subroutine write_image2
+    
+    ! subroutine write_image2(image_data, nx, nz, src, it, channel, SINGLE)
+    
+    !     implicit none
+
+    !     integer, parameter :: dp = kind(0.d0)
+    !     integer :: unit_number
+    !     integer :: nx, nz, it
+    !     integer,dimension(2) :: src
+    !     real(kind=dp) :: image_data(nx, nz)
+    !     character(len=2) :: channel
+    !     character(len=100) :: filename
+    !     logical :: SINGLE
+
+    !     ! WRITE (filename, "(a2, i6.6, '.dat')" ) channel, it
+    !     WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a1, a4)" ) &
+    !                 channel,'.', it,'.', src(1),'.', src(2), '.','.dat'
+    !     open(newunit = unit_number, form = 'unformatted', file = trim(filename) )
+
+    !     if (SINGLE) then
+    !         write(unit_number) sngl(image_data)
+    !     else
+    !         write(unit_number) image_data 
+    !     end if 
+
+
+    !     close(unit = unit_number)
+
+    ! end subroutine write_image2
+    
+    ! --------------------------------------------------------------------------
+    subroutine write_image3(image_data, nx, ny, nz, source, it, channel, SINGLE)
+    
+        implicit none
+    
+        integer :: nx, ny, nz, it, unit_number
+        type(Source_Type), intent(in) :: source
+        real(real64), intent(in) :: image_data(nx, ny, nz)
+        character(len=2) :: channel
+        character(len=80) :: filename
+        logical :: SINGLE
+        
+        WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a1, i0, a4)" ) &
+            channel, '.', it, '.', source%xind, '.', source%yind, '.', source%zind, '.dat'
+        
+        open(newunit = unit_number, form = 'unformatted', file = trim(filename) )
+        
+        if (SINGLE) then
+            write(unit_number) sngl(image_data)
+        else
+            write(unit_number) image_data 
+        end if 
+        
+        close(unit = unit_number)
+
+    end subroutine write_image3
     
     ! ! --------------------------------------------------------------------------
     subroutine loadcpml(filename, image_data)
