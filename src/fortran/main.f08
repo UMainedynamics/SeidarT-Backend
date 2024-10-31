@@ -15,15 +15,10 @@ program main
     
     implicit none 
     
-    type(Domain_Type) :: domain 
-    ! type(Stiffness_Type), allocatable :: stiffness(:)
-    ! type(Attenuation_Type), allocatable :: attenuation(:)
-    ! type(Permittivity_Type), allocatable :: permittivity(:)
-    ! type(Conductivity_Type), allocatable :: conductivity(:)
     type(Source_Type) :: seismic_source
     type(Source_Type) :: electromagnetic_source
     
-    integer, allocatable :: geometry(:,:) 
+    ! integer, allocatable :: geometry(:,:) 
     character(len=256) :: input_json_file 
     logical :: seismic
     integer :: argc 
@@ -66,10 +61,11 @@ program main
     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
     
     domain%nx = domain%nx + 2*domain%cpml
+    domain%ny = domain%ny + 2*domain%cpml
     domain%nz = domain%nz + 2*domain%cpml
     
     ! Read the geometry.dat file into memory
-    call read_geometry('geometry.dat', domain, geometry)
+    ! call read_geometry('geometry.dat', domain, geometry)
     
     ! if (seismic) then 
     !     print *, "Writing seismic model parameters to Fortran unformatted binary files."
@@ -84,10 +80,10 @@ program main
     if (domain%dim == 2.5) then
         if (seismic) then
             print *, "Running 2.5D seismic model with ", seismic_source%time_steps, " time steps"
-            ! call seismic25(domain, seismic_source, .TRUE.)
+            call seismic25(domain, seismic_source, .TRUE.)
         else 
             print *, "Running 2.5D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
-            ! call electromag25(domain, electromagnetic_source, .TRUE.)
+            call electromag25(domain, electromagnetic_source, .TRUE.)
         endif
     else
         if (seismic) then  

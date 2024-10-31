@@ -423,6 +423,7 @@ module cpmlfdtd
                                                        c44(nx,nz), c45(nx,nz), c46(nx,nz), &
                                                                    c55(nx,nz), c56(nx,nz), &
                                                                                c66(nx,nz) )
+        allocate(rho(nx,nz))
                 
         allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
                 K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
@@ -431,14 +432,9 @@ module cpmlfdtd
         allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
                 K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
         allocate(gammax(nx, nz), gammay(nx, nz), gammaz(nx, nz))
-        allocate(srcx(source%time_steps), srcz(source%time_steps))
+        allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
                 
         ! Allocate more
-        allocate(memory_dvx_dx(nx, ny, nz), memory_dvx_dz(nx, ny, nz))
-        allocate(memory_dvz_dx(nx, ny, nz), memory_dvz_dz(nx, ny, nz))
-        allocate(memory_dsigmaxx_dx(nx, ny, nz), memory_dsigmazz_dz(nx, ny, nz))
-        allocate(memory_dsigmaxz_dx(nx, ny, nz), memory_dsigmaxz_dz(nx, ny, nz))
-        
         allocate(memory_dvx_dx(nx,ny,nz), memory_dvx_dy(nx,ny,nz), memory_dvx_dz(nx,ny,nz) )
         allocate(memory_dvy_dx(nx,ny,nz), memory_dvy_dy(nx,ny,nz), memory_dvy_dz(nx,ny,nz) )
         allocate(memory_dvz_dx(nx,ny,nz), memory_dvz_dy(nx,ny,nz), memory_dvz_dz(nx,ny,nz) )
@@ -967,29 +963,29 @@ module cpmlfdtd
         endif
         
         ! ----------------------------------------------------------------------
-            nx = domain%nx 
-            nz = domain%nz 
-            dx = domain%dx 
-            dz = domain%dz 
-            dt = source%dt
-            
-            allocate(eps11(nx, nz), eps13(nx, nz),  &
-                        eps33(nx, nz))
-            allocate(sig11(nx, nz), sig13(nx, nz),  &
-                        sig33(nx, nz))
-            allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
-                    K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
-            allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
-                    K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
-            allocate(srcx(source%time_steps), srcz(source%time_steps))
-            
-            ! Allocate more
-            allocate(epsilonx(nx, nz), epsilonz(nx, nz))
-            allocate(sigmax(nx, nz), sigmaz(nx, nz))
-            allocate(memory_dEz_dx(nx, nz), memory_dEx_dz(nx, nz))
-            allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
-            allocate(Ex(nx, nz), Ez(nx, nz))
-            allocate(Hy(nx, nz))
+        nx = domain%nx 
+        nz = domain%nz 
+        dx = domain%dx 
+        dz = domain%dz 
+        dt = source%dt
+        
+        allocate(eps11(nx, nz), eps13(nx, nz),  &
+                    eps33(nx, nz))
+        allocate(sig11(nx, nz), sig13(nx, nz),  &
+                    sig33(nx, nz))
+        allocate(K_x(nx), alpha_x(nx), a_x(nx), b_x(nx), &
+                K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
+        allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
+                K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
+        allocate(srcx(source%time_steps), srcz(source%time_steps))
+        
+        ! Allocate more
+        allocate(epsilonx(nx, nz), epsilonz(nx, nz))
+        allocate(sigmax(nx, nz), sigmaz(nx, nz))
+        allocate(caEx(nx, nz), cbEx(nx, nz), caEz(nx, nz), cbEz(nx, nz))
+        allocate(memory_dEz_dx(nx, nz), memory_dEx_dz(nx, nz))
+        allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
+        allocate(Ex(nx, nz), Ez(nx, nz), Hy(nx, nz))
             
         ! ======================================================================
         ! ----------------------- Load Permittivity Coefficients ----------------------
@@ -1050,9 +1046,10 @@ module cpmlfdtd
         ! ----------------------------------------------------------------------
         ! Load initial conditions and initialize variables
         call material_rw2('initialconditionEx.dat', Ex, .TRUE.)
-        call material_rw2('initialconditionHy.dat', Hy, .TRUE.)
+        ! call material_rw2('initialconditionHy.dat', Hy, .TRUE.)
         call material_rw2('initialconditionEz.dat', Ez, .TRUE.)
-
+    
+        Hy(:,:) = 0.d0
         ! PML
         memory_dEx_dz(:,:) = 0.0d0
         memory_dEz_dx(:,:) = 0.0d0
@@ -1269,9 +1266,10 @@ module cpmlfdtd
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         
         ! Allocate more
-        allocate(epsilonx(nx, nz), epsilony(nx, nz), epsilonz(nx, nz))
-        allocate(sigmax(nx, nz), sigmay(nx, nz), sigmaz(nx, nz))
-        
+        allocate(epsilonx(nx,nz), epsilony(nx,nz), epsilonz(nx,nz))
+        allocate(sigmax(nx,nz), sigmay(nx,nz), sigmaz(nx, nz))
+        allocate(caEx(nx,nz), cbEx(nx,nz), caEy(nx,nz), cbEy(nx,nz), &
+                    caEz(nx,nz), cbEz(nx,nz))
         allocate( memory_dEx_dy(nx,ny,nz), memory_dEy_dx(nx,ny,nz), &
                     memory_dEx_dz(nx,ny,nz), memory_dEz_dx(nx,ny,nz), &
                     memory_dEz_dy(nx,ny,nz), memory_dEy_dz(nx,ny,nz) )
@@ -1284,19 +1282,19 @@ module cpmlfdtd
         
         ! ------------------------ Load Permittivity Coefficients ------------------------
         ! Load Epsilon
-        call material_rw2('eps11.dat', eps11, .TRUE.)
-        call material_rw2('eps12.dat', eps12, .TRUE.)
-        call material_rw2('eps13.dat', eps13, .TRUE.)
-        call material_rw2('eps22.dat', eps22, .TRUE.)
-        call material_rw2('eps23.dat', eps23, .TRUE.)
-        call material_rw2('eps33.dat', eps33, .TRUE.)
+        call material_rw2('e11.dat', eps11, .TRUE.)
+        call material_rw2('e12.dat', eps12, .TRUE.)
+        call material_rw2('e13.dat', eps13, .TRUE.)
+        call material_rw2('e22.dat', eps22, .TRUE.)
+        call material_rw2('e23.dat', eps23, .TRUE.)
+        call material_rw2('e33.dat', eps33, .TRUE.)
         ! Load Sigma
-        call material_rw2('sig11.dat', sig11, .TRUE.)
-        call material_rw2('sig12.dat', sig12, .TRUE.)
-        call material_rw2('sig13.dat', sig13, .TRUE.)
-        call material_rw2('sig22.dat', sig22, .TRUE.)
-        call material_rw2('sig23.dat', sig23, .TRUE.)
-        call material_rw2('sig33.dat', sig33, .TRUE.)
+        call material_rw2('s11.dat', sig11, .TRUE.)
+        call material_rw2('s12.dat', sig12, .TRUE.)
+        call material_rw2('s13.dat', sig13, .TRUE.)
+        call material_rw2('s22.dat', sig22, .TRUE.)
+        call material_rw2('s23.dat', sig23, .TRUE.)
+        call material_rw2('s33.dat', sig33, .TRUE.)
 
         ! ------------------------ Assign some constants -----------------------
         ! Assign the source location indices
@@ -1316,24 +1314,17 @@ module cpmlfdtd
         sigmay(:,:) = sig12 + sig22 + sig23
         sigmaz(:,:) = sig13 + sig23 + sig33
 
-        caEx(:,:) = ( 1.0d0 - sigmax * dt / &
-                    (2.0d0 * epsilonx ) ) / &
-                    ( 1.0d0 + sigmax * dt / &
-                    (2.0d0 * epsilonx ) )
-        cbEx(:,:) = (dt / epsilonx ) / &
-                    ( 1.0d0 + sigmax * dt / &
-                    ( 2.0d0 * epsilonx ) )
+        caEx(:,:) = ( 1.0d0 - sigmax * dt / (2.0d0 * epsilonx ) ) / &
+                    ( 1.0d0 + sigmax * dt / (2.0d0 * epsilonx ) )
+        cbEx(:,:) = (dt / epsilonx ) / ( 1.0d0 + sigmax * dt / ( 2.0d0 * epsilonx ) )
 
         caEy(:,:) = ( 1.0d0 - sigmay * dt / (2.0d0 * epsilony ) ) / &
                     ( 1.0d0 + sigmay * dt / (2.0d0 * epsilony ) )
-        cbEy(:,:) = (dt / epsilony ) / &
-                    ( 1.0d0 + sigmay * dt / ( 2.0d0 * epsilony ) )
+        cbEy(:,:) = (dt / epsilony ) / ( 1.0d0 + sigmay * dt / ( 2.0d0 * epsilony ) )
 
-        caEz(:,:) = ( 1.0d0 - sigmaz * dt / &
-                    ( 2.0d0 * epsilonz ) ) / &
+        caEz(:,:) = ( 1.0d0 - sigmaz * dt / ( 2.0d0 * epsilonz ) ) / &
                     ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
-        cbEz(:,:) = (dt / epsilonz ) / &
-                    ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
+        cbEz(:,:) = (dt / epsilonz ) / ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
 
         daHx = dt/(4.0d0*mu0*mu)
         dbHx = dt/mu0 !dt/(mu*mu*dx*(1+daHz) ) 
@@ -1428,10 +1419,13 @@ module cpmlfdtd
         call material_rw3('initialconditionEy.dat', Ey, .TRUE.)
         call material_rw3('initialconditionEz.dat', Ez, .TRUE.)
         
-        call material_rw3('initialconditionHx.dat', Hx, .TRUE.)
-        call material_rw3('initialconditionHy.dat', Hy, .TRUE.)
-        call material_rw3('initialconditionHz.dat', Hz, .TRUE.)
-
+        ! call material_rw3('initialconditionHx.dat', Hx, .TRUE.)
+        ! call material_rw3('initialconditionHy.dat', Hy, .TRUE.)
+        ! call material_rw3('initialconditionHz.dat', Hz, .TRUE.)
+        Hx(:,:,:) = 0.d0  
+        Hy(:,:,:) = 0.d0 
+        Hz(:,:,:) = 0.d0 
+        
         ! PML
         memory_dEx_dy(:,:,:) = 0.0d0
         memory_dEy_dx(:,:,:) = 0.0d0
