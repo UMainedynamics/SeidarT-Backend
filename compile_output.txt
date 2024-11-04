@@ -1,0 +1,60 @@
+src/fortran/main.f08:63:12:
+
+   63 |     domain%nx = domain%nx + 2*domain%cpml
+      |            1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:64:12:
+
+   64 |     domain%ny = domain%ny + 2*domain%cpml
+      |            1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:65:12:
+
+   65 |     domain%nz = domain%nz + 2*domain%cpml
+      |            1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:80:16:
+
+   80 |     if (domain%dim == 2.5) then
+      |                1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:88:8:
+
+   88 |     else
+      |        1
+Error: Unexpected ELSE statement at (1)
+src/fortran/main.f08:96:7:
+
+   96 |     endif
+      |       1
+Error: Expecting END PROGRAM statement at (1)
+src/fortran/main.f08:61:49:
+
+   61 |     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+      |                                                 1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:61:49:
+
+   61 |     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+      |                                                 1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:61:49:
+
+   61 |     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+      |                                                 1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:61:49:
+
+   61 |     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+      |                                                 1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:61:49:
+
+   61 |     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+      |                                                 1
+Error: Symbol 'domain' at (1) has no IMPLICIT type
+src/fortran/main.f08:61:49:
+
+   61 |     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+      |                                                 1
+Error: Symbol 'domain' at (1) has no IMPLICIT type

@@ -15,6 +15,7 @@ program main
     
     implicit none 
     
+    type(Domain_Type) :: domain 
     type(Source_Type) :: seismic_source
     type(Source_Type) :: electromagnetic_source
     
