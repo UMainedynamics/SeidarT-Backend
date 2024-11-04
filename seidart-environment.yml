@@ -1,0 +1,30 @@
+name: seidart
+channels:
+  - conda-forge
+  - defaults
+  - anaconda
+  - jmcmurray
+dependencies:
+  - cmake
+  - pip
+  - pyevtk
+  - python
+  - numpy
+  - pandas
+  - gfortran
+  - libgfortran5
+  - scipy
+  - setuptools
+  - seaborn
+  - imagemagick
+  - ghostscript
+  - glob2
+  - matplotlib
+  - wheel
+  - seaborn
+  - scikit-build
+  - dill 
+  - ninja
+  - json
+  - pip:
+      - mplstereonet
