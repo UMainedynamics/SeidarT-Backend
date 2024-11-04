@@ -1,6 +1,8 @@
 # 'make USE_OPENMP=1' will compile with the openmp directives. Default 'make' 
 # will compile without OpenMP. 
 #
+UNAME_S := $(shell uname -s)
+
 
 CONDA_PREFIX := $(shell conda info --base)/envs/seidart
 INCLUDE_PATH := $(CONDA_PREFIX)/include
@@ -10,6 +12,10 @@ BIN_PATH := $(CONDA_PREFIX)/bin
 # Compiler and flags
 FC := $(shell which gfortran)
 $(info Using GFortran from $(FC))
+
+ifeq ($(UNAME_S), Darwin)
+    UNSET_CONDA_ENV_VARS := $(shell unset CONDA_PREFIX && unset LD_LIBRARY_PATH && unset DYLD_LIBRARY_PATH)
+endif
 
 FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
 
