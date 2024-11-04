@@ -63,12 +63,14 @@ jobs:
           path: compile_output.txt
 
       - name: Archive Binaries
+        if: success()
         run: |
           mkdir -p release
           cp $BIN_PATH/seidartfdtd release/
         # Replace 'your_executable_name' with the actual executable name
           
       - name: Upload Binaries
+        if: success()
         uses: actions/upload-artifact@v3
         with:
           name: seidart-fortran-binaries-${{ matrix.os }}
