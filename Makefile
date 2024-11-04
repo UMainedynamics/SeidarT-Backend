@@ -8,7 +8,7 @@ LIB_PATH := $(CONDA_PREFIX)/lib
 BIN_PATH := $(CONDA_PREFIX)/bin
 
 # Compiler and flags
-FC := gfortran
+FC := $(shell which gfortran)
 FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
 
 # Source files
