@@ -23,8 +23,9 @@ jobs:
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v2
         with:
+          miniconda-version: "latest"  # Ensure Miniconda is installed
           auto-update-conda: true
-          python-version: 3.8
+          python-version: 3.12
           environment-file: seidart-environment.yml  # Assuming you have an environment.yml for dependencies
           activate-environment: seidart
           
