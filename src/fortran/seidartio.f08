@@ -116,282 +116,282 @@ module seidartio
     end subroutine read_geometry
 
     ! --------------------------------------------------------------------------
-    subroutine seismic_parameter_write(domain, geometry, stiffness, attenuation)
-        implicit none 
+    ! subroutine seismic_parameter_write(domain, geometry, stiffness, attenuation)
+    !     implicit none 
         
-        type(Domain_Type), intent(in) :: domain 
-        integer, intent(in) :: geometry(:,:)
-        type(Stiffness_Type), intent(in) :: stiffness(:)
-        type(Attenuation_Type), intent(in) :: attenuation(:)
+    !     type(Domain_Type), intent(in) :: domain 
+    !     integer, intent(in) :: geometry(:,:)
+    !     type(Stiffness_Type), intent(in) :: stiffness(:)
+    !     type(Attenuation_Type), intent(in) :: attenuation(:)
         
-        real(real64), allocatable :: extended_stiffness(:,:,:)
-        real(real64), allocatable :: extended_attenuation(:,:,:)
-        real(real64), allocatable :: density_gradient(:,:)
+    !     real(real64), allocatable :: extended_stiffness(:,:,:)
+    !     real(real64), allocatable :: extended_attenuation(:,:,:)
+    !     real(real64), allocatable :: density_gradient(:,:)
         
-        integer :: nx, nz, cpml 
-        integer :: i, j, k, id_value 
-        integer :: nx_ext, nz_ext 
-        integer :: unit_number, io_status 
+    !     integer :: nx, nz, cpml 
+    !     integer :: i, j, k, id_value 
+    !     integer :: nx_ext, nz_ext 
+    !     integer :: unit_number, io_status 
         
-        character(len=7) :: stiffness_fn
-        ! character(len=10) :: attenuation_fn
-        character(len=3), dimension(22) :: scoef_names = (/ &
-                                            'c11', 'c12', 'c13', 'c14', 'c15', &
-                                            'c16', 'c22', 'c23', 'c24', 'c25', &
-                                            'c26', 'c33', 'c34', 'c35', 'c36', &
-                                            'c44', 'c45', 'c46', 'c55', 'c56', &
-                                            'c66', 'rho' /)
+    !     character(len=7) :: stiffness_fn
+    !     ! character(len=10) :: attenuation_fn
+    !     character(len=3), dimension(22) :: scoef_names = (/ &
+    !                                         'c11', 'c12', 'c13', 'c14', 'c15', &
+    !                                         'c16', 'c22', 'c23', 'c24', 'c25', &
+    !                                         'c26', 'c33', 'c34', 'c35', 'c36', &
+    !                                         'c44', 'c45', 'c46', 'c55', 'c56', &
+    !                                         'c66', 'rho' /)
         
-        character(len=10), dimension(3) :: attenuation_fn = (/ &
-                                    'gammax.dat', 'gammay.dat', 'gammaz.dat'/)
+    !     character(len=10), dimension(3) :: attenuation_fn = (/ &
+    !                                 'gammax.dat', 'gammay.dat', 'gammaz.dat'/)
         
-        ! Extract domain dimensions and cpml
-        nx = domain%nx
-        nz = domain%nz
-        cpml = domain%cpml
+    !     ! Extract domain dimensions and cpml
+    !     nx = domain%nx
+    !     nz = domain%nz
+    !     cpml = domain%cpml
 
-        ! Calculate extended dimensions
-        nx_ext = 2 * cpml + nx
-        nz_ext = 2 * cpml + nz
+    !     ! Calculate extended dimensions
+    !     nx_ext = 2 * cpml + nx
+    !     nz_ext = 2 * cpml + nz
         
-        ! Allocate the extended stiffness array with extra CPML padding
-        allocate(extended_stiffness(nx_ext, nz_ext, 22))
-        allocate(extended_attenuation(nx_ext, nz_ext, 3))  
-        allocate(density_gradient(nx, nz))
+    !     ! Allocate the extended stiffness array with extra CPML padding
+    !     allocate(extended_stiffness(nx_ext, nz_ext, 22))
+    !     allocate(extended_attenuation(nx_ext, nz_ext, 3))  
+    !     allocate(density_gradient(nx, nz))
         
-        ! Load the density gradient 
-        call material_rw2('density_gradient.dat', density_gradient, .TRUE. )
+    !     ! Load the density gradient 
+    !     call material_rw2('density_gradient.dat', density_gradient, .TRUE. )
         
-        extended_stiffness(:,:,:) = 0.0 
-        extended_attenuation(:,:,:) = 0.0
+    !     extended_stiffness(:,:,:) = 0.0 
+    !     extended_attenuation(:,:,:) = 0.0
 
-         ! Loop over the geometry array and assign stiffness coefficients
-        do j = 1, nz
-            do i = 1, nx
-                id_value = geometry(i, j) + 1  ! Get the material id from geometry
+    !      ! Loop over the geometry array and assign stiffness coefficients
+    !     do j = 1, nz
+    !         do i = 1, nx
+    !             id_value = geometry(i, j) + 1  ! Get the material id from geometry
 
-                ! Assign stiffness coefficients based on id_value from geometry
-                extended_stiffness(i + cpml, j + cpml, 1) = stiffness(id_value)%c11
-                extended_stiffness(i + cpml, j + cpml, 2) = stiffness(id_value)%c12
-                extended_stiffness(i + cpml, j + cpml, 3) = stiffness(id_value)%c13
-                extended_stiffness(i + cpml, j + cpml, 4) = stiffness(id_value)%c14
-                extended_stiffness(i + cpml, j + cpml, 5) = stiffness(id_value)%c15
-                extended_stiffness(i + cpml, j + cpml, 6) = stiffness(id_value)%c16
-                extended_stiffness(i + cpml, j + cpml, 7) = stiffness(id_value)%c22
-                extended_stiffness(i + cpml, j + cpml, 8) = stiffness(id_value)%c23
-                extended_stiffness(i + cpml, j + cpml, 9) = stiffness(id_value)%c24
-                extended_stiffness(i + cpml, j + cpml, 10) = stiffness(id_value)%c25
-                extended_stiffness(i + cpml, j + cpml, 11) = stiffness(id_value)%c26
-                extended_stiffness(i + cpml, j + cpml, 12) = stiffness(id_value)%c33
-                extended_stiffness(i + cpml, j + cpml, 13) = stiffness(id_value)%c34
-                extended_stiffness(i + cpml, j + cpml, 14) = stiffness(id_value)%c35
-                extended_stiffness(i + cpml, j + cpml, 15) = stiffness(id_value)%c36
-                extended_stiffness(i + cpml, j + cpml, 16) = stiffness(id_value)%c44
-                extended_stiffness(i + cpml, j + cpml, 17) = stiffness(id_value)%c45
-                extended_stiffness(i + cpml, j + cpml, 18) = stiffness(id_value)%c46
-                extended_stiffness(i + cpml, j + cpml, 19) = stiffness(id_value)%c55
-                extended_stiffness(i + cpml, j + cpml, 20) = stiffness(id_value)%c56
-                extended_stiffness(i + cpml, j + cpml, 21) = stiffness(id_value)%c66
-                extended_stiffness(i + cpml, j + cpml, 22) = stiffness(id_value)%density
-                ! same for attenuation
-                extended_attenuation(i + cpml, j + cpml, 1) = attenuation(id_value)%alpha_x
-                extended_attenuation(i + cpml, j + cpml, 2) = attenuation(id_value)%alpha_y
-                extended_attenuation(i + cpml, j + cpml, 3) = attenuation(id_value)%alpha_z
-            end do
-        end do
+    !             ! Assign stiffness coefficients based on id_value from geometry
+    !             extended_stiffness(i + cpml, j + cpml, 1) = stiffness(id_value)%c11
+    !             extended_stiffness(i + cpml, j + cpml, 2) = stiffness(id_value)%c12
+    !             extended_stiffness(i + cpml, j + cpml, 3) = stiffness(id_value)%c13
+    !             extended_stiffness(i + cpml, j + cpml, 4) = stiffness(id_value)%c14
+    !             extended_stiffness(i + cpml, j + cpml, 5) = stiffness(id_value)%c15
+    !             extended_stiffness(i + cpml, j + cpml, 6) = stiffness(id_value)%c16
+    !             extended_stiffness(i + cpml, j + cpml, 7) = stiffness(id_value)%c22
+    !             extended_stiffness(i + cpml, j + cpml, 8) = stiffness(id_value)%c23
+    !             extended_stiffness(i + cpml, j + cpml, 9) = stiffness(id_value)%c24
+    !             extended_stiffness(i + cpml, j + cpml, 10) = stiffness(id_value)%c25
+    !             extended_stiffness(i + cpml, j + cpml, 11) = stiffness(id_value)%c26
+    !             extended_stiffness(i + cpml, j + cpml, 12) = stiffness(id_value)%c33
+    !             extended_stiffness(i + cpml, j + cpml, 13) = stiffness(id_value)%c34
+    !             extended_stiffness(i + cpml, j + cpml, 14) = stiffness(id_value)%c35
+    !             extended_stiffness(i + cpml, j + cpml, 15) = stiffness(id_value)%c36
+    !             extended_stiffness(i + cpml, j + cpml, 16) = stiffness(id_value)%c44
+    !             extended_stiffness(i + cpml, j + cpml, 17) = stiffness(id_value)%c45
+    !             extended_stiffness(i + cpml, j + cpml, 18) = stiffness(id_value)%c46
+    !             extended_stiffness(i + cpml, j + cpml, 19) = stiffness(id_value)%c55
+    !             extended_stiffness(i + cpml, j + cpml, 20) = stiffness(id_value)%c56
+    !             extended_stiffness(i + cpml, j + cpml, 21) = stiffness(id_value)%c66
+    !             extended_stiffness(i + cpml, j + cpml, 22) = stiffness(id_value)%density
+    !             ! same for attenuation
+    !             extended_attenuation(i + cpml, j + cpml, 1) = attenuation(id_value)%alpha_x
+    !             extended_attenuation(i + cpml, j + cpml, 2) = attenuation(id_value)%alpha_y
+    !             extended_attenuation(i + cpml, j + cpml, 3) = attenuation(id_value)%alpha_z
+    !         end do
+    !     end do
         
-        ! Scale the density by the gradient that was calculated around air boundaries
-        extended_stiffness(cpml+1:nx+cpml,cpml+1:nz+cpml,22) = extended_stiffness(cpml+1:nx+cpml,cpml+1:nz+cpml,22) * density_gradient
+    !     ! Scale the density by the gradient that was calculated around air boundaries
+    !     extended_stiffness(cpml+1:nx+cpml,cpml+1:nz+cpml,22) = extended_stiffness(cpml+1:nx+cpml,cpml+1:nz+cpml,22) * density_gradient
         
-        ! Extend the values at 1 + cpml to the 1 to cpml indices
-        do k = 1, 21
-            ! Extend along x-direction (rows)
-            do j = 1, nz_ext
-                do i = 1, cpml
-                    extended_stiffness(i, j, k) = extended_stiffness(1 + cpml, j, k)
-                    extended_stiffness(nx_ext - i + 1, j, k) = extended_stiffness(nx_ext - cpml, j, k)
-                end do
-            end do
+    !     ! Extend the values at 1 + cpml to the 1 to cpml indices
+    !     do k = 1, 21
+    !         ! Extend along x-direction (rows)
+    !         do j = 1, nz_ext
+    !             do i = 1, cpml
+    !                 extended_stiffness(i, j, k) = extended_stiffness(1 + cpml, j, k)
+    !                 extended_stiffness(nx_ext - i + 1, j, k) = extended_stiffness(nx_ext - cpml, j, k)
+    !             end do
+    !         end do
             
-            ! Extend along z-direction (columns)
-            do i = 1, nx_ext
-                do j = 1, cpml
-                    extended_stiffness(i, j, k) = extended_stiffness(i, 1 + cpml, k)
-                    extended_stiffness(i, nz_ext - j + 1, k) = extended_stiffness(i, nz_ext - cpml, k)
-                end do
-            end do
-        end do
+    !         ! Extend along z-direction (columns)
+    !         do i = 1, nx_ext
+    !             do j = 1, cpml
+    !                 extended_stiffness(i, j, k) = extended_stiffness(i, 1 + cpml, k)
+    !                 extended_stiffness(i, nz_ext - j + 1, k) = extended_stiffness(i, nz_ext - cpml, k)
+    !             end do
+    !         end do
+    !     end do
         
-        do k = 1, 3
-            ! Extend along x-direction (rows)
-            do j = 1, nz_ext
-                do i = 1, cpml
-                    extended_attenuation(i, j, k) = extended_attenuation(1 + cpml, j, k)
-                    extended_attenuation(nx_ext - i + 1, j, k) = extended_attenuation(nx_ext - cpml, j, k)
-                end do
-            end do
+    !     do k = 1, 3
+    !         ! Extend along x-direction (rows)
+    !         do j = 1, nz_ext
+    !             do i = 1, cpml
+    !                 extended_attenuation(i, j, k) = extended_attenuation(1 + cpml, j, k)
+    !                 extended_attenuation(nx_ext - i + 1, j, k) = extended_attenuation(nx_ext - cpml, j, k)
+    !             end do
+    !         end do
             
-            ! Extend along z-direction (columns)
-            do i = 1, nx_ext
-                do j = 1, cpml
-                    extended_attenuation(i, j, k) = extended_attenuation(i, 1 + cpml, k)
-                    extended_attenuation(i, nz_ext - j + 1, k) = extended_attenuation(i, nz_ext - cpml, k)
-                end do
-            end do
-        end do
+    !         ! Extend along z-direction (columns)
+    !         do i = 1, nx_ext
+    !             do j = 1, cpml
+    !                 extended_attenuation(i, j, k) = extended_attenuation(i, 1 + cpml, k)
+    !                 extended_attenuation(i, nz_ext - j + 1, k) = extended_attenuation(i, nz_ext - cpml, k)
+    !             end do
+    !         end do
+    !     end do
         
-        ! Write each 2D array (stiffness coefficients) to separate files
-        do k = 1, 22
-            ! Create filename based on coefficient name (e.g., 'c11.dat')
-            write(stiffness_fn, '(A3, ".dat")') scoef_names(k)
-            call material_rw2(stiffness_fn, extended_stiffness(:,:,k), .FALSE.)
-        end do
+    !     ! Write each 2D array (stiffness coefficients) to separate files
+    !     do k = 1, 22
+    !         ! Create filename based on coefficient name (e.g., 'c11.dat')
+    !         write(stiffness_fn, '(A3, ".dat")') scoef_names(k)
+    !         call material_rw2(stiffness_fn, extended_stiffness(:,:,k), .FALSE.)
+    !     end do
         
-        do k = 1, 3
-            ! Create filename based on coefficient name (e.g., 'c11.dat')
-            ! write(attenuation_fn, '(A3, ".dat")') acoef_names(k)
+    !     do k = 1, 3
+    !         ! Create filename based on coefficient name (e.g., 'c11.dat')
+    !         ! write(attenuation_fn, '(A3, ".dat")') acoef_names(k)
 
-            ! Open the file to write the 2D array
-            open(newunit=unit_number, file=attenuation_fn(k), form='unformatted', &
-                access='stream', status='replace', iostat=io_status)
-            if (io_status /= 0) then
-                print *, "Error opening file for writing: ", attenuation_fn(k)
-                stop
-            end if
+    !         ! Open the file to write the 2D array
+    !         open(newunit=unit_number, file=attenuation_fn(k), form='unformatted', &
+    !             access='stream', status='replace', iostat=io_status)
+    !         if (io_status /= 0) then
+    !             print *, "Error opening file for writing: ", attenuation_fn(k)
+    !             stop
+    !         end if
 
-            ! Write the 2D array to the binary file
-            write(unit_number) extended_attenuation(:,:,k)
+    !         ! Write the 2D array to the binary file
+    !         write(unit_number) extended_attenuation(:,:,k)
 
-            ! Close the file
-            close(unit_number)
-        end do
+    !         ! Close the file
+    !         close(unit_number)
+    !     end do
         
-        deallocate(extended_stiffness)
-        deallocate(extended_attenuation)
-    end subroutine seismic_parameter_write
+    !     deallocate(extended_stiffness)
+    !     deallocate(extended_attenuation)
+    ! end subroutine seismic_parameter_write
     
-    ! --------------------------------------------------------------------------
-    subroutine electromagnetic_parameter_write(domain, geometry, permittivity, conductivity)
-        implicit none
+    ! ! --------------------------------------------------------------------------
+    ! subroutine electromagnetic_parameter_write(domain, geometry, permittivity, conductivity)
+    !     implicit none
         
-        type(Domain_Type), intent(in) :: domain 
-        integer, intent(in) :: geometry(:,:) 
-        type(Permittivity_Type), intent(in) :: permittivity(:) 
-        type(Conductivity_Type), intent(in) :: conductivity(:) 
+    !     type(Domain_Type), intent(in) :: domain 
+    !     integer, intent(in) :: geometry(:,:) 
+    !     type(Permittivity_Type), intent(in) :: permittivity(:) 
+    !     type(Conductivity_Type), intent(in) :: conductivity(:) 
         
-        real(real64), allocatable :: extended_permittivity(:,:,:)
-        real(real64), allocatable :: extended_conductivity(:,:,:)
-        integer :: nx, nz, cpml 
-        integer :: i, j, k, id_value 
-        integer nx_ext, nz_ext 
-        integer :: unit_number, io_status 
+    !     real(real64), allocatable :: extended_permittivity(:,:,:)
+    !     real(real64), allocatable :: extended_conductivity(:,:,:)
+    !     integer :: nx, nz, cpml 
+    !     integer :: i, j, k, id_value 
+    !     integer nx_ext, nz_ext 
+    !     integer :: unit_number, io_status 
         
-        character(len=9) :: permittivity_fn, conductivity_fn 
-        character(len=5), dimension(6) :: pcoef_names = (/ &
-                                'eps11','eps12','eps13','eps22','eps23','eps33'/)
-        character(len=5), dimension(6) :: scoef_names = (/ &
-                                'sig11','sig12','sig13','sig22','sig23','sig33'/)
+    !     character(len=9) :: permittivity_fn, conductivity_fn 
+    !     character(len=5), dimension(6) :: pcoef_names = (/ &
+    !                             'eps11','eps12','eps13','eps22','eps23','eps33'/)
+    !     character(len=5), dimension(6) :: scoef_names = (/ &
+    !                             'sig11','sig12','sig13','sig22','sig23','sig33'/)
         
-        ! Extract domain dimensions and cpml
-        nx = domain%nx
-        nz = domain%nz
-        cpml = domain%cpml
+    !     ! Extract domain dimensions and cpml
+    !     nx = domain%nx
+    !     nz = domain%nz
+    !     cpml = domain%cpml
 
-        ! Calculate extended dimensions
-        nx_ext = 2 * cpml + nx
-        nz_ext = 2 * cpml + nz
+    !     ! Calculate extended dimensions
+    !     nx_ext = 2 * cpml + nx
+    !     nz_ext = 2 * cpml + nz
         
-        ! Allocate the extended permittivity array with extra CPML padding
-        allocate(extended_permittivity(nx_ext, nz_ext, 21))
-        allocate(extended_conductivity(nx_ext, nz_ext, 3))  
+    !     ! Allocate the extended permittivity array with extra CPML padding
+    !     allocate(extended_permittivity(nx_ext, nz_ext, 21))
+    !     allocate(extended_conductivity(nx_ext, nz_ext, 3))  
         
-        extended_permittivity(:,:,:) = 0.0 
-        extended_conductivity(:,:,:) = 0.0
+    !     extended_permittivity(:,:,:) = 0.0 
+    !     extended_conductivity(:,:,:) = 0.0
         
-        do j = 1,nz 
-            do i = 1,nx 
-                id_value = geometry(i,j) 
+    !     do j = 1,nz 
+    !         do i = 1,nx 
+    !             id_value = geometry(i,j) 
                 
-                extended_permittivity(i + cpml, j + cpml, 1) = permittivity(id_value)%e11
-                extended_permittivity(i + cpml, j + cpml, 2) = permittivity(id_value)%e12
-                extended_permittivity(i + cpml, j + cpml, 3) = permittivity(id_value)%e13
-                extended_permittivity(i + cpml, j + cpml, 4) = permittivity(id_value)%e22
-                extended_permittivity(i + cpml, j + cpml, 5) = permittivity(id_value)%e23
-                extended_permittivity(i + cpml, j + cpml, 6) = permittivity(id_value)%e33
+    !             extended_permittivity(i + cpml, j + cpml, 1) = permittivity(id_value)%e11
+    !             extended_permittivity(i + cpml, j + cpml, 2) = permittivity(id_value)%e12
+    !             extended_permittivity(i + cpml, j + cpml, 3) = permittivity(id_value)%e13
+    !             extended_permittivity(i + cpml, j + cpml, 4) = permittivity(id_value)%e22
+    !             extended_permittivity(i + cpml, j + cpml, 5) = permittivity(id_value)%e23
+    !             extended_permittivity(i + cpml, j + cpml, 6) = permittivity(id_value)%e33
 
-                extended_conductivity(i + cpml, j + cpml, 1) = conductivity(id_value)%s11
-                extended_conductivity(i + cpml, j + cpml, 2) = conductivity(id_value)%s12
-                extended_conductivity(i + cpml, j + cpml, 3) = conductivity(id_value)%s13
-                extended_conductivity(i + cpml, j + cpml, 4) = conductivity(id_value)%s22
-                extended_conductivity(i + cpml, j + cpml, 5) = conductivity(id_value)%s23
-                extended_conductivity(i + cpml, j + cpml, 6) = conductivity(id_value)%s33
-            end do 
-        end do 
+    !             extended_conductivity(i + cpml, j + cpml, 1) = conductivity(id_value)%s11
+    !             extended_conductivity(i + cpml, j + cpml, 2) = conductivity(id_value)%s12
+    !             extended_conductivity(i + cpml, j + cpml, 3) = conductivity(id_value)%s13
+    !             extended_conductivity(i + cpml, j + cpml, 4) = conductivity(id_value)%s22
+    !             extended_conductivity(i + cpml, j + cpml, 5) = conductivity(id_value)%s23
+    !             extended_conductivity(i + cpml, j + cpml, 6) = conductivity(id_value)%s33
+    !         end do 
+    !     end do 
         
-        ! Extend the values at 1 + cpml to the 1 to cpml indices
-        do k = 1, 6
-          ! Extend along x-direction (rows)
-          do j = 1, nz_ext
-            do i = 1, cpml
-              extended_permittivity(i, j, k) = extended_permittivity(1 + cpml, j, k)
-              extended_conductivity(i, j, k) = extended_conductivity(1 + cpml, j, k)
-              extended_permittivity(nx_ext - i + 1, j, k) = extended_permittivity(nx_ext - cpml, j, k)
-              extended_conductivity(nx_ext - i + 1, j, k) = extended_conductivity(nx_ext - cpml, j, k)
-            end do
-          end do
+    !     ! Extend the values at 1 + cpml to the 1 to cpml indices
+    !     do k = 1, 6
+    !       ! Extend along x-direction (rows)
+    !       do j = 1, nz_ext
+    !         do i = 1, cpml
+    !           extended_permittivity(i, j, k) = extended_permittivity(1 + cpml, j, k)
+    !           extended_conductivity(i, j, k) = extended_conductivity(1 + cpml, j, k)
+    !           extended_permittivity(nx_ext - i + 1, j, k) = extended_permittivity(nx_ext - cpml, j, k)
+    !           extended_conductivity(nx_ext - i + 1, j, k) = extended_conductivity(nx_ext - cpml, j, k)
+    !         end do
+    !       end do
         
-          ! Extend along z-direction (columns)
-          do i = 1, nx_ext
-            do j = 1, cpml
-              extended_permittivity(i, j, k) = extended_permittivity(i, 1 + cpml, k)
-              extended_conductivity(i, j, k) = extended_conductivity(i, 1 + cpml, k)
-              extended_permittivity(i, nz_ext - j + 1, k) = extended_permittivity(i, nz_ext - cpml, k)
-              extended_conductivity(i, nz_ext - j + 1, k) = extended_conductivity(i, nz_ext - cpml, k)
-            end do
-          end do
-        end do
+    !       ! Extend along z-direction (columns)
+    !       do i = 1, nx_ext
+    !         do j = 1, cpml
+    !           extended_permittivity(i, j, k) = extended_permittivity(i, 1 + cpml, k)
+    !           extended_conductivity(i, j, k) = extended_conductivity(i, 1 + cpml, k)
+    !           extended_permittivity(i, nz_ext - j + 1, k) = extended_permittivity(i, nz_ext - cpml, k)
+    !           extended_conductivity(i, nz_ext - j + 1, k) = extended_conductivity(i, nz_ext - cpml, k)
+    !         end do
+    !       end do
+    !     end do
         
-        do k = 1, 6
-            ! Create filename based on coefficient name (e.g., 'c11.dat')
-            write(permittivity_fn, '(A5, ".dat")') pcoef_names(k)
+    !     do k = 1, 6
+    !         ! Create filename based on coefficient name (e.g., 'c11.dat')
+    !         write(permittivity_fn, '(A5, ".dat")') pcoef_names(k)
 
-            ! Open the file to write the 2D array
-            open(newunit=unit_number, file=permittivity_fn, form='unformatted', &
-                access='stream', status='replace', iostat=io_status)
-            if (io_status /= 0) then
-                print *, "Error opening file for writing: ", permittivity_fn
-                stop
-            end if
+    !         ! Open the file to write the 2D array
+    !         open(newunit=unit_number, file=permittivity_fn, form='unformatted', &
+    !             access='stream', status='replace', iostat=io_status)
+    !         if (io_status /= 0) then
+    !             print *, "Error opening file for writing: ", permittivity_fn
+    !             stop
+    !         end if
 
-            ! Write the 2D array to the binary file
-            write(unit_number) extended_permittivity(:,:,k)
+    !         ! Write the 2D array to the binary file
+    !         write(unit_number) extended_permittivity(:,:,k)
 
-            ! Close the file
-            close(unit_number)
-        end do
-         do k = 1, 3
-            ! Create filename based on coefficient name (e.g., 'c11.dat')
-            write(conductivity_fn, '(A3, ".dat")') scoef_names(k)
+    !         ! Close the file
+    !         close(unit_number)
+    !     end do
+    !      do k = 1, 3
+    !         ! Create filename based on coefficient name (e.g., 'c11.dat')
+    !         write(conductivity_fn, '(A3, ".dat")') scoef_names(k)
 
-            ! Open the file to write the 2D array
-            open(newunit=unit_number, file=conductivity_fn, form='unformatted', &
-                access='stream', status='replace', iostat=io_status)
-            if (io_status /= 0) then
-                print *, "Error opening file for writing: ", conductivity_fn
-                stop
-            end if
+    !         ! Open the file to write the 2D array
+    !         open(newunit=unit_number, file=conductivity_fn, form='unformatted', &
+    !             access='stream', status='replace', iostat=io_status)
+    !         if (io_status /= 0) then
+    !             print *, "Error opening file for writing: ", conductivity_fn
+    !             stop
+    !         end if
 
-            ! Write the 2D array to the binary file
-            write(unit_number) extended_conductivity(:,:,k)
+    !         ! Write the 2D array to the binary file
+    !         write(unit_number) extended_conductivity(:,:,k)
 
-            ! Close the file
-            close(unit_number)
-        end do
+    !         ! Close the file
+    !         close(unit_number)
+    !     end do
         
-        deallocate(extended_permittivity)
-        deallocate(extended_conductivity)
+    !     deallocate(extended_permittivity)
+    !     deallocate(extended_conductivity)
         
-    end subroutine electromagnetic_parameter_write
+    ! end subroutine electromagnetic_parameter_write
     
     ! --------------------------------------------------------------------------
     subroutine loadsource(filename, time_steps, srcfn)
