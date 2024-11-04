@@ -13,8 +13,24 @@ BIN_PATH := $(CONDA_PREFIX)/bin
 FC := $(shell which gfortran)
 $(info Using GFortran from $(FC))
 
-ifeq ($(UNAME_S), Darwin)
-    UNSET_CONDA_ENV_VARS := $(shell unset CONDA_PREFIX && unset LD_LIBRARY_PATH && unset DYLD_LIBRARY_PATH)
+# ifeq ($(UNAME_S), Darwin)
+#     UNSET_CONDA_ENV_VARS := $(shell unset CONDA_PREFIX && unset LD_LIBRARY_PATH && unset DYLD_LIBRARY_PATH)
+# 	JSON_FORTRAN_PREFIX := $(shell brew --prefix json-fortran)
+# 	LIB_PATH := $(JSON_FORTRAN_PREFIX)/lib
+# 	INCLUDE_PATH := $(JSON_FORTRAN_PREFIX)/include/jsonfortran
+	
+# endif
+
+ifeq ($(UNAME_S), Linux)
+    CONDA_PREFIX := $(shell conda info --base)/envs/seidart
+    INCLUDE_PATH := $(CONDA_PREFIX)/include
+    LIB_PATH := $(CONDA_PREFIX)/lib
+    BIN_PATH := $(CONDA_PREFIX)/bin
+else ifeq ($(UNAME_S), Darwin)
+    JSON_FORTRAN_PREFIX := $(shell brew --prefix json-fortran)
+    INCLUDE_PATH := $(JSON_FORTRAN_PREFIX)/include/jsonfortran
+    LIB_PATH := $(JSON_FORTRAN_PREFIX)/lib
+    BIN_PATH := $(JSON_FORTRAN_PREFIX)/bin
 endif
 
 FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
