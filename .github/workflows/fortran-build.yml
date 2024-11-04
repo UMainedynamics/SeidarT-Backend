@@ -12,6 +12,7 @@ on:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10  # Set timeout to 2 hours; adjust as needed
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
