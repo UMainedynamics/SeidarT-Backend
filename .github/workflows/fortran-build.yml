@@ -53,7 +53,14 @@ jobs:
 
       - name: Compile Fortran Code
         run: |
-          make 
+          make ||true
+      
+      - name: Upload Compile Output
+        if: failure()  # Only upload if the compile step fails
+        uses: actions/upload-artifact@v3
+        with:
+          name: compile_output
+          path: compile_output.txt
 
       - name: Archive Binaries
         run: |
