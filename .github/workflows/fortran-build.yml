@@ -58,6 +58,9 @@ jobs:
         run: |
           make ||true
       
+      - name: Check json-fortran Installation
+        run: conda list json-fortran
+  
       - name: Print Compile Output (for quick debugging)
         run: cat compile_output.txt  # Print the compile log to the workflow log
 
