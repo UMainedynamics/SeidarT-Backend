@@ -34,7 +34,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gfortran libgfortran5
+          sudo apt-get install -y gfortran libgfortran5 json-fortran
+          
       - name: Instal JSON-Fortran on Ubuntu 
         if: matrix.os == 'ubuntu-latest' 
         run: |
@@ -63,7 +64,7 @@ jobs:
           make ||true
       
       - name: Check json-fortran Installation
-        run: conda list json-fortran
+        run: conda list
   
       - name: Print Compile Output (for quick debugging)
         run: cat compile_output.txt  # Print the compile log to the workflow log
