@@ -43,12 +43,14 @@ jobs:
           export JSON_FORTRAN_PREFIX=$(brew --prefix json-fortran)
           echo "JSON_FORTRAN_PREFIX=$JSON_FORTRAN_PREFIX" >> $GITHUB_ENV
 
-      - name: Set paths for conda environment
+            - name: Set paths for conda environment
         run: |
           export CONDA_PREFIX=$(conda info --base)/envs/seidart
           export INCLUDE_PATH=$CONDA_PREFIX/include
           export LIB_PATH=$CONDA_PREFIX/lib
           export BIN_PATH=$CONDA_PREFIX/bin
+          export LIBRARY_PATH=$LIB_PATH
+          export LD_LIBRARY_PATH=$LIB_PATH
           echo "Paths set: INCLUDE_PATH=$INCLUDE_PATH, LIB_PATH=$LIB_PATH, BIN_PATH=$BIN_PATH"
 
       - name: Compile Fortran Code
