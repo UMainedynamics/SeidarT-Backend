@@ -55,6 +55,9 @@ jobs:
         run: |
           make ||true
       
+      - name: Print Compile Output (for quick debugging)
+        run: cat compile_output.txt  # Print the compile log to the workflow log
+
       - name: Upload Compile Output
         # if: failure()  # Only upload if the compile step fails
         uses: actions/upload-artifact@v3
