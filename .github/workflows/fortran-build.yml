@@ -27,7 +27,7 @@ jobs:
           miniconda-version: "latest"  # Ensure Miniconda is installed
           auto-update-conda: true
           python-version: 3.12
-          environment-file: seidart-environment.yml  # Assuming you have an environment.yml for dependencies
+          environment-file: seidart-environment.yml 
           activate-environment: seidart
           
       - name: Install GFortran and dependencies
