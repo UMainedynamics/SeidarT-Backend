@@ -5,14 +5,12 @@ UNAME_S=$(uname -s)
 
 # Set paths based on the operating system
 if [[ "$UNAME_S" == "Linux" ]]; then
-    CONDA_PREFIX=$(conda info --base)/envs/seidart
-    INCLUDE_PATH="$CONDA_PREFIX/include"
-    LIB_PATH="$CONDA_PREFIX/lib"
+    INCLUDE_PATH="/usr/local/include"
+    LIB_PATH="/usr/local/lib"
     BIN_PATH="src/executables/linux"
 elif [[ "$UNAME_S" == "Darwin" ]]; then
-    JSON_FORTRAN_PREFIX=$(brew --prefix json-fortran)
-    INCLUDE_PATH="$JSON_FORTRAN_PREFIX/include"
-    LIB_PATH="$JSON_FORTRAN_PREFIX/lib"
+    INCLUDE_PATH="/usr/local/include"
+    LIB_PATH="/usr/local/lib"
     BIN_PATH="src/executables/macos"
 else
     echo "Unsupported OS: $UNAME_S"
@@ -44,6 +42,7 @@ $FC $FFLAGS -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
 
 if [[ $? -ne 0 ]]; then
     echo "Compilation failed. Check compile_output.txt for details."
+    cat compile_output.txt
     exit 1
 fi
 
