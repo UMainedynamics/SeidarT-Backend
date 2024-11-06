@@ -27,10 +27,10 @@ ifeq ($(UNAME_S), Linux)
     LIB_PATH := $(CONDA_PREFIX)/lib
     BIN_PATH := $(CONDA_PREFIX)/bin
 else ifeq ($(UNAME_S), Darwin)
-    JSON_FORTRAN_PREFIX := #/opt/homebrew/Cellar/json-fortran/9.0.2/ #$(shell brew --prefix json-fortran)
-    INCLUDE_PATH := /opt/homebrew/Cellar/json-fortran/9.0.2/include #$(JSON_FORTRAN_PREFIX)/include
-    LIB_PATH := /opt/homebrew/Cellar/json-fortran/9.0.2/lib #$(JSON_FORTRAN_PREFIX)/lib
-    BIN_PATH := /opt/homebrew/Cellar/json-fortran/9.0.2/bin #$(JSON_FORTRAN_PREFIX)/bin
+    JSON_FORTRAN_PREFIX := $(shell brew --prefix json-fortran) #/opt/homebrew/Cellar/json-fortran/9.0.2/ #$(shell brew --prefix json-fortran)
+    INCLUDE_PATH := $(JSON_FORTRAN_PREFIX)/include #/opt/homebrew/Cellar/json-fortran/9.0.2/include #$(JSON_FORTRAN_PREFIX)/include
+    LIB_PATH := $(JSON_FORTRAN_PREFIX)/include #/opt/homebrew/Cellar/json-fortran/9.0.2/lib #$(JSON_FORTRAN_PREFIX)/lib
+    BIN_PATH := $(JSON_FORTRAN_PREFIX)/include #/opt/homebrew/Cellar/json-fortran/9.0.2/bin #$(JSON_FORTRAN_PREFIX)/bin
 endif
 
 FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
