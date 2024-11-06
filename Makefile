@@ -55,7 +55,7 @@ all: $(EXECUTABLE) install clean
 $(EXECUTABLE): $(SOURCES)
 	@echo "Compiling the SeidarT CPML FDTD executable..."
 	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
-	$(FC) $(FFLAGS) -o $(EXECUTABLE) $(SOURCES) -lgfortran > compile_output.txt 2>&1
+	$(FC) $(FFLAGS) -o $(EXECUTABLE) $(SOURCES) -lgfortran #> compile_output.txt 2>&1
 	@echo "Compilation finished."
 
 # Install the executable into the correct Miniconda folder
