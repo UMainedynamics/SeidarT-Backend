@@ -17,11 +17,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Homebrew
+    - name: Install Homebrew and Compiler Tools
       run: |
         if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
           sudo apt-get update
-          sudo apt-get install -y build-essential curl file git
+          sudo apt-get install -y build-essential curl file git gfortran cmake
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
           echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
@@ -35,7 +35,7 @@ jobs:
         if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
         fi
-        brew install gcc json-fortran
+        brew install json-fortran
 
     - name: Build Executable
       run: |
