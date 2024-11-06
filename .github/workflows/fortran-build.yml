@@ -20,14 +20,15 @@ jobs:
 
     - name: Install Compiler Tools and Dependencies
       run: |
-        if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
           # Install required tools directly via apt on Linux
           sudo apt-get update
           sudo apt-get install -y build-essential curl file git gfortran cmake
-        elif [[ ${{ matrix.os }} == 'macos-latest' ]]; then
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
           # On macOS, use Homebrew to install dependencies
           brew update
           brew install gcc json-fortran
+        fi
 
     - name: Cache json-fortran Build
       uses: actions/cache@v3
@@ -46,7 +47,7 @@ jobs:
         mkdir -p build
         cd build
         cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-        make -j$(nproc)
+        make -j$(nproc)  # For Linux, use all available CPU cores
         sudo make install
         cd ../..
 
