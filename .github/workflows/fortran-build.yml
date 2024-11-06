@@ -30,7 +30,7 @@ jobs:
           environment-file: seidart-environment.yml 
           activate-environment: seidart
           
-      - name: Instal JSON-Fortran on Ubuntu 
+      - name: Install JSON-Fortran on Ubuntu 
         if: matrix.os == 'ubuntu-latest' 
         run: |
           conda install -c conda-forge json-fortran binutils_impl_linux-64 libgcc-devel_linux-64
