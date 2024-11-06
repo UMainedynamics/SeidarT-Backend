@@ -55,8 +55,10 @@ jobs:
       run: |
         export C_INCLUDE_PATH=/usr/local/include:$C_INCLUDE_PATH
         export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
+        export FCFLAGS="-I/usr/local/jsonfortran-gnu-9.0.2/lib"
         echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
         echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
+        echo "FCFLAGS=$FCFLAGS" >> $GITHUB_ENV
 
     - name: Build Executable
       run: |
