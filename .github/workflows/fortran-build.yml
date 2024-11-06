@@ -28,7 +28,6 @@ jobs:
           # On macOS, use Homebrew to install dependencies
           brew update
           brew install gcc json-fortran
-        fi
 
     - name: Cache json-fortran Build
       uses: actions/cache@v3
@@ -51,21 +50,31 @@ jobs:
         sudo make install
         cd ../..
 
+    - name: Set Include and Library Paths
+      run: |
+        export C_INCLUDE_PATH=/usr/local/include:$C_INCLUDE_PATH
+        export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
+        echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
+        echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
+
     - name: Build Executable
       run: |
         chmod +x build.sh
         ./build.sh || exit_code=$?
+        # If build.sh fails, cat the compile output to the log
         if [ -f compile_output.txt ]; then
           cat compile_output.txt
         fi
+        # Exit with the original error code if it failed
         exit $exit_code || true
 
-
     - name: Move Executable
+      if: success()
       run: |
         mv seidart src/executables/${{ matrix.os }}
 
     - name: Upload Executable Artifact
+      if: success()
       uses: actions/upload-artifact@v3
       with:
         name: seidart_executables_${{ matrix.os }}
