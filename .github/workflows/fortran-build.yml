@@ -23,21 +23,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential curl file git
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> $GITHUB_ENV
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
         elif [[ ${{ matrix.os }} == 'macos-latest' ]]; then
           brew update
         fi
 
-    - name: Set Up Homebrew Path
-      run: |
-        if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-        fi
-      shell: bash
-
     - name: Install Dependencies via Homebrew
       run: |
+        if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        fi
         brew install gcc json-fortran
 
     - name: Build Executable
