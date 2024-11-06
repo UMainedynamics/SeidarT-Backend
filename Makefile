@@ -27,7 +27,7 @@ ifeq ($(UNAME_S), Linux)
     LIB_PATH := $(CONDA_PREFIX)/lib
     BIN_PATH := $(CONDA_PREFIX)/bin
 else ifeq ($(UNAME_S), Darwin)
-    JSON_FORTRAN_PREFIX := $(shell brew --prefix json-fortran)
+    JSON_FORTRAN_PREFIX := /opt/homebrew/Cellar/json-fortran/9.0.2/ #$(shell brew --prefix json-fortran)
     INCLUDE_PATH := $(JSON_FORTRAN_PREFIX)/include
     LIB_PATH := $(JSON_FORTRAN_PREFIX)/lib
     BIN_PATH := $(JSON_FORTRAN_PREFIX)/bin
