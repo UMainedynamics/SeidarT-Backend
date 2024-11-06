@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-    timeout-minutes: 120  # Set the timeout to 120 minutes
+    timeout-minutes: 240  # Increased the timeout to 240 minutes (4 hours)
 
     steps:
     - name: Checkout repository
@@ -24,20 +24,31 @@ jobs:
           # Install required tools directly via apt on Linux
           sudo apt-get update
           sudo apt-get install -y build-essential curl file git gfortran cmake
-          # Clone and build json-fortran from source
-          git clone https://github.com/jacobwilliams/json-fortran.git
-          cd json-fortran
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-          make -j$(nproc)
-          sudo make install
-          cd ../..
         elif [[ ${{ matrix.os }} == 'macos-latest' ]]; then
           # On macOS, use Homebrew to install dependencies
           brew update
           brew install gcc json-fortran
-        fi
+
+    - name: Cache json-fortran Build
+      uses: actions/cache@v3
+      with:
+        path: json-fortran/build
+        key: ${{ runner.os }}-jsonfortran-${{ hashFiles('json-fortran/*') }}
+        restore-keys: |
+          ${{ runner.os }}-jsonfortran-
+
+    - name: Clone and Build json-fortran
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Clone json-fortran with a shallow clone to reduce time
+        git clone --depth=1 https://github.com/jacobwilliams/json-fortran.git
+        cd json-fortran
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)
+        sudo make install
+        cd ../..
 
     - name: Build Executable
       run: |
