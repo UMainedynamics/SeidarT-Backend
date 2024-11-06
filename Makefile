@@ -48,20 +48,20 @@ endif
 
 # Default target
 all: $(EXECUTABLE) install clean
-	export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
+	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
 	@echo "To uninstall run 'make uninstall'"
 
 # Rule to build the executable
 $(EXECUTABLE): $(SOURCES)
 	@echo "Compiling the SeidarT CPML FDTD executable..."
-	export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
+	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
 	$(FC) $(FFLAGS) -o $(EXECUTABLE) $(SOURCES) -lgfortran > compile_output.txt 2>&1
 	@echo "Compilation finished."
 
 # Install the executable into the correct Miniconda folder
 install: $(EXECUTABLE)
 	@echo "Installing the executable to $(BIN_PATH)..."
-	export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
+	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
 	mv $(EXECUTABLE) $(BIN_PATH)
 	@echo "SeidarT CPML FDTD executable is in the $(BIN_PATH)"
 
