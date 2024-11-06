@@ -1,53 +1,81 @@
-#!/bin/bash
+name: Build Fortran Executables
 
-# Detect OS
-UNAME_S=$(uname -s)
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
-# Set paths based on the operating system
-if [[ "$UNAME_S" == "Linux" ]]; then
-    INCLUDE_PATH="/usr/local/include"
-    LIB_PATH="/usr/local/lib"
-    BIN_PATH="src/executables/linux"
-elif [[ "$UNAME_S" == "Darwin" ]]; then
-    INCLUDE_PATH="/usr/local/include"
-    LIB_PATH="/usr/local/lib"
-    BIN_PATH="src/executables/macos"
-else
-    echo "Unsupported OS: $UNAME_S"
-    exit 1
-fi
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    timeout-minutes: 240  # Increased the timeout to 240 minutes (4 hours)
 
-# Compiler and flags
-FC=$(which gfortran)
-echo "Using GFortran from $FC"
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all"
+    - name: Install Compiler Tools and Dependencies
+      run: |
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          # Install required tools directly via apt on Linux
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git gfortran cmake
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          # On macOS, use Homebrew to install dependencies
+          brew update
+          brew install gcc json-fortran
 
-# OpenMP support (optional)
-if [[ "$1" == "--openmp" ]]; then
-    FFLAGS="$FFLAGS -fopenmp"
-fi
+    - name: Cache json-fortran Build
+      uses: actions/cache@v3
+      with:
+        path: json-fortran/build
+        key: ${{ runner.os }}-jsonfortran-${{ hashFiles('json-fortran/*') }}
+        restore-keys: |
+          ${{ runner.os }}-jsonfortran-
 
-# Source files
-SRC_DIR="src/fortran"
-SOURCES="$SRC_DIR/constants.f08 $SRC_DIR/seidart_types.f08 $SRC_DIR/seidartio.f08 $SRC_DIR/cpmlfdtd.f08 $SRC_DIR/main.f08"
-EXECUTABLE="seidartfdtd"
+    - name: Clone and Build json-fortran
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Clone json-fortran with a shallow clone to reduce time
+        git clone --depth=1 https://github.com/jacobwilliams/json-fortran.git
+        cd json-fortran
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)  # For Linux, use all available CPU cores
+        sudo make install
+        cd ../..
 
-# Create executable directory if it doesn't exist
-mkdir -p "$BIN_PATH"
+    - name: Set Include and Library Paths
+      run: |
+        export C_INCLUDE_PATH=/usr/local/include:$C_INCLUDE_PATH
+        export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
+        echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
+        echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
 
-# Compile the executable
-echo "Compiling the SeidarT CPML FDTD executable..."
-$FC $FFLAGS -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
+    - name: Build Executable
+      run: |
+        chmod +x build.sh
+        ./build.sh || exit_code=$?
+        # If build.sh fails, cat the compile output to the log
+        if [ -f compile_output.txt ]; then
+          cat compile_output.txt
+        fi
+        # Exit with the original error code if it failed
+        exit $exit_code || true
 
-if [[ $? -ne 0 ]]; then
-    echo "Compilation failed. Check compile_output.txt for details."
-    cat compile_output.txt
-    exit 1
-fi
+    - name: Move Executable
+      if: success()
+      run: |
+        mv seidart src/executables/${{ matrix.os }}
 
-# Move the executable to the correct folder
-echo "Moving the executable to $BIN_PATH..."
-mv $EXECUTABLE $BIN_PATH/
-
-echo "Build and installation complete. Executable is located in $BIN_PATH."
+    - name: Upload Executable Artifact
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: seidart_executables_${{ matrix.os }}
+        path: src/executables/${{ matrix.os }}
