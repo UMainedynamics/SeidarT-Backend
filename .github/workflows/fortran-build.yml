@@ -1,5 +1,5 @@
 name: Build Fortran Executables
- 
+
 on:
   push:
     branches:
@@ -12,30 +12,32 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-    
+    timeout-minutes: 120  # Set the timeout to 120 minutes
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Homebrew and Compiler Tools
+    - name: Install Compiler Tools and Dependencies
       run: |
         if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
+          # Install required tools directly via apt on Linux
           sudo apt-get update
           sudo apt-get install -y build-essential curl file git gfortran cmake
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
-          echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.profile
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          # Clone and build json-fortran from source
+          git clone https://github.com/jacobwilliams/json-fortran.git
+          cd json-fortran
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+          make -j$(nproc)
+          sudo make install
+          cd ../..
         elif [[ ${{ matrix.os }} == 'macos-latest' ]]; then
+          # On macOS, use Homebrew to install dependencies
           brew update
+          brew install gcc json-fortran
         fi
-
-    - name: Install Dependencies via Homebrew
-      run: |
-        if [[ ${{ matrix.os }} == 'ubuntu-latest' ]]; then
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-        fi
-        brew install json-fortran
 
     - name: Build Executable
       run: |
