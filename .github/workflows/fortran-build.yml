@@ -1,85 +1,84 @@
-name: Build and Release Fortran Binaries
+name: Build Fortran Executables
 
 on:
   push:
     branches:
       - main
   pull_request:
-    branches:
-      - main
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10  # Set timeout to 2 hours; adjust as needed
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+    timeout-minutes: 240  # Increased the timeout to 240 minutes (4 hours)
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          miniconda-version: "latest"  # Ensure Miniconda is installed
-          auto-update-conda: true
-          python-version: 3.12
-          environment-file: seidart-environment.yml 
-          activate-environment: seidart
-          
-      - name: Install JSON-Fortran on Ubuntu 
-        if: matrix.os == 'ubuntu-latest' 
-        run: |
-          conda install -c conda-forge json-fortran binutils_impl_linux-64 libgcc-devel_linux-64
-      
-      - name: Install JSON-Fortran on macOS
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install json-fortran
-          export JSON_FORTRAN_PREFIX=$(brew --prefix json-fortran)
-          echo "JSON_FORTRAN_PREFIX=$JSON_FORTRAN_PREFIX" >> $GITHUB_ENV
+    - name: Install Compiler Tools and Dependencies
+      run: |
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          # Install required tools directly via apt on Linux
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git gfortran cmake
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          # On macOS, use Homebrew to install dependencies
+          brew update
+          brew install gcc json-fortran
+        fi
 
-        
-      - name: Set paths for conda environment
-        run: |
-          export CONDA_PREFIX=$(conda info --base)/envs/seidart
-          export INCLUDE_PATH=$CONDA_PREFIX/include
-          export LIB_PATH=$CONDA_PREFIX/lib
-          export BIN_PATH=$CONDA_PREFIX/bin
-          export LIBRARY_PATH=$LIB_PATH
-          export LD_LIBRARY_PATH=$LIB_PATH
-          echo "Paths set: INCLUDE_PATH=$INCLUDE_PATH, LIB_PATH=$LIB_PATH, BIN_PATH=$BIN_PATH"
+    - name: Cache json-fortran Build
+      uses: actions/cache@v3
+      with:
+        path: json-fortran/build
+        key: ${{ runner.os }}-jsonfortran-${{ hashFiles('json-fortran/*') }}
+        restore-keys: |
+          ${{ runner.os }}-jsonfortran-
 
-      - name: Compile Fortran Code
-        run: |
-          make ||true
-      
-      - name: Check json-fortran Installation
-        run: conda list
-  
-      - name: Print Compile Output (for quick debugging)
-        run: cat compile_output.txt  # Print the compile log to the workflow log
+    - name: Clone and Build json-fortran
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Clone json-fortran with a shallow clone to reduce time
+        git clone --depth=1 https://github.com/jacobwilliams/json-fortran.git
+        cd json-fortran
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)  # For Linux, use all available CPU cores
+        sudo make install
+        cd ../..
 
-      - name: Upload Compile Output
-        # if: failure()  # Only upload if the compile step fails
-        uses: actions/upload-artifact@v3
-        with:
-          name: compile_output
-          path: compile_output.txt
+    - name: Set Include and Library Paths
+      run: |
+        export C_INCLUDE_PATH=/usr/local/include:$C_INCLUDE_PATH
+        export LIBRARY_PATH=/usr/local/lib:$LIBRARY_PATH
+        export FCFLAGS="-I/usr/local/jsonfortran-gnu-9.0.2/lib"
+        echo "C_INCLUDE_PATH=$C_INCLUDE_PATH" >> $GITHUB_ENV
+        echo "LIBRARY_PATH=$LIBRARY_PATH" >> $GITHUB_ENV
+        echo "FCFLAGS=$FCFLAGS" >> $GITHUB_ENV
 
-      - name: Archive Binaries
-        if: success()
-        run: |
-          mkdir -p release
-          cp $BIN_PATH/seidartfdtd release/
-        # Replace 'your_executable_name' with the actual executable name
-          
-      - name: Upload Binaries
-        if: success()
-        uses: actions/upload-artifact@v3
-        with:
-          name: seidart-fortran-binaries-${{ matrix.os }}
-          path: release/
+    - name: Build Executable
+      run: |
+        chmod +x build.sh
+        ./build.sh || exit_code=$?
+        # If build.sh fails, cat the compile output to the log
+        if [ -f compile_output.txt ]; then
+          cat compile_output.txt
+        fi
+        # Exit with the original error code if it failed
+        exit $exit_code || true
+
+    - name: Move Executable
+      if: success()
+      run: |
+        mv seidart src/executables/${{ matrix.os }}
+
+    - name: Upload Executable Artifact
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: seidart_executables_${{ matrix.os }}
+        path: src/executables/${{ matrix.os }}
