@@ -54,7 +54,12 @@ jobs:
     - name: Build Executable
       run: |
         chmod +x build.sh
-        ./build.sh
+        ./build.sh || exit_code=$?
+        if [ -f compile_output.txt ]; then
+          cat compile_output.txt
+        fi
+        exit $exit_code || true
+
 
     - name: Move Executable
       run: |
