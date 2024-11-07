@@ -9,9 +9,10 @@ if [[ "$UNAME_S" == "Linux" ]]; then
     LIB_PATH="/usr/local/lib"
     BIN_PATH="src/executables/linux"
 elif [[ "$UNAME_S" == "Darwin" ]]; then
-    INCLUDE_PATH="/usr/local/include"
-    LIB_PATH="/usr/local/lib"
-    BIN_PATH="src/executables/macos"
+    JSON_FORTRAN_PREFIX="/opt/homebrew/Cellar/json-fortran/9.0.2"
+    INCLUDE_PATH=$JSON_FORTRAN_PREFIX/include
+    LIB_PATH=$JSON_FORTRAN_PREFIX/lib
+    BIN_PATH=$JSON_FORTRAN_PREFIX/bin
 else
     echo "Unsupported OS: $UNAME_S"
     exit 1

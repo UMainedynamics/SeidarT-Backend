@@ -20,6 +20,7 @@ jobs:
       - name: Install Dependencies
         run: |
           brew install gfortran json-fortran
+          echo "Using GFortran from $(which gfortran)"
 
       - name: Compile and Test
         run: |
