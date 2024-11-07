@@ -24,7 +24,7 @@ $(info Using GFortran from $(FC))
 #/opt/homebrew/Cellar/json-fortran/9.0.2/ 
 
 ifeq ($(UNAME_S), Linux)
-    CONDA_PREFIX := $(shell conda info --base)/envs/seidart
+    CONDA_PREFIX := $strip( $(shell conda info --base) )
     INCLUDE_PATH := $(CONDA_PREFIX)/include
     LIB_PATH := $(CONDA_PREFIX)/lib
     BIN_PATH := $(CONDA_PREFIX)/bin
