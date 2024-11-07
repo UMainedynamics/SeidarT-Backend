@@ -20,12 +20,13 @@ module seidartio
     
         implicit none 
         character(len=*), intent(in) :: file_name
+        character(len=256) :: temp_string
         type(Domain_Type), intent(out) :: domain
         type(Source_Type), intent(out) :: seismic_source
         type(Source_Type), intent(out) :: electromagnetic_source
 
         type(json_file) :: json
-
+    
         ! --------------------- End Declarations -------------------------------
         call json%initialize()
         call json%load_file(trim(file_name))
@@ -40,8 +41,11 @@ module seidartio
         call json%get('Domain.dz', domain%dz)
         call json%get('Domain.cpml', domain%cpml)
         call json%get('Domain.nmats', domain%nmats)
-        call json%get('Domain.image_file', domain%image_file)
-    
+        ! call json%get('Domain.image_file', domain%image_file)
+        call json%get('Domain.image_file', temp_string)
+        domain%image_file = trim(adjustl(temp_string))
+        
+        
         ! Parse the Seismic Source
         call json%get('Seismic.Source.x', seismic_source%x)
         call json%get('Seismic.Source.y', seismic_source%y)
@@ -53,9 +57,12 @@ module seidartio
         call json%get('Seismic.Source.x-z_rotation', seismic_source%x_z_rotation)
         call json%get('Seismic.Source.x-y_rotation', seismic_source%x_y_rotation)
         call json%get('Seismic.Source.amplitude', seismic_source%amplitude)
-        call json%get('Seismic.Source.source_type', seismic_source%source_type)
+        ! call json%get('Seismic.Source.source_type', seismic_source%source_type)
         call json%get('Seismic.Source.dt', seismic_source%dt)
         call json%get('Seismic.Source.time_steps', seismic_source%time_steps)
+        
+        call json%get('Seismic.Source.source_type', temp_string)
+        electromagnetic_source%source_type = trim(adjustl(temp_string))
         
         ! Parse the EM Source
         call json%get('Electromagnetic.Source.x', electromagnetic_source%x)
@@ -68,10 +75,13 @@ module seidartio
         call json%get('Electromagnetic.Source.x-z_rotation', electromagnetic_source%x_z_rotation)
         call json%get('Electromagnetic.Source.x-y_rotation', electromagnetic_source%x_y_rotation)
         call json%get('Electromagnetic.Source.amplitude', electromagnetic_source%amplitude)
-        call json%get('Electromagnetic.Source.source_type', electromagnetic_source%source_type)
+        ! call json%get('Electromagnetic.Source.source_type', electromagnetic_source%source_type)
         call json%get('Electromagnetic.Source.dt', electromagnetic_source%dt)
         call json%get('Electromagnetic.Source.time_steps', electromagnetic_source%time_steps)
-
+        
+        call json%get('Electromagnetic.Source.source_type', temp_string)
+        electromagnetic_source%source_type = trim(adjustl(temp_string))
+        
         call json%destroy()
     end subroutine parse_json
     
