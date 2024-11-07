@@ -3,23 +3,9 @@
 #
 UNAME_S := $(shell uname -s)
 
-
-CONDA_PREFIX := $(shell conda info --base)/envs/seidart
-INCLUDE_PATH := $(CONDA_PREFIX)/include
-LIB_PATH := $(CONDA_PREFIX)/lib
-BIN_PATH := $(CONDA_PREFIX)/bin
-
 # Compiler and flags
 FC := $(shell which gfortran)
 $(info Using GFortran from $(FC))
-
-# ifeq ($(UNAME_S), Darwin)
-#     UNSET_CONDA_ENV_VARS := $(shell unset CONDA_PREFIX && unset LD_LIBRARY_PATH && unset DYLD_LIBRARY_PATH)
-# 	JSON_FORTRAN_PREFIX := $(shell brew --prefix json-fortran)
-# 	LIB_PATH := $(JSON_FORTRAN_PREFIX)/lib
-# 	INCLUDE_PATH := $(JSON_FORTRAN_PREFIX)/include/jsonfortran
-	
-# endif
 
 #/opt/homebrew/Cellar/json-fortran/9.0.2/ 
 
@@ -50,20 +36,17 @@ endif
 
 # Default target
 all: $(EXECUTABLE) install clean
-	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
 	@echo "To uninstall run 'make uninstall'"
 
 # Rule to build the executable
 $(EXECUTABLE): $(SOURCES)
 	@echo "Compiling the SeidarT CPML FDTD executable..."
-	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
 	$(FC) $(FFLAGS) -o $(EXECUTABLE) $(SOURCES) -lgfortran #> compile_output.txt 2>&1
 	@echo "Compilation finished."
 
 # Install the executable into the correct Miniconda folder
 install: $(EXECUTABLE)
 	@echo "Installing the executable to $(BIN_PATH)..."
-	# export DYLD_LIBRARY_PATH=/opt/homebrew/Cellar/json-fortran/9.0.2/lib:$$DYLD_LIBRARY_PATH
 	mv $(EXECUTABLE) $(BIN_PATH)
 	@echo "SeidarT CPML FDTD executable is in the $(BIN_PATH)"
 
