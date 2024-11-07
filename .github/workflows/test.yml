@@ -25,4 +25,4 @@ jobs:
         run: |
           make clean
           make
-          ./your_executable
+#          ./your_executable

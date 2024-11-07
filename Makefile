@@ -41,7 +41,7 @@ all: $(EXECUTABLE) install clean
 # Rule to build the executable
 $(EXECUTABLE): $(SOURCES)
 	@echo "Compiling the SeidarT CPML FDTD executable..."
-	$(FC) $(FFLAGS) -o $(EXECUTABLE) $(SOURCES) -lgfortran
+	gfortran $(FFLAGS) -o $(EXECUTABLE) $(SOURCES) -lgfortran
 	@echo "Compilation finished."
 
 # Install the executable into the correct Miniconda folder
