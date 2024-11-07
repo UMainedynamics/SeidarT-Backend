@@ -20,7 +20,7 @@ module seidartio
     
         implicit none 
         character(len=*), intent(in) :: file_name
-        character(len=256) :: temp_string
+        character(len=:), allocatable :: temp_string
         type(Domain_Type), intent(out) :: domain
         type(Source_Type), intent(out) :: seismic_source
         type(Source_Type), intent(out) :: electromagnetic_source
