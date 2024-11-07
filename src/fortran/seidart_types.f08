@@ -15,7 +15,8 @@ module seidart_types
         integer :: nx, ny, nz
         real(real64) :: dx, dy, dz 
         integer :: cpml, nmats 
-        character(len=:), allocatable :: image_file 
+        ! character(len=:), allocatable :: image_file 
+        character(len=256) :: image_file 
     end type Domain_Type
     
     ! Seismic and Electromagnetic Source
@@ -27,7 +28,8 @@ module seidart_types
         real(real64) :: source_frequency
         real(real64) :: x_z_rotation, x_y_rotation
         real(real64) :: amplitude
-        character(len=:), allocatable :: source_type
+        ! character(len=:), allocatable :: source_type
+        character(len=256) :: source_type
     end type Source_Type
     
     ! Seismic attenuation properties
