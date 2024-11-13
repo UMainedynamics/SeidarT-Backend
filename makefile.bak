@@ -4,9 +4,10 @@
 UNAME_S := $(shell uname -s)
 
 # Compiler and flags
-FC := gfortran 
-# FCFLAGS = -O3
-# LDFLAGS = -ljsonfortran
+FC := $(shell which gfortran)
+$(info Using GFortran from $(FC))
+
+#/opt/homebrew/Cellar/json-fortran/9.0.2/ 
 
 ifeq ($(UNAME_S), Linux)
     CONDA_PREFIX := $(shell conda info --base)/envs/seidart

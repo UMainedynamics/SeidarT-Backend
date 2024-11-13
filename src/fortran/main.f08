@@ -11,7 +11,7 @@ program main
     ! Types are defined in seidartio
     use seidartio 
     use cpmlfdtd 
-    use seidart_types
+    use seidart_types 
     
     implicit none 
     

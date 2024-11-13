@@ -1,29 +1,56 @@
-name: macOS Build and Test
+# This is a GitHub Actions workflow configuration for testing SeidarT project 
+# using a Conda environment.
+
+name: SeidarT CI for Mac
 
 on:
   push:
     branches:
       - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
-      - name: Check out repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install Homebrew
-        run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: 3.9
+          activate-environment: seidart
+          environment-file: seidart-environment.yml
+          auto-activate-base: false
 
       - name: Install Dependencies
         run: |
-          brew install gfortran json-fortran
-          echo "Using GFortran from $(which gfortran)"
+          conda env update --file seidart-environment.yml --name seidart
+          conda activate seidart
+          # Install JSON-Fortran using Conda
+          conda install -c conda-forge json-fortran
 
-      - name: Compile and Test
+      - name: Compile SeidarT Backend
         run: |
-          make clean
-          make
-#          ./your_executable
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          make BIN_PATH=build install
+
+      - name: Run Tests
+        run: |
+          conda activate seidart
+          cd build
+          ctest --output-on-failure
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: SeidarT-build-logs
+          path: build/*.log
