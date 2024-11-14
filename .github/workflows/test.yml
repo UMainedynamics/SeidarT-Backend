@@ -13,8 +13,6 @@ on:
 
 jobs:
   build:
-    jobs:
-  build:
     runs-on: macos-14-arm64
     steps:
       - name: Check out code
