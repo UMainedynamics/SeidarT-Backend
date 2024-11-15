@@ -22,21 +22,17 @@ jobs:
         uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: 3.12
+          mamba-version: "*"
           miniconda-version: "latest"
           environment-file: seidart-environment.yml
           activate-environment: seidart
-      
-      - name: Initialize Conda
-        shell: bash
-        run: |
-          echo ". /Users/runner/miniconda3/etc/profile.d/conda.sh" >> $GITHUB_ENV
-          echo "conda activate seidart" >> $GITHUB_ENV
+          auto-activate-base: false
       
       - name: Install Dependencies
         run: |
           conda activate seidart
           # Install JSON-Fortran using Conda
-          conda install -c conda-forge json-fortran
+          mamba install -c conda-forge json-fortran
 
       - name: Compile SeidarT Backend
         run: |
