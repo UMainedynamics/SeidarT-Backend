@@ -48,7 +48,9 @@ jobs:
         cd build
         cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
         make -j$(nproc)  # For Linux, use all available CPU cores
-        sudo make install BIN_PATH=build
+        sudo make install
+        cd ../..
+
 
     - name: Upload Executable Artifact
       if: success()
