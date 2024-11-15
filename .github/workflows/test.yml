@@ -27,11 +27,10 @@ jobs:
           activate-environment: seidart
       
       - name: Initialize Conda
-        run: conda init bash
-
-      - name: Reload Shell
-        shell: bash -l {0}
-        run: conda activate seidart
+        shell: bash
+        run: |
+          echo ". /Users/runner/miniconda3/etc/profile.d/conda.sh" >> $GITHUB_ENV
+          echo "conda activate seidart" >> $GITHUB_ENV
       
       - name: Install Dependencies
         run: |
