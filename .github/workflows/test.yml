@@ -57,13 +57,13 @@ jobs:
         sudo make install
         cd ../..
 
-    - name: Compile Fortran Code 
-      run: |
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        make -j$(nproc)
-        make BIN_PATH=build install
+    # - name: Compile Fortran Code 
+    #   run: |
+    #     mkdir build
+    #     cd build
+    #     cmake .. -DCMAKE_BUILD_TYPE=Release
+    #     make -j$(nproc)
+    #     make BIN_PATH=build install
     
     - name: Upload Executable Artifact
       if: success()
