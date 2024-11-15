@@ -7,6 +7,8 @@
 
 BIN_PATH ?= 
 UNAME_S := $(shell uname -s)
+OS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
+ARCH = $(shell uname -m)
 
 # Compiler and flags
 FC := gfortran 
@@ -31,7 +33,7 @@ FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ff
 # Source files
 SRC_DIR := src/fortran
 SOURCES := $(SRC_DIR)/constants.f08 $(SRC_DIR)/seidart_types.f08 $(SRC_DIR)/seidartio.f08 $(SRC_DIR)/cpmlfdtd.f08 $(SRC_DIR)/main.f08
-EXECUTABLE := seidartfdtd 
+EXECUTABLE := seidartfdtd-$(OS)-$(ARCH) 
 
 # OpenMP support (conditionally add -fopenmp flag)
 USE_OPENMP ?= 0
