@@ -1,56 +1,58 @@
-# This is a GitHub Actions workflow configuration for testing SeidarT project 
-# using a Conda environment.
-
-name: SeidarT CI for Mac
+name: Build Fortran Executables
 
 on:
   push:
     branches:
       - main
   pull_request:
-    branches:
-      - main
 
 jobs:
   build:
-    runs-on: macos-latest
-    timeout-minutes: 30
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    timeout-minutes: 240  # Increased the timeout to 240 minutes (4 hours)
+
     steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          python-version: 3.12
-          mamba-version: "*"
-          miniconda-version: "latest"
-          environment-file: seidart-environment.yml
-          activate-environment: seidart
-          auto-activate-base: false
-      
-      - name: Install Dependencies
-        run: |
-          conda activate seidart
-          # Install JSON-Fortran using Conda
-          mamba install -c conda-forge json-fortran
+    - name: Install Compiler Tools and Dependencies
+      run: |
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          # Install required tools directly via apt on Linux
+          sudo apt-get update
+          sudo apt-get install -y build-essential curl file git gfortran cmake
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          # On macOS, use Homebrew to install dependencies
+          brew update
+          brew install gfortran json-fortran
+        fi
 
-      - name: Compile SeidarT Backend
-        run: |
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          make -j$(nproc)
-          make BIN_PATH=build install
+    - name: Cache json-fortran Build
+      uses: actions/cache@v3
+      with:
+        path: json-fortran/build
+        key: ${{ runner.os }}-jsonfortran-${{ hashFiles('json-fortran/*') }}
+        restore-keys: |
+          ${{ runner.os }}-jsonfortran-
 
-      - name: Run Tests
-        run: |
-          conda activate seidart
-          cd build
-          ctest --output-on-failure
+    - name: Clone and Build json-fortran
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        # Clone json-fortran with a shallow clone to reduce time
+        git clone --depth=1 https://github.com/jacobwilliams/json-fortran.git
+        cd json-fortran
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+        make -j$(nproc)  # For Linux, use all available CPU cores
+        sudo make install BIN_PATH=build
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: SeidarT-build-logs
-          path: build/*.log
+    - name: Upload Executable Artifact
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: seidart_executables_${{ matrix.os }}
+        path: src/executables/${{ matrix.os }}

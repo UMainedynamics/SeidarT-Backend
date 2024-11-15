@@ -27,7 +27,7 @@ jobs:
         elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
           # On macOS, use Homebrew to install dependencies
           brew update
-          brew install gcc json-fortran
+          brew install gfortran json-fortran
         fi
 
     - name: Cache json-fortran Build
@@ -48,7 +48,7 @@ jobs:
         cd build
         cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
         make -j$(nproc)  # For Linux, use all available CPU cores
-        sudo make install
+        sudo make install BIN_PATH=build
         cd ../..
 
     - name: Set Include and Library Paths
