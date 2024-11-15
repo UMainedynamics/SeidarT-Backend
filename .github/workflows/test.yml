@@ -26,6 +26,13 @@ jobs:
           environment-file: seidart-environment.yml
           activate-environment: seidart
       
+      - name: Initialize Conda
+        run: conda init bash
+
+      - name: Reload Shell
+        shell: bash -l {0}
+        run: conda activate seidart
+      
       - name: Install Dependencies
         run: |
           conda activate seidart
