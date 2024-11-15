@@ -37,7 +37,13 @@ jobs:
         key: ${{ runner.os }}-jsonfortran-${{ hashFiles('json-fortran/*') }}
         restore-keys: |
           ${{ runner.os }}-jsonfortran-
-
+    
+    - name: Clean existing json-fortran directory
+      run: |
+        if [ -d "json-fortran" ]; then
+          rm -rf json-fortran
+        fi
+    
     - name: Clone and Build json-fortran
       if: matrix.os == 'ubuntu-latest'
       run: |
