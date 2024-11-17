@@ -5,7 +5,6 @@
 # The executable will by default be placed in the BIN_PATH. If a different path 
 # is passed at the command line, we want to use that one
 
-BIN_PATH ?= 
 UNAME_S := $(shell uname -s)
 OS = $(shell uname -s | tr '[:upper:]' '[:lower:]')
 ARCH = $(shell uname -m)

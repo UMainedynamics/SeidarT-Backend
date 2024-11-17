@@ -64,7 +64,7 @@ jobs:
         ls -la 
         mkdir build
         cd build
-        sudo make BIN_PATH=build install
+        sudo make install BIN_PATH=build
     
     - name: Upload Executable Artifact
       if: success()
