@@ -55,9 +55,10 @@ os=$(uname -s | tr '[:upper:]' '[:lower:]')
 # BASE_PATH=`conda info --base`
 # INCLUDE_PATH=`echo $BASE_PATH/envs/seidart/include`
 # LIB_PATH=`echo $BASE_PATH/envs/seidart/lib`
-INCLUDE_PATH="$CONDA_PREFIX/include"
-LIB_PATH=`echo $CONDA_PREFIX/lib` 
-
+# INCLUDE_PATH="$CONDA_PREFIX/include"
+# LIB_PATH=`echo $CONDA_PREFIX/lib` 
+INCLUDE_PATH="/usr/local/include"
+LIB_PATH="/usr/local/lib"
 
 echo "Include path is set to $INCLUDE_PATH"
 echo "Library path is set to $LIB_PATH"
