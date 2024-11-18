@@ -61,6 +61,7 @@ jobs:
       run: |
         echo "Current directory is:"
         pwd 
+        ls /usr/local/jsonfortran-gnu-9.0.2/lib
         mkdir build
         bash ./build.sh
       continue-on-error: true
