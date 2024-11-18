@@ -30,33 +30,6 @@ jobs:
           brew install gfortran json-fortran
         fi
 
-    - name: Cache json-fortran Build
-      uses: actions/cache@v3
-      with:
-        path: json-fortran/build
-        key: ${{ runner.os }}-jsonfortran-${{ hashFiles('json-fortran/*') }}
-        restore-keys: |
-          ${{ runner.os }}-jsonfortran-
-    
-    - name: Clean existing json-fortran directory
-      run: |
-        if [ -d "json-fortran" ]; then
-          rm -rf json-fortran
-        fi
-    
-    - name: Clone and Build json-fortran
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        # Clone json-fortran with a shallow clone to reduce time
-        git clone --depth=1 https://github.com/jacobwilliams/json-fortran.git
-        cd json-fortran
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
-        make -j$(nproc)  # For Linux, use all available CPU cores
-        sudo make install
-        cd ../..
-
     - name: Compile Fortran Code 
       run: |
         echo "Current directory is:"
@@ -64,9 +37,8 @@ jobs:
         ls -la 
         mkdir build
         conda info -s
-        find /usr -name "libjsonfortran*" 2>/dev/null || echo "No library found"
-        find /usr -name "json_module.mod" 2>/dev/null || echo "No module file found"        
-        bash ./build.sh
+        ls /usr/local/
+        # bash ./build.sh
     
     - name: Upload Executable Artifact
       if: success()
