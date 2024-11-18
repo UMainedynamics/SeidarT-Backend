@@ -52,16 +52,19 @@ os=$(uname -s | tr '[:upper:]' '[:lower:]')
 #     echo "Unsupported OS: $UNAME_S"
 #     exit 1
 # fi
-BASE_PATH=`conda info --base`
-INCLUDE_PATH=`echo $BASE_PATH/envs/seidart/include`
-LIB_PATH=`echo $BASE_PATH/envs/seidart/lib`
+# BASE_PATH=`conda info --base`
+# INCLUDE_PATH=`echo $BASE_PATH/envs/seidart/include`
+# LIB_PATH=`echo $BASE_PATH/envs/seidart/lib`
+INCLUDE_PATH=`echo $CONDA_PREFIX/include`
+LIB_PATH=`echo $CONDA_PREFIX/lib` 
 
 
 echo "Include path is set to $INCLUDE_PATH"
 echo "Library path is set to $LIB_PATH"
 
 if [[ "$user_defined_builddir" = false ]]; then
-    BIN_PATH=`echo $BASE_PATH/envs/seidart/bin`
+    # BIN_PATH=`echo $BASE_PATH/envs/seidart/bin`
+    BIN_PATH=`echo $CONDA_PREFIX/bin`
 fi
 
 echo "Install path is set to $BIN_PATH"
