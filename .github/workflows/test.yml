@@ -37,7 +37,7 @@ jobs:
         ls -la 
         mkdir build
         conda info -s
-        bash ./build.sh
+        bash ./build.sh -b build
     
     - name: Upload Executable Artifact
       if: success()
