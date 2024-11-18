@@ -63,8 +63,7 @@ jobs:
         pwd 
         ls -la 
         mkdir build
-        cd build
-        sudo make install
+        bash ./build.sh
     
     - name: Upload Executable Artifact
       if: success()
