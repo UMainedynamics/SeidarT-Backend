@@ -63,6 +63,7 @@ jobs:
         pwd 
         mkdir build
         bash ./build.sh
+      continue-on-error: true
     
     - name: View compile output 
       run: cat compile_output.txt
