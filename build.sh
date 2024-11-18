@@ -55,7 +55,7 @@ os=$(uname -s | tr '[:upper:]' '[:lower:]')
 # BASE_PATH=`conda info --base`
 # INCLUDE_PATH=`echo $BASE_PATH/envs/seidart/include`
 # LIB_PATH=`echo $BASE_PATH/envs/seidart/lib`
-INCLUDE_PATH=`echo $CONDA_PREFIX/include`
+INCLUDE_PATH="$CONDA_PREFIX/include"
 LIB_PATH=`echo $CONDA_PREFIX/lib` 
 
 
