@@ -61,9 +61,11 @@ jobs:
       run: |
         echo "Current directory is:"
         pwd 
-        ls -la 
         mkdir build
         bash ./build.sh
+    
+    - name: View compile output 
+      run: cat compile_output.txt
     
     - name: Upload Executable Artifact
       if: success()
