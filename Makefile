@@ -54,7 +54,7 @@ $(EXECUTABLE): $(SOURCES)
 install: $(EXECUTABLE)
 	@echo "Installing the executable to $(BIN_PATH)..."
 	mv $(EXECUTABLE) $(BIN_PATH)
-	@echo "SeidarT CPML FDTD executable is in the $(BIN_PATH)"
+	@echo "SeidarT CPML FDTD executable is in the $(BIN_PATH)" directory
 
 	
 # Uninstall
