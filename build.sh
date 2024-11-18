@@ -61,7 +61,9 @@ INCLUDE_PATH="/usr/local/jsonfortran-gnu-9.0.2/include"
 LIB_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
 
 echo "Include path is set to $INCLUDE_PATH"
+
 echo "Library path is set to $LIB_PATH"
+ls /usr/local/jsonfortran-gnu-9.0.2
 
 if [[ "$user_defined_builddir" = false ]]; then
     # BIN_PATH=`echo $BASE_PATH/envs/seidart/bin`
