@@ -57,7 +57,7 @@ os=$(uname -s | tr '[:upper:]' '[:lower:]')
 # LIB_PATH=`echo $BASE_PATH/envs/seidart/lib`
 # INCLUDE_PATH="$CONDA_PREFIX/include"
 # LIB_PATH=`echo $CONDA_PREFIX/lib` 
-INCLUDE_PATH="/usr/local/jsonfortran-gnu-9.0.2/include"
+INCLUDE_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
 LIB_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
 
 echo "Include path is set to $INCLUDE_PATH"
