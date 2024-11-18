@@ -61,6 +61,8 @@ jobs:
       run: |
         echo "Current directory is:"
         pwd 
+        ls -la 
+        mkdir build
         bash ./build.sh
     
     - name: Upload Executable Artifact
