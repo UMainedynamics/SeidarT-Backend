@@ -63,7 +63,9 @@ jobs:
         pwd 
         ls -la 
         mkdir build
-        conda info -s        
+        conda info -s
+        find /usr -name "libjsonfortran*" 2>/dev/null || echo "No library found"
+        find /usr -name "json_module.mod" 2>/dev/null || echo "No module file found"        
         bash ./build.sh
     
     - name: Upload Executable Artifact
