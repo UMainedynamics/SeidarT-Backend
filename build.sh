@@ -57,7 +57,7 @@ echo "Install path is set to $BIN_PATH"
 FC=$(which gfortran)
 echo "Using GFortran from $FC"
 
-FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all"
+FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all -fPIC"
 
 # OpenMP support (optional)
 if [[ "$openmp_compile" = true ]]; then
