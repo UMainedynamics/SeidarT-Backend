@@ -38,18 +38,13 @@ jobs:
       run: |
         bash ./build.sh -b build
     
-    - name: Configure Git
+    - name: Configure and Push to SeidarT Repository
       run: |
         git config --global user.email "github-actions@github.com"
         git config --global user.name "GitHub Actions"
         git config --global url."https://".insteadOf git://
         git remote set-url origin https://github.com/UMainedynamics/SeidarT.git
-    
-    - name: Clone Repository
-      run: git clone https://github.com/UMainedynamics/SeidarT.git
 
-    - name: Copy Binary and Push
-      run: |
         cp build/seidartfdtd* SeidarT/src/seidart/binaries
         cd SeidarT
         git add src/seidart/binaries/seidartfdtd*
