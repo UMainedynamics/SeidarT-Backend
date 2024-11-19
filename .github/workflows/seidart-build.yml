@@ -39,16 +39,24 @@ jobs:
         bash ./build.sh -b build
     
     - name: Configure and Push to SeidarT Repository
-      run: |
-        git config --global user.email "github-actions@github.com"
-        git config --global user.name "GitHub Actions"
-        git config --global url."https://".insteadOf git://
-        git remote set-url origin https://github.com/UMainedynamics/SeidarT.git
-
-        cp build/seidartfdtd* SeidarT/src/seidart/binaries
-        cd SeidarT
-        git add src/seidart/binaries/seidartfdtd*
-        git commit -m "Update precompiled binary for ${{ matrix.os }}"        
-        git push https://${GITHUB_TOKEN}@github.com/UMainedynamics/SeidarT.git
+      uses: sbernsen/github-action-push-to-another-reposotory@main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        source-directory: 'build'
+        destination-github-username: 'sbernsen'
+        destination-repository-name: 'SeidarT'
+        user-email: stevenbernsen@gmail.com
+        target-branch: main
+      # run: |
+      #   git config --global user.email "github-actions@github.com"
+      #   git config --global user.name "GitHub Actions"
+      #   git config --global url."https://".insteadOf git://
+      #   git remote set-url origin https://github.com/UMainedynamics/SeidarT.git
+
+      #   cp build/seidartfdtd* SeidarT/src/seidart/binaries
+      #   cd SeidarT
+      #   git add src/seidart/binaries/seidartfdtd*
+      #   git commit -m "Update precompiled binary for ${{ matrix.os }}"        
+      #   git push https://${GITHUB_TOKEN}@github.com/UMainedynamics/SeidarT.git
+      
