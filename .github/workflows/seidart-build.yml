@@ -42,7 +42,9 @@ jobs:
       run: |
         git config --global user.email "github-actions@github.com"
         git config --global user.name "GitHub Actions"
-
+        git config --global url."https://".insteadOf git://
+        git remote set-url origin https://github.com/UMainedynamics/SeidarT.git
+    
     - name: Clone Repository
       run: git clone https://github.com/UMainedynamics/SeidarT.git
 
@@ -51,7 +53,6 @@ jobs:
         cp build/seidartfdtd* SeidarT/src/seidart/binaries
         cd SeidarT
         git add src/seidart/binaries/seidartfdtd*
-        git commit -m "Update precompiled binary"
-        git push https://${GITHUB_TOKEN}@github.com/UMainedynamics/SeidarT.git
+        git commit -m "Update precompiled binary for ${{ matrix.os }}"        git push https://${GITHUB_TOKEN}@github.com/UMainedynamics/SeidarT.git
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
