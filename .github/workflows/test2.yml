@@ -1,10 +1,10 @@
-name: SeidarT Build For Linux
+name: Create SeidarT Environment
 
 on: [push]
 
 jobs:
   build-and-run:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     defaults:
       run:
         shell: bash -l {0}
@@ -29,25 +29,4 @@ jobs:
 
     - name: Run bash script
       run: |
-        bash ./build.sh -b build
-    
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./path/to/your/executable
-        asset_name: your_executable_name
-        asset_content_type: application/octet-stream
+        bash ./paths.sh
