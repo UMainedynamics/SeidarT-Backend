@@ -38,8 +38,28 @@ UNAME_S=$(uname -s)
 arch=$(uname -m | tr '[:upper:]' '[:lower:]')
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 
-INCLUDE_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
-LIB_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
+# INCLUDE_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
+# LIB_PATH="/usr/local/jsonfortran-gnu-9.0.2/lib"
+
+# Set paths based on the operating system
+# if [[ "$UNAME_S" == "Linux" ]]; then
+#     INCLUDE_PATH="$CONDA_PREFIX/include"
+#     LIB_PATH="$CONDA_PREFIX/lib"
+#     BIN_PATH="$CONDA_PREFIX/linux"
+# elif [[ "$UNAME_S" == "Darwin" ]]; then
+#     JSON_FORTRAN_PREFIX="/opt/homebrew/Cellar/json-fortran/9.0.2"
+#     INCLUDE_PATH=$JSON_FORTRAN_PREFIX/include
+#     LIB_PATH=$JSON_FORTRAN_PREFIX/lib
+#     BIN_PATH=$JSON_FORTRAN_PREFIX/bin
+# else
+#     echo "Unsupported OS: $UNAME_S"
+#     exit 1
+# fi
+# BASE_PATH=`conda info --base`
+# INCLUDE_PATH=`echo $BASE_PATH/envs/seidart/include`
+# LIB_PATH=`echo $BASE_PATH/envs/seidart/lib`
+INCLUDE_PATH="$CONDA_PREFIX/include"
+LIB_PATH=`echo $CONDA_PREFIX/lib` 
 
 echo "Include path is set to $INCLUDE_PATH"
 echo "Library path is set to $LIB_PATH"

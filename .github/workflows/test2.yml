@@ -1,4 +1,4 @@
-name: Create SeidarT Environment
+name: SeidarT Build For Linux
 
 on: [push]
 
