@@ -99,13 +99,14 @@ mkdir -p "$BIN_PATH"
 
 # Compile the executable
 echo "Compiling the SeidarT CPML FDTD executable..."
-# $FC -v $FFLAGS -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
-/usr/bin/gfortran -v -I/usr/local/jsonfortran-gnu-9.0.2/lib \
--L/usr/local/jsonfortran-gnu-9.0.2/lib -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow \
--O0 -fcheck=all -o seidartfdtd-linux-x86_64 \
-src/fortran/constants.f08 src/fortran/seidart_types.f08 src/fortran/seidartio.f08 \
-src/fortran/cpmlfdtd.f08 src/fortran/main.f08 \
--ljsonfortran -lgfortran -lm -shared-libgcc
+$FC -v $FFLAGS -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
+
+# /usr/bin/gfortran -v -I/usr/local/jsonfortran-gnu-9.0.2/lib \
+# -L/usr/local/jsonfortran-gnu-9.0.2/lib -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow \
+# -O0 -fcheck=all -o seidartfdtd-linux-x86_64 \
+# src/fortran/constants.f08 src/fortran/seidart_types.f08 src/fortran/seidartio.f08 \
+# src/fortran/cpmlfdtd.f08 src/fortran/main.f08 \
+# -ljsonfortran -lgfortran -lm -shared-libgcc
 
 if [[ $? -ne 0 ]]; then
     echo "Compilation failed. Check compile_output.txt for details."
