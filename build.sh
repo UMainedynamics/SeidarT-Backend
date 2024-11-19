@@ -63,7 +63,12 @@ LIB_PATH=`echo $CONDA_PREFIX/lib`
 
 echo "Include path is set to $INCLUDE_PATH"
 echo "Library path is set to $LIB_PATH"
-export LD_LIBRARY_PATH=/usr/local/jsonfortran-gnu-9.0.2/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/usr/local/jsonfortran-gnu-9.0.2/lib:$LD_LIBRARY_PATH
+
+echo "Listed files and directories in the include path"
+ls $INCLUDE_PATH 
+echo "Listed files and directories in the library path"
+ls $LIB_PATH
 
 if [[ "$user_defined_builddir" = false ]]; then
     # BIN_PATH=`echo $BASE_PATH/envs/seidart/bin`
