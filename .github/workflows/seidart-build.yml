@@ -39,7 +39,7 @@ jobs:
         bash ./build.sh -b build
     
     - name: Configure and Push to SeidarT Repository
-      uses: sbernsen/github-action-push-to-another-reposotory@main
+      uses: cpina/github-action-push-to-another-reposotory@main
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
