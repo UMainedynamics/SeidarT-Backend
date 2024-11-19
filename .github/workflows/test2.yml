@@ -1,17 +1,21 @@
-name: Create SeidarT Environment
+name: SeidarT Build For MacOS
 
-on: [push]
+on:
+  push:
+    tags:
+      - "v*.*.*"
 
 jobs:
-  build-and-run:
+  build-and-release:
     runs-on: macos-latest
     defaults:
       run:
         shell: bash -l {0}
 
     steps:
-    - uses: actions/checkout@v2
-
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
@@ -29,4 +33,4 @@ jobs:
 
     - name: Run bash script
       run: |
-        bash ./paths.sh
+        bash ./build.sh -b build
