@@ -29,5 +29,4 @@ jobs:
 
     - name: Run bash script
       run: |
-        # Replace this with the path to your bash script
-        ./paths.sh
+        bash ./paths.sh
