@@ -24,9 +24,13 @@ jobs:
       with:
         miniconda-version: "latest"
         auto-update-conda: true
-        activate-environment: seidart
-        environment-file: seidart-environment.yml
         auto-activate-base: false
+    
+    - name: Create Conda environment 
+      run: conda env create --file=seidart-environment.yml 
+    
+    - name: Activate Conda environment
+      run: conda activate seidart
 
     - name: Verify Conda installation
       run: conda info
