@@ -38,25 +38,25 @@ jobs:
       run: |
         bash ./build.sh -b build
     
-    - name: Configure and Push to SeidarT Repository
-      uses: cpina/github-action-push-to-another-reposotory@main
+    - name: Checkout SeidarT repo
+      uses: actions/checkout@v2
+      with:
+        repository: UMainedynamics/SeidarT
+        token: ${{ secrets.API_TOKEN_GITHUB }}
+        path: SeidarT
+
+    - name: Copy binaries
+      run: |
+        mkdir -p SeidarT/src/seidart/binaries
+        cp -r build/* SeidarT/src/seidart/binaries/
+
+    - name: Commit and push binaries
+      run: |
+        cd SeidarT
+        git config --global user.email "stevenbernsen@gmail.com"
+        git config --global user.name "sbernsen"
+        git add src/seidart/binaries
+        git commit -m "Add built binaries"
+        git push
       env:
         GITHUB_TOKEN: ${{ secrets.API_TOKEN_GITHUB }}
-      with:
-        source-directory: 'build'
-        destination-github-username: 'sbernsen'
-        destination-repository-name: 'SeidarT'
-        user-email: stevenbernsen@gmail.com
-        target-branch: main
-      # run: |
-      #   git config --global user.email "github-actions@github.com"
-      #   git config --global user.name "GitHub Actions"
-      #   git config --global url."https://".insteadOf git://
-      #   git remote set-url origin https://github.com/UMainedynamics/SeidarT.git
-
-      #   cp build/seidartfdtd* SeidarT/src/seidart/binaries
-      #   cd SeidarT
-      #   git add src/seidart/binaries/seidartfdtd*
-      #   git commit -m "Update precompiled binary for ${{ matrix.os }}"        
-      #   git push https://${GITHUB_TOKEN}@github.com/UMainedynamics/SeidarT.git
-      
