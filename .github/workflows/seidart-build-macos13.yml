@@ -1,0 +1,54 @@
+name: SeidarT Build For Intel macOS Binaries
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-and-release:
+    runs-on: macos-13
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
+    - name: Set up Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        miniconda-version: "latest"
+        auto-update-conda: true
+        activate-environment: seidart
+        environment-file: seidart-environment.yml
+        auto-activate-base: false
+
+    - name: Build Binaries
+      shell: bash -l {0}
+      run: |
+        conda info
+        conda activate seidart
+        bash ./build.sh -b build
+    
+    - name: Checkout SeidarT repo
+      uses: actions/checkout@v2
+      with:
+        repository: UMainedynamics/SeidarT
+        token: ${{ secrets.API_TOKEN_GITHUB2 }}
+        path: SeidarT
+
+    - name: Copy binaries
+      run: |
+        mkdir -p SeidarT/src/seidart/binaries
+        cp -r build/* SeidarT/src/seidart/binaries/
+
+    - name: Commit and push binaries
+      run: |
+        cd SeidarT
+        git config --global user.email "stevenbernsen@gmail.com"
+        git config --global user.name "sbernsen"
+        git add src/seidart/binaries
+        git commit -m "Add built binaries"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.API_TOKEN_GITHUB2 }}
+
