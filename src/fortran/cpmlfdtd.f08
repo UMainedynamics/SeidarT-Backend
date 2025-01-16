@@ -171,11 +171,12 @@ module cpmlfdtd
         !---
         
         do it = 1,source%time_steps
-        
+            !$omp parallel private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
             ! ------------------------------------------------------------
             !  compute stress sigma and update memory variables for C-PML
             ! ------------------------------------------------------------
-            !$omp parallel do private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz)
+            
+            !$omp do
             do j = 2,nz
                 do i = 1,nx-1
         
@@ -209,7 +210,9 @@ module cpmlfdtd
         
                 enddo
             enddo
+            !$omp end do
             
+            !$omp do
             do j = 1,nz-1
                 do i = 2,nx
         
@@ -239,13 +242,13 @@ module cpmlfdtd
         
                 enddo
             enddo
-            !$omp end parallel do
+            !$omp end do
             
             ! --------------------------------------------------------
             !  compute velocity and update memory variables for C-PML
             ! --------------------------------------------------------
             
-            !$omp parallel do private(i, j, deltarho, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
+            !$omp do 
             do j = 2,nz
                 do i = 2,nx
         
@@ -268,7 +271,9 @@ module cpmlfdtd
                             ( dt / (deltarho - dt * gammax(i,j) ))
                 enddo
             enddo
+            !$omp end do
             
+            !$omp do
             do j = 1,nz-1
                 do i = 1,nx-1
         
@@ -289,7 +294,9 @@ module cpmlfdtd
         
                 enddo
             enddo
-            !$omp end parallel do
+            !$omp end do
+            
+            !$omp end parallel
             
             ! Add the source term
             vx(isource,jsource) = vx(isource,jsource) + srcx(it) * dt / rho(isource,jsource)
@@ -1080,9 +1087,12 @@ module cpmlfdtd
         !---  beginning of time loop
         !---
         do it = 1,source%time_steps
+            !$omp parallel private(i, j, value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx)
+            
             !--------------------------------------------------------
             ! compute magnetic field and update memory variables for C-PML
             !--------------------------------------------------------
+            !$omp do
             do j = 1,nz-1  
                 do i = 1,nx-1
                 
@@ -1101,11 +1111,13 @@ module cpmlfdtd
 
                 enddo  
             enddo
-
+            !$omp end do 
+            
             !--------------------------------------------------------
             ! compute electric field and update memory variables for C-PML
             !--------------------------------------------------------
             ! Compute the differences in the y-direction
+            !$omp do
             do j = 2,nz
                 do i = 1,nx
                     ! Update the Ex field
@@ -1118,7 +1130,9 @@ module cpmlfdtd
                     Ex(i,j) = caEx(i,j) * Ex(i,j) + cbEx(i,j) * value_dHy_dz
                 enddo
             enddo
-
+            !$omp end do 
+            
+            !$omp do
             do j = 1,nz
                 do i = 2,nx
                     ! Update the Ez field
@@ -1131,7 +1145,9 @@ module cpmlfdtd
                     Ez(i,j) = caEz(i,j) * Ez(i,j) + cbEz(i,j) * value_dHy_dx 
                 enddo
             enddo
-
+            !$omp end do 
+            
+            !$omp end parallel
             !----------------------------------------------------------------------------
             Ex(isource,jsource) = Ex(isource,jsource) + &
                             srcx(it) * dt / eps11(isource,jsource)

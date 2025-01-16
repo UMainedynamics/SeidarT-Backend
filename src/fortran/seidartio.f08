@@ -45,7 +45,6 @@ module seidartio
         call json%get('Domain.image_file', temp_string)
         domain%image_file = trim(adjustl(temp_string))
         
-        
         ! Parse the Seismic Source
         call json%get('Seismic.Source.x', seismic_source%x)
         call json%get('Seismic.Source.y', seismic_source%y)
@@ -62,7 +61,7 @@ module seidartio
         call json%get('Seismic.Source.time_steps', seismic_source%time_steps)
         
         call json%get('Seismic.Source.source_type', temp_string)
-        electromagnetic_source%source_type = trim(adjustl(temp_string))
+        seismic_source%source_type = trim(adjustl(temp_string))
         
         ! Parse the EM Source
         call json%get('Electromagnetic.Source.x', electromagnetic_source%x)
@@ -83,6 +82,7 @@ module seidartio
         electromagnetic_source%source_type = trim(adjustl(temp_string))
         
         call json%destroy()
+    
     end subroutine parse_json
     
     ! --------------------------------------------------------------------------

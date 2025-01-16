@@ -60,7 +60,10 @@ echo "Install path is set to $BIN_PATH"
 FC=$(which gfortran)
 echo "Using GFortran from $FC"
 
-FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all -fPIC"
+# Debugging options are the first FFLAGS. Uncomment when necessary
+# FFLAGS="-O3 -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -march=native -funroll-loops -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all -fPIC"
+# These are the production flags
+FFLAGS="-O3 -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -march=native -funroll-loops -Wall -fbacktrace -fPIC"
 
 # OpenMP support (optional)
 if [[ "$openmp_compile" = true ]]; then
@@ -79,13 +82,6 @@ mkdir -p "$BIN_PATH"
 echo "Compiling the SeidarT CPML FDTD executable..."
 $FC -v $FFLAGS -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
 
-# /usr/bin/gfortran -v -I/usr/local/jsonfortran-gnu-9.0.2/lib \
-# -L/usr/local/jsonfortran-gnu-9.0.2/lib -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow \
-# -O0 -fcheck=all -o seidartfdtd-linux-x86_64 \
-# src/fortran/constants.f08 src/fortran/seidart_types.f08 src/fortran/seidartio.f08 \
-# src/fortran/cpmlfdtd.f08 src/fortran/main.f08 \
-# -ljsonfortran -lgfortran -lm -shared-libgcc
-
 if [[ $? -ne 0 ]]; then
     echo "Compilation failed. Check compile_output.txt for details."
     cat compile_output.txt
@@ -95,7 +91,7 @@ fi
 # -----------------------------------------------------------------------------
 # Move the executable to the correct folder
 echo "Moving the executable to $BIN_PATH..."
-mv $EXECUTABLE $BIN_PATH/
+mv $EXECUTABLE $BIN_PATH/seidartfdtd
 
 echo "Build and installation complete. Executable is located in $BIN_PATH."
 
