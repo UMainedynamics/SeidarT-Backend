@@ -30,7 +30,7 @@ module cpmlfdtd
         real(real64), allocatable :: c11(:,:), c13(:,:), c15(:,:), c33(:,:), c35(:,:), c55(:,:), rho(:,:)
         real(real64), allocatable :: K_x(:), alpha_x(:), a_x(:), b_x(:), K_x_half(:), alpha_x_half(:), a_x_half(:), b_x_half(:)
         real(real64), allocatable :: K_z(:), alpha_z(:), a_z(:), b_z(:), K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
-        real(real64), allocatable :: gammax(:,:), gammaz(:,:)        
+        real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:)        
         real(real64), allocatable :: srcx(:), srcz(:) ! The vector time series of the source
         
         ! Model variables
@@ -67,7 +67,7 @@ module cpmlfdtd
                  K_x_half(nx), alpha_x_half(nx), a_x_half(nx), b_x_half(nx))
         allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
                 K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
-        allocate(gammax(nx, nz), gammaz(nx, nz))
+        allocate(gamma_x(nx, nz), gamma_z(nx, nz), gamma_xz(nx, nz))
         allocate(srcx(source%time_steps), srcz(source%time_steps))
         
         ! Allocate more
@@ -89,8 +89,9 @@ module cpmlfdtd
         call material_rw2('rho.dat', rho, .TRUE.)
                 
         ! ------------------- Load Attenuation Coefficients --------------------
-        call material_rw2('gamma_x.dat', gammax, .TRUE.)
-        call material_rw2('gamma_z.dat', gammaz, .TRUE.)
+        call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
+        call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
+        call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
         
         ! ------------------------ Assign some constants -----------------------
         
@@ -199,15 +200,34 @@ module cpmlfdtd
                     value_dvz_dx = value_dvz_dx / K_x(i) + memory_dvz_dx(i,j)
                     value_dvx_dz = value_dvx_dz / K_z_half(j) + memory_dvx_dz(i,j)
                     
-                    sigmaxx(i,j) = sigmaxx(i,j) + &
+                    ! sigmaxx(i,j) = sigmaxx(i,j) + &
+                    !     (   c11(i,j) * value_dvx_dx + &
+                    !         c13(i,j) * value_dvz_dz + &
+                    !         c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
+                    ! sigmazz(i,j) = sigmazz(i,j) + &
+                    !     (   c13(i,j) * value_dvx_dx + &
+                            ! c33(i,j) * value_dvz_dz + &
+                            ! c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
+                    ! sigmaxx(i,j) = sigmaxx(i,j) + &
+                    !     (   c11(i,j) * value_dvx_dx + &
+                    !         c13(i,j) * value_dvz_dz + &
+                    !         c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * &
+                    !             dt - gamma_x(i,j) * sigmaxx(i,j) * dt
+                    ! sigmazz(i,j) = sigmazz(i,j) + &
+                    !     (   c13(i,j) * value_dvx_dx + &
+                    !         c33(i,j) * value_dvz_dz + &
+                    !         c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * &
+                    !             dt - gamma_z(i,j) * sigmazz(i,j) * dt
+                    sigmaxx(i,j) = ( sigmaxx(i,j) + &
                         (   c11(i,j) * value_dvx_dx + &
                             c13(i,j) * value_dvz_dz + &
-                            c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
-                    sigmazz(i,j) = sigmazz(i,j) + &
+                            c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt ) / & 
+                               (1 + gamma_x(i,j) * dt )
+                    sigmazz(i,j) = ( sigmazz(i,j) + &
                         (   c13(i,j) * value_dvx_dx + &
                             c33(i,j) * value_dvz_dz + &
-                            c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
-        
+                            c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt) / & 
+                                (1 + gamma_z(i,j) * dt )
                 enddo
             enddo
             !$omp end do
@@ -235,11 +255,20 @@ module cpmlfdtd
                     value_dvz_dx = value_dvz_dx / K_x(i) + memory_dvz_dx(i,j)
                     value_dvx_dz = value_dvx_dz / K_z_half(j) + memory_dvx_dz(i,j)
             
-                    sigmaxz(i,j) = sigmaxz(i,j) + &
+                    ! sigmaxz(i,j) = sigmaxz(i,j) + &
+                    !     (   c15(i,j)  * value_dvx_dx + & 
+                    !         c35(i,j)  * value_dvz_dz + &
+                    !         c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
+                    ! sigmaxz(i,j) = sigmaxz(i,j) + &
+                    !     (   c15(i,j)  * value_dvx_dx + & 
+                    !         c35(i,j)  * value_dvz_dz + &
+                    !         c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * &
+                    !             dt - gamma_xz(i,j) * sigmaxz(i,j) * dt
+                    sigmaxz(i,j) = ( sigmaxz(i,j) + &
                         (   c15(i,j)  * value_dvx_dx + & 
                             c35(i,j)  * value_dvz_dz + &
-                            c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
-        
+                            c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt ) / &
+                                (1 - gamma_xz(i,j) * dt )
                 enddo
             enddo
             !$omp end do
@@ -266,9 +295,8 @@ module cpmlfdtd
                                 memory_dsigmaxx_dx(i,j)
                     value_dsigmaxz_dz = value_dsigmaxz_dz / K_z(j) + &
                                 memory_dsigmaxz_dz(i,j)
-            
-                    vx(i,j) = vx(i,j) + (value_dsigmaxx_dx + value_dsigmaxz_dz) * &
-                            ( dt / (deltarho - dt * gammax(i,j) ))
+                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx + value_dsigmaxz_dz) / deltarho
+
                 enddo
             enddo
             !$omp end do
@@ -288,10 +316,8 @@ module cpmlfdtd
             
                     value_dsigmaxz_dx = value_dsigmaxz_dx / K_x_half(i) + memory_dsigmaxz_dx(i,j)
                     value_dsigmazz_dz = value_dsigmazz_dz / K_z_half(j) + memory_dsigmazz_dz(i,j)
-            
-                    vz(i,j) = vz(i,j) + (value_dsigmaxz_dx + value_dsigmazz_dz) * &
-                            ( dt / ( deltarho - dt * gammaz(i,j) )  )
-        
+
+                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx + value_dsigmazz_dz) / deltarho
                 enddo
             enddo
             !$omp end do
@@ -299,8 +325,10 @@ module cpmlfdtd
             !$omp end parallel
             
             ! Add the source term
-            vx(isource,jsource) = vx(isource,jsource) + srcx(it) * dt / rho(isource,jsource)
-            vz(isource,jsource) = vz(isource,jsource) + srcz(it) * dt / rho(isource,jsource)
+            ! vx(isource,jsource) = vx(isource,jsource) + srcx(it) * dt / rho(isource,jsource)
+            ! vz(isource,jsource) = vz(isource,jsource) + srcz(it) * dt / rho(isource,jsource)
+            vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
+            vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
         
             ! Dirichlet conditions (rigid boundaries) on the edges or at the 
             ! bottom of the PML layers
@@ -328,7 +356,7 @@ module cpmlfdtd
         deallocate(c11, c13, c15, c33, c35, c55, rho)
         deallocate(K_x, alpha_x, a_x, b_x, K_x_half, alpha_x_half, a_x_half, b_x_half)
         deallocate(K_z, alpha_z, a_z, b_z, K_z_half, alpha_z_half, a_z_half, b_z_half)
-        deallocate(gammax, gammaz, srcx, srcz)
+        deallocate(gamma_x, gamma_z, gamma_xz, srcx, srcz)
         
         ! Allocate more
         deallocate(memory_dvx_dx, memory_dvx_dz)
@@ -383,7 +411,8 @@ module cpmlfdtd
                         K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
         
         ! Arrays for the PML damping factors
-        real(real64), allocatable :: gammax(:,:), gammay(:,:), gammaz(:,:)
+        real(real64), allocatable :: gamma_x(:,:), gamma_y(:,:), gamma_z(:,:)
+        real(real64), allocatable :: gamma_xz(:,:), gamma_xy(:,:), gamma_yz(:,:)
 
         ! Source arrays
         real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
@@ -438,7 +467,9 @@ module cpmlfdtd
                 K_y_half(ny), alpha_y_half(ny), a_y_half(ny), b_y_half(ny))
         allocate(K_z(nz), alpha_z(nz), a_z(nz), b_z(nz), &
                 K_z_half(nz), alpha_z_half(nz), a_z_half(nz), b_z_half(nz))
-        allocate(gammax(nx, nz), gammay(nx, nz), gammaz(nx, nz))
+        allocate(gamma_x(nx, nz), gamma_y(nx, nz), gamma_z(nx, nz))
+        allocate(gamma_xy(nx, nz), gamma_yz(nx, nz), gamma_xz(nx, nz))
+        
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
                 
         ! Allocate more
@@ -480,10 +511,12 @@ module cpmlfdtd
             call material_rw2('rho.dat', rho, .TRUE.)
         
         ! ------------------- Load Attenuation Coefficients --------------------
-            call material_rw2('gamma_x.dat', gammax, .TRUE.)
-            call material_rw2('gamma_z.dat', gammaz, .TRUE.)
-            call material_rw2('gamma_y.dat', gammay, .TRUE.)
-        
+            call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
+            call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
+            call material_rw2('gamma_y.dat', gamma_y, .TRUE.)
+            call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
+            call material_rw2('gamma_yz.dat', gamma_yz, .TRUE.)
+            call material_rw2('gamma_xy.dat', gamma_xy, .TRUE.)
         ! ------------------------ Assign some constants -----------------------
         isource = source%xind + domain%cpml
         jsource = source%yind + domain%cpml
@@ -798,7 +831,7 @@ module cpmlfdtd
                         dsigmaxy_dy = dsigmaxy_dy / K_y(j) + memory_dsigmaxy_dy(i,j,k)
                         dsigmaxz_dz = dsigmaxz_dz / K_z(k) + memory_dsigmaxz_dz(i,j,k) 
 
-                        vx(i,j,k) = vx(i,j,k) * (1 - gammax(i,j) ) + &
+                        vx(i,j,k) = vx(i,j,k) + &
                             (dsigmaxx_dx + dsigmaxy_dy + dsigmaxz_dz) * &
                             dt / deltarho !rho(i,k)
                     enddo
@@ -821,7 +854,7 @@ module cpmlfdtd
                         dsigmayy_dy = dsigmayy_dy / K_y_half(j) + memory_dsigmayy_dy(i,j,k)
                         dsigmayz_dz = dsigmayz_dz / K_z(k) + memory_dsigmayz_dz(i,j,k)
 
-                        vy(i,j,k) = vy(i,j,k) * (1 - gammay(i,j) )+ &
+                        vy(i,j,k) = vy(i,j,k) + &
                             (dsigmaxy_dx + dsigmayy_dy + dsigmayz_dz) * &
                             dt / deltarho !rho(i,k)
                     enddo
@@ -846,7 +879,7 @@ module cpmlfdtd
                         dsigmayz_dy = dsigmayz_dy / K_y(j) + memory_dsigmayz_dy(i,j,k)
                         dsigmazz_dz = dsigmazz_dz / K_z_half(k) + memory_dsigmazz_dz(i,j,k)
 
-                        vz(i,j,k) = vz(i,j,k) * (1 - gammaz(i,j) )+ &
+                        vz(i,j,k) = vz(i,j,k) + &
                             (dsigmaxz_dx + dsigmayz_dy + dsigmazz_dz) * &
                             dt / deltarho !rho(i,k)
 
@@ -1087,7 +1120,9 @@ module cpmlfdtd
         !---  beginning of time loop
         !---
         do it = 1,source%time_steps
-            !$omp parallel private(i, j, value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx)
+            !$omp parallel private(i, j, value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx) &
+            !$omp& shared(Ex, Ez, Hy, memory_dEx_dz, memory_dEz_dx, memory_dHy_dz, memory_dHy_dx, b_z, b_x, a_z, a_x, K_z, K_x, caEz, cbEz, caEx, cbEx, daHy, dbHy) & 
+            !$omp& reduction(max:velocnorm)
             
             !--------------------------------------------------------
             ! compute magnetic field and update memory variables for C-PML
@@ -1108,14 +1143,13 @@ module cpmlfdtd
 
                     ! Now update the Magnetic field
                     Hy(i,j) = daHy*Hy(i,j) + dbHy*( value_dEz_dx + value_dEx_dz )
+                    velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
 
                 enddo  
             enddo
             !$omp end do 
             
-            !--------------------------------------------------------
-            ! compute electric field and update memory variables for C-PML
-            !--------------------------------------------------------
+            ! Electric field and update memory variables for C-PML
             ! Compute the differences in the y-direction
             !$omp do
             do j = 2,nz
@@ -1124,9 +1158,7 @@ module cpmlfdtd
                     value_dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
                     memory_dHy_dz(i,j) = b_z(j) * memory_dHy_dz(i,j) + a_z(j) * value_dHy_dz
                     value_dHy_dz = value_dHy_dz/K_z(j) + memory_dHy_dz(i,j)
-
-                    ! Ex(i,j) = (( caEx(i,j) + caEx(i,j-1) )/2) * Ex(i,j) + &
-                    !     (( cbEx(i,j) + cbEx(i,j-1) )/2 ) * value_dHy_dz
+                    
                     Ex(i,j) = caEx(i,j) * Ex(i,j) + cbEx(i,j) * value_dHy_dz
                 enddo
             enddo
@@ -1140,8 +1172,6 @@ module cpmlfdtd
                     memory_dHy_dx(i,j) = b_x_half(i) * memory_dHy_dx(i,j) + a_x_half(i) * value_dHy_dx
                     value_dHy_dx = value_dHy_dx/K_x_half(i) + memory_dHy_dx(i,j)
                     
-                    ! Ez(i,j) = (( caEz(i,j) + caEz(i-1,j) )/2) * Ez(i,j) + &
-                    !     (( cbEz(i,j) + cbEz(i-1,j) )/2) * value_dHy_dx 
                     Ez(i,j) = caEz(i,j) * Ez(i,j) + cbEz(i,j) * value_dHy_dx 
                 enddo
             enddo
@@ -1171,7 +1201,7 @@ module cpmlfdtd
             Hy(:,nz) = 0.d0
 
             ! print maximum of norm of velocity
-            velocnorm = maxval(sqrt(Ex**2 + Ez**2))
+            ! velocnorm = maxval(sqrt(Ex**2 + Ez**2))
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
 
             call write_image2(Ex, nx, nz, source, it, 'Ex', SINGLE)

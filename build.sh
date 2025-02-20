@@ -61,9 +61,9 @@ FC=$(which gfortran)
 echo "Using GFortran from $FC"
 
 # Debugging options are the first FFLAGS. Uncomment when necessary
-# FFLAGS="-O3 -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -march=native -funroll-loops -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all -fPIC"
+# FFLAGS=" -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -march=native -funroll-loops -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all -fPIC -O2 -ffast-math -ffp-contract=fast"
 # These are the production flags
-FFLAGS="-O3 -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -march=native -funroll-loops -Wall -fbacktrace -fPIC"
+FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
 
 # OpenMP support (optional)
 if [[ "$openmp_compile" = true ]]; then
