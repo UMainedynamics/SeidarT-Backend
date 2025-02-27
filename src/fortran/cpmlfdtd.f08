@@ -180,12 +180,12 @@ module cpmlfdtd
             !$omp do
             do j = 2,nz
                 do i = 1,nx-1
-        
+                    
                     value_dvx_dx = (vx(i+1,j) - vx(i,j)) / dx
                     value_dvz_dz = (vz(i,j) - vz(i,j-1)) / dz
                     value_dvz_dx = (vz(i+1,j) - vz(i,j)) / dx
                     value_dvx_dz = (vx(i,j) - vx(i,j-1)) / dz
-
+                    
                     memory_dvx_dx(i,j) = b_x_half(j) * memory_dvx_dx(i,j) + &
                                             a_x_half(i) * value_dvx_dx
                     memory_dvz_dz(i,j) = b_z(j) * memory_dvz_dz(i,j) + &
@@ -194,30 +194,12 @@ module cpmlfdtd
                                             a_z_half(j) * value_dvx_dz 
                     memory_dvz_dx(i,j) = b_x(i) * memory_dvz_dx(i,j) + &
                                             a_x(i) * value_dvz_dx
-
+                    
                     value_dvx_dx = value_dvx_dx / K_x_half(i) + memory_dvx_dx(i,j)
                     value_dvz_dz = value_dvz_dz / K_z(j) + memory_dvz_dz(i,j)
                     value_dvz_dx = value_dvz_dx / K_x(i) + memory_dvz_dx(i,j)
                     value_dvx_dz = value_dvx_dz / K_z_half(j) + memory_dvx_dz(i,j)
                     
-                    ! sigmaxx(i,j) = sigmaxx(i,j) + &
-                    !     (   c11(i,j) * value_dvx_dx + &
-                    !         c13(i,j) * value_dvz_dz + &
-                    !         c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
-                    ! sigmazz(i,j) = sigmazz(i,j) + &
-                    !     (   c13(i,j) * value_dvx_dx + &
-                            ! c33(i,j) * value_dvz_dz + &
-                            ! c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
-                    ! sigmaxx(i,j) = sigmaxx(i,j) + &
-                    !     (   c11(i,j) * value_dvx_dx + &
-                    !         c13(i,j) * value_dvz_dz + &
-                    !         c15(i,j) * (value_dvz_dx + value_dvx_dz) ) * &
-                    !             dt - gamma_x(i,j) * sigmaxx(i,j) * dt
-                    ! sigmazz(i,j) = sigmazz(i,j) + &
-                    !     (   c13(i,j) * value_dvx_dx + &
-                    !         c33(i,j) * value_dvz_dz + &
-                    !         c35(i,j) * (value_dvz_dx + value_dvx_dz) ) * &
-                    !             dt - gamma_z(i,j) * sigmazz(i,j) * dt
                     sigmaxx(i,j) = ( sigmaxx(i,j) + &
                         (   c11(i,j) * value_dvx_dx + &
                             c13(i,j) * value_dvz_dz + &
@@ -235,7 +217,7 @@ module cpmlfdtd
             !$omp do
             do j = 1,nz-1
                 do i = 2,nx
-        
+                    
                     value_dvx_dx = (vx(i,j) - vx(i-1,j)) / dx
                     value_dvz_dz = (vz(i,j+1) - vz(i,j)) / dz
                     value_dvz_dx = (vz(i,j) - vz(i-1,j)) / dx
@@ -254,21 +236,12 @@ module cpmlfdtd
                     value_dvz_dz = value_dvz_dz / K_z(j) + memory_dvz_dz(i,j)
                     value_dvz_dx = value_dvz_dx / K_x(i) + memory_dvz_dx(i,j)
                     value_dvx_dz = value_dvx_dz / K_z_half(j) + memory_dvx_dz(i,j)
-            
-                    ! sigmaxz(i,j) = sigmaxz(i,j) + &
-                    !     (   c15(i,j)  * value_dvx_dx + & 
-                    !         c35(i,j)  * value_dvz_dz + &
-                    !         c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt
-                    ! sigmaxz(i,j) = sigmaxz(i,j) + &
-                    !     (   c15(i,j)  * value_dvx_dx + & 
-                    !         c35(i,j)  * value_dvz_dz + &
-                    !         c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * &
-                    !             dt - gamma_xz(i,j) * sigmaxz(i,j) * dt
+                    
                     sigmaxz(i,j) = ( sigmaxz(i,j) + &
                         (   c15(i,j)  * value_dvx_dx + & 
                             c35(i,j)  * value_dvz_dz + &
                             c55(i,j) * (value_dvz_dx + value_dvx_dz) ) * dt ) / &
-                                (1 - gamma_xz(i,j) * dt )
+                                (1 + gamma_xz(i,j) * dt )
                 enddo
             enddo
             !$omp end do
@@ -280,23 +253,23 @@ module cpmlfdtd
             !$omp do 
             do j = 2,nz
                 do i = 2,nx
-        
+                    
                     deltarho = ( 2*rho(i,j) + rho(i,j-1) + rho(i-1,j) )/4
-
+                    
                     value_dsigmaxx_dx = (sigmaxx(i,j) - sigmaxx(i-1,j)) / dx
                     value_dsigmaxz_dz = (sigmaxz(i,j) - sigmaxz(i,j-1)) / dz
-            
+                    
                     memory_dsigmaxx_dx(i,j) = b_x(i) * memory_dsigmaxx_dx(i,j) + &
                                 a_x(i) * value_dsigmaxx_dx
                     memory_dsigmaxz_dz(i,j) = b_z(j) * memory_dsigmaxz_dz(i,j) + &
                                 a_z(j) * value_dsigmaxz_dz
-            
+                    
                     value_dsigmaxx_dx = value_dsigmaxx_dx / K_x(i) + &
                                 memory_dsigmaxx_dx(i,j)
                     value_dsigmaxz_dz = value_dsigmaxz_dz / K_z(j) + &
                                 memory_dsigmaxz_dz(i,j)
                     vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx + value_dsigmaxz_dz) / deltarho
-
+                    
                 enddo
             enddo
             !$omp end do
