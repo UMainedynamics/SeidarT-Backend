@@ -55,6 +55,17 @@ fi
 
 echo "Install path is set to $BIN_PATH"
 
+# Check if the OS is macOS
+if [[ "$(uname)" == "Darwin" ]]; then
+    # Ensure that CONDA_PREFIX is set (it should be if your environment is activated)
+    if [ -n "$CONDA_PREFIX" ]; then
+        export DYLD_LIBRARY_PATH="$CONDA_PREFIX/lib:$DYLD_LIBRARY_PATH"
+        echo "DYLD_LIBRARY_PATH set to: $DYLD_LIBRARY_PATH"
+    else
+        echo "Warning: CONDA_PREFIX is not set. Are you sure the conda environment is activated?"
+    fi
+fi
+
 # -----------------------------------------------------------------------------
 # Compiler and flags
 FC=$(which gfortran)

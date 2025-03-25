@@ -633,21 +633,24 @@ module cpmlfdtd
                         dvx_dz = dvx_dz / K_z(k) + memory_dvx_dz(i,j,k)
                         dvy_dz = dvy_dz / K_z(k) + memory_dvy_dz(i,j,k)
 
-                        sigmaxx(i,j,k) = sigmaxx(i,j,k) + &
+                        sigmaxx(i,j,k) = ( sigmaxx(i,j,k) + &
                         (   c11(i,k) * dvx_dx + c12(i,k) * dvy_dy + c13(i,k) * dvz_dz + &
                             c14(i,k) * (dvy_dz + dvz_dy) + c15(i,k) * (dvx_dz + dvz_dx) + &
-                            c16(i,k) * (dvx_dy + dvz_dy) ) * dt
+                            c16(i,k) * (dvx_dy + dvz_dy) ) * dt ) / &
+                                (1 + gamma_x(i,j) * dt )
 
                         ! Full 3D will need a gradient in the y-direction
-                        sigmayy(i,j,k) = sigmayy(i,j,k) + &
+                        sigmayy(i,j,k) = ( sigmayy(i,j,k) + &
                         (   c12(i,k) * dvx_dx + c22(i,k) * dvy_dy + c23(i,k) * dvz_dz + &
                             c24(i,k) * (dvy_dz + dvz_dy) + c25(i,k) * (dvx_dz + dvz_dx) + &
-                            c26(i,k) * (dvy_dx + dvx_dy) ) * dt
+                            c26(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
+                                (1 + gamma_y(i,j) * dt )
 
-                        sigmazz(i,j,k) = sigmazz(i,j,k) + &
+                        sigmazz(i,j,k) = ( sigmazz(i,j,k) + &
                         (   c13(i,k) * dvx_dx + c23(i,k) * dvy_dy + c33(i,k) * dvz_dz + &
                             c34(i,k) * (dvy_dz + dvz_dy) + c35(i,k) * (dvx_dz + dvz_dx) + &
-                            c36(i,k) * (dvy_dx + dvx_dy) ) * dt
+                            c36(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
+                                (1 + gamma_z(i,j) * dt )
 
                     enddo
                 enddo
@@ -686,10 +689,11 @@ module cpmlfdtd
                         dvz_dz = dvz_dz / K_z_half(k) + memory_dvz_dz(i,j,k)
                         dvy_dz = dvy_dz / K_z_half(k) + memory_dvy_dz(i,j,k)
 
-                        sigmaxy(i,j,k) = sigmaxy(i,j,k) + &
+                        sigmaxy(i,j,k) = ( sigmaxy(i,j,k) + &
                         (   c16(i,k) * dvx_dx + c26(i,k) * dvy_dy + c36(i,k) * dvz_dz + &
                             c46(i,k) * (dvz_dy + dvy_dz) + c56(i,k) * (dvz_dx + dvx_dz) + &
-                            c66(i,k) * (dvy_dx + dvx_dy) ) * dt
+                            c66(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
+                                (1 + gamma_xy(i,j) * dt )
 
                     enddo
                 enddo
@@ -730,10 +734,11 @@ module cpmlfdtd
                         dvx_dz = dvx_dz / K_z_half(k) + memory_dvx_dz(i,j,k)
                         dvy_dz = dvy_dz / K_z_half(k) + memory_dvy_dz(i,j,k)
 
-                        sigmaxz(i,j,k) = sigmaxz(i,j,k) + &
+                        sigmaxz(i,j,k) = ( sigmaxz(i,j,k) + &
                             (   c15(i,k) * dvx_dx + c25(i,k) * dvy_dy + c35(i,k) * dvz_dz + &
                                 c45(i,k) * ( dvx_dz + dvz_dx) + c55(i,k) * ( dvx_dz + dvz_dx) + &
-                                c56(i,k) * ( dvx_dy + dvy_dx) ) * dt 
+                                c56(i,k) * ( dvx_dy + dvy_dx) ) * dt  ) / &
+                                    (1 + gamma_xz(i,j) * dt )
 
                     enddo
                 enddo
@@ -772,10 +777,11 @@ module cpmlfdtd
                         dvx_dz = dvx_dz / K_z_half(k) + memory_dvx_dz(i,j,k)
                         dvy_dz = dvy_dz / K_z_half(k) + memory_dvy_dz(i,j,k)
 
-                        sigmayz(i,j,k) = sigmayz(i,j,k)  + &
+                        sigmayz(i,j,k) = ( sigmayz(i,j,k)  + &
                             (   c14(i,k) * dvx_dx + c24(i,k) * dvy_dy + c34(i,k) * dvz_dz + &
                                 c44(i,k) * ( dvy_dz + dvz_dy) + c45(i,k) * ( dvx_dz + dvz_dx) + &
-                                c46(i,k) * ( dvy_dx + dvx_dy) ) * dt 
+                                c46(i,k) * ( dvy_dx + dvx_dy) ) * dt  ) / & 
+                                    (1 + gamma_yz(i,j) * dt )
                     enddo
                 enddo
             enddo
