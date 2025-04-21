@@ -20,18 +20,20 @@ program main
     type(Source_Type) :: electromagnetic_source
     
     ! integer, allocatable :: geometry(:,:) 
+    character(len=256) :: arg
     character(len=256) :: input_json_file 
     logical :: seismic
-    integer :: argc 
-    character(len=256) :: seismic_arg 
+    logical :: seismoacoustic
+    integer :: argc, i
+    character(len=256) :: key, value
     
     ! ---------------------------- Parse CLI -----------------------------------
     ! Get the number of command line arguments
     argc = command_argument_count() 
-    
+
      ! Check if the right number of arguments are provided
     if (argc < 1) then
-        print *, 'Usage: main <input.json> [seismic=<true|false>]'
+        print *, 'Usage: main <input.json> [seismic=<true|false>] [seismoacoustic=<true|false>]'
         stop
     end if
      
@@ -40,23 +42,35 @@ program main
     
     ! Set seismic flag to true by default
     seismic = .true.
+    seismoacoustic = .false. 
     
-    ! Optional: Get the seismic flag from the second argument
-    if (argc > 1) then
-        call get_command_argument(2, seismic_arg)
-        
-        ! Check if the argument is 'seismic=false' or 'seismic=true'
-        if (trim(seismic_arg) == 'seismic=false') then
-            seismic = .false.
-        else if (trim(seismic_arg) == 'seismic=true') then
+    ! loop over any further key=value flags
+    do i = 2, argc
+        call get_command_argument(i, arg)
+        if (index(arg,'=') > 0) then
+        key = adjustl(  trim(arg(1:index(arg,'=')-1))  )
+        value = adjustl(  trim(arg(index(arg,'=')+1:))    )
+        select case (key)
+        case ('seismic')
+            if (value == 'true') then
             seismic = .true.
-        else
-            print *, 'Invalid argument for seismic flag. Use seismic=<true|false>'
-        stop
+            else if (value == 'false') then
+            seismic = .false.
+            end if
+        case ('seismoacoustic')
+            if (value == 'true') then
+            seismoacoustic = .true.
+            seismic        = .true.   ! enforce seismic if doing seismoacoustic
+            else if (value == 'false') then
+            seismoacoustic = .false.
+            end if
+        case default
+            ! ignore other flags
+        end select
         end if
-    end if
+    end do
 
-    
+    print*,seismoacoustic
     ! --------------------------------------------------------------------------
     ! Get going 
     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
@@ -65,36 +79,37 @@ program main
     domain%ny = domain%ny + 2*domain%cpml
     domain%nz = domain%nz + 2*domain%cpml
     
-    ! Read the geometry.dat file into memory
-    ! call read_geometry('geometry.dat', domain, geometry)
-    
-    ! if (seismic) then 
-    !     print *, "Writing seismic model parameters to Fortran unformatted binary files."
-    !     call seismic_parameter_write(domain, geometry, stiffness, attenuation)
-    ! else 
-    !     print *, "Writing electromagnetic model parameters to Fortran unformatted binary files."
-    !     call electromagnetic_parameter_write(domain, geometry, permittivity, conductivity)
-    ! end if
-    
-    
-    ! --------------------------------------------------------------------------
+    !----------------------------------------------------------------------
+    ! dispatch to the correct solver
     if (domain%dim == 2.5) then
+
+        ! if (seismoacoustic) then
+        ! print *, "Running 2.5D seismo‑acoustic model with", seismic_source%time_steps, "time steps"
+        ! call seismoacoustic25(domain, seismic_source, .TRUE.)
+
+        ! else if (seismic) then
         if (seismic) then
-            print *, "Running 2.5D seismic model with ", seismic_source%time_steps, " time steps"
+            print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
             call seismic25(domain, seismic_source, .TRUE.)
-        else 
+        else
             print *, "Running 2.5D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag25(domain, electromagnetic_source, .TRUE.)
-        endif
-    else
-        if (seismic) then  
-            print *, "Running 2D seismic model with", seismic_source%time_steps, " time steps"
+        end if
+    else    ! dim == 2.0
+
+        if (seismoacoustic) then
+            print *, "Running 2D seismo‑acoustic model with", seismic_source%time_steps, "time steps"
+            call seismoacoustic2(domain, seismic_source, .TRUE.)
+        else if (seismic) then
+            print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
             call seismic2(domain, seismic_source, .TRUE.)
-        else 
-            print *, "Running 2D electromagnetic model with", electromagnetic_source%time_steps, " time steps"
+        else
+            print *, "Running 2D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag2(domain, electromagnetic_source, .TRUE.)
-        endif
-    endif 
+        end if
+
+  end if
+
     
     ! --------------------------------------------------------------------------
 end program main 

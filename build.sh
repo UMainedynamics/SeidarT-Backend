@@ -4,6 +4,7 @@
 user_defined_builddir=false
 openmp_compile=false
 clean=false
+debug=false
 # Loop through the arguments
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -20,9 +21,13 @@ while [[ "$#" -gt 0 ]]; do
       clean=true
       shift
       ;;
+    -d|--debug)
+      debug=true
+      shift
+      ;;
     -*|--*)
       echo "Unknown option: $1"
-      echo "Usage: cmd [-b install_directory] [-c|--clean]"
+      echo "Usage: cmd [-b install_directory] [-c|--clean] [-d|--debug]"
       exit 1
       ;;
     *)
@@ -74,7 +79,15 @@ echo "Using GFortran from $FC"
 # Debugging options are the first FFLAGS. Uncomment when necessary
 # FFLAGS=" -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -march=native -funroll-loops -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -fcheck=all -fPIC -O2 -ffast-math -ffp-contract=fast"
 # These are the production flags
+# if [[ "$debug" = true ]]; then 
+#   FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -std=f2008 -g -Og \
+#                                           -fbacktrace -fcheck=all \
+#                                           -ffpe-trap=invalid,zero,overflow \
+#                                           -finit-real=snan -finit-integer=0 \
+#                                           -Wall"
+# else
 FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
+# fi 
 
 # OpenMP support (optional)
 if [[ "$openmp_compile" = true ]]; then
@@ -97,6 +110,12 @@ if [[ $? -ne 0 ]]; then
     echo "Compilation failed. Check compile_output.txt for details."
     cat compile_output.txt
     exit 1
+fi
+
+# If debug mode, exit after successful build
+if [[ "$debug" = true ]]; then
+    echo "Debug build complete; skipping installation."
+    exit 0
 fi
 
 # -----------------------------------------------------------------------------
