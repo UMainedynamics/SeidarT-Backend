@@ -96,7 +96,12 @@ fi
 
 # Source files
 SRC_DIR="src/fortran"
-SOURCES="$SRC_DIR/constants.f08 $SRC_DIR/seidart_types.f08 $SRC_DIR/seidartio.f08 $SRC_DIR/cpmlfdtd.f08 $SRC_DIR/main.f08"
+SOURCES="$SRC_DIR/constants.f08 \
+         $SRC_DIR/seidart_types.f08 \
+         $SRC_DIR/seidartio.f08 \
+         $SRC_DIR/density_averaging.f08 \
+         $SRC_DIR/cpmlfdtd.f08 \
+         $SRC_DIR/main.f08"
 EXECUTABLE="seidartfdtd-$os-$arch"
 
 # Create executable directory if it doesn't exist

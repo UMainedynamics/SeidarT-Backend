@@ -25,7 +25,7 @@ program main
     logical :: seismic
     logical :: seismoacoustic
     integer :: argc, i
-    character(len=256) :: key, value
+    character(len=256) :: key, value, density_method
     
     ! ---------------------------- Parse CLI -----------------------------------
     ! Get the number of command line arguments
@@ -40,10 +40,11 @@ program main
     ! Get the first command-line argument (input.json)
     call get_command_argument(1, input_json_file)
     
-    ! Set seismic flag to true by default
+    ! Set defaults
+    ! seismic flag 
     seismic = .true.
-    seismoacoustic = .false. 
-    
+    density_method = 'arithmetic'
+        
     ! loop over any further key=value flags
     do i = 2, argc
         call get_command_argument(i, arg)
@@ -57,20 +58,24 @@ program main
             else if (value == 'false') then
             seismic = .false.
             end if
-        case ('seismoacoustic')
-            if (value == 'true') then
-            seismoacoustic = .true.
-            seismic        = .true.   ! enforce seismic if doing seismoacoustic
-            else if (value == 'false') then
-            seismoacoustic = .false.
-            end if
+        case ('density_method')
+            density_method = adjustl(value)
         case default
             ! ignore other flags
         end select
         end if
     end do
 
-    print*,seismoacoustic
+    ! Validate density_method
+    select case (trim(density_method))
+    case ('harmonic','geometric','arithmetic','none')
+        ! OK
+    case default
+        print *, 'Error: invalid density_method "', density_method, '".'
+        print *, '       Must be one of: harmonic, geometric, arithmetic, none'
+        stop
+    end select
+    
     ! --------------------------------------------------------------------------
     ! Get going 
     call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
@@ -97,12 +102,9 @@ program main
         end if
     else    ! dim == 2.0
 
-        if (seismoacoustic) then
-            print *, "Running 2D seismo‑acoustic model with", seismic_source%time_steps, "time steps"
-            call seismoacoustic2(domain, seismic_source, .TRUE.)
-        else if (seismic) then
+        if (seismic) then
             print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
-            call seismic2(domain, seismic_source, .TRUE.)
+            call seismic2(domain, seismic_source, density_method, .TRUE.)
         else
             print *, "Running 2D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag2(domain, electromagnetic_source, .TRUE.)
