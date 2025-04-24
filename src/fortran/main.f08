@@ -95,7 +95,7 @@ program main
         ! else if (seismic) then
         if (seismic) then
             print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
-            call seismic25(domain, seismic_source, .TRUE.)
+            call seismic25(domain, seismic_source, density_method, .TRUE.)
         else
             print *, "Running 2.5D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag25(domain, electromagnetic_source, .TRUE.)

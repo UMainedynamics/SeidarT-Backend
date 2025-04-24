@@ -58,10 +58,10 @@ module cpmlfdtd
         end if
         
         select case (trim(adjustl(density_method)))
-        case ('none'      ); density_code = 0
-        case ('harmonic'  ); density_code = 1
-        case ('geometric'); density_code = 2
-        case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 0
+            case ('harmonic'  ); density_code = 1
+            case ('geometric'); density_code = 2
+            case ('arithmetic'); density_code = 3
         end select
         
         nx = domain%nx 
@@ -354,7 +354,7 @@ module cpmlfdtd
     end subroutine seismic2
 
     ! =========================================================================
-    subroutine seismic25(domain, source, SINGLE_OUTPUT)
+    subroutine seismic25(domain, source, density_method, SINGLE_OUTPUT)
         !--------------------------------------------------------------------------------------
         use constants
         
@@ -364,9 +364,12 @@ module cpmlfdtd
         type(Domain_Type), intent(in) :: domain 
         type(Source_Type), intent(in) :: source 
         logical, intent(in), optional :: SINGLE_OUTPUT
-        
+        character(len=256), intent(in) :: density_method
         ! Local variables
-        real(real64) :: deltarho, velocnorm
+        real(real64) :: rhoxx, rhoyx, rhozx, &
+                        rhoxy, rhoyy, rhozy, &
+                        rhoxz, rhoyz, rhozz, &
+                        velocnorm
 
         
         real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c14(:,:), c15(:,:), c16(:,:), &
@@ -419,7 +422,8 @@ module cpmlfdtd
         
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
-    
+        integer :: density_code
+        
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
         if (present(SINGLE_OUTPUT)) then 
@@ -428,7 +432,12 @@ module cpmlfdtd
             SINGLE = .TRUE.
         endif
         
-         
+        select case (trim(adjustl(density_method)))
+            case ('none'      ); density_code = 0
+            case ('harmonic'  ); density_code = 1
+            case ('geometric'); density_code = 2
+            case ('arithmetic'); density_code = 3
+        end select
         
         nx = domain%nx
         ny = domain%ny 
@@ -807,8 +816,10 @@ module cpmlfdtd
                 do j = 2,ny
                     do i = 2,nx
                         ! ds1/dx, ds6/dy, ds5,dz
-                        deltarho = (4 * rho(i,k) + rho(i-1,k) + rho(i,k-1) )/6
-
+                        rhoxx = face_density(rho(i,k), rho(i-1,k), density_code)
+                        rhoyx = face_density(rho(i,k), rho(i,k), density_code) 
+                        rhozx = face_density(rho(i,k), rho(i,k-1), density_code) 
+                        
                         dsigmaxx_dx = (sigmaxx(i,j,k) - sigmaxx(i-1,j,k) ) / dx
                         dsigmaxy_dy = (sigmaxy(i,j,k) - sigmaxy(i,j-1,k) ) / dy
                         dsigmaxz_dz = (sigmaxz(i,j,k) - sigmaxz(i,j,k-1) ) / dz
@@ -825,16 +836,18 @@ module cpmlfdtd
                         dsigmaxz_dz = dsigmaxz_dz / K_z(k) + memory_dsigmaxz_dz(i,j,k) 
 
                         vx(i,j,k) = vx(i,j,k) + &
-                            (dsigmaxx_dx + dsigmaxy_dy + dsigmaxz_dz) * &
-                            dt / deltarho !rho(i,k)
+                            (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoxy + dsigmaxz_dz/rhoxz) * &
+                            dt 
                     enddo
                 enddo
 
                 do j = 1,ny-1
                     do i = 1,nx-1
                         ! ds6/dx, ds2/dy, ds4/dz
-                        deltarho = (4*rho(i,k) + rho(i+1,k) + rho(i,k-1) )/6
-
+                        rhoxy = face_density(rho(i,k), rho(i+1,k), density_code)
+                        rhoyx = face_density(rho(i,k), rho(i,k), density_code) 
+                        rhozy = face_density(rho(i,k), rho(i,k-1), density_code)
+                         
                         dsigmaxy_dx = ( sigmaxy(i+1,j,k) - sigmaxy(i,j,k) ) / dx
                         dsigmayy_dy = ( sigmayy(i,j+1,k) - sigmayy(i,j,k) ) / dy
                         dsigmayz_dz = ( sigmayz(i,j,k) - sigmayz(i,j,k-1) ) / dz
@@ -848,8 +861,8 @@ module cpmlfdtd
                         dsigmayz_dz = dsigmayz_dz / K_z(k) + memory_dsigmayz_dz(i,j,k)
 
                         vy(i,j,k) = vy(i,j,k) + &
-                            (dsigmaxy_dx + dsigmayy_dy + dsigmayz_dz) * &
-                            dt / deltarho !rho(i,k)
+                            (dsigmaxy_dx/rhoxy + dsigmayy_dy/rhoyy + dsigmayz_dz/rhozy) * &
+                            dt !/ deltarho !rho(i,k)
                     enddo
                 enddo
             enddo
@@ -858,8 +871,10 @@ module cpmlfdtd
                 do j = 2,ny
                     do i = 1,nx-1
                         ! ds5/dx, ds4/dy, ds3/dz
-                        deltarho = ( rho(i+1,k) + rho(i,k+1) + 4*rho(i,k) )/6
-
+                        rhoxz = face_density(rho(i,k), rho(i+1,k), density_code)
+                        rhoyz = face_density(rho(i,k), rho(i,k), density_code) 
+                        rhozz = face_density(rho(i,k), rho(i,k+1), density_code)
+                        
                         dsigmaxz_dx = ( sigmaxz(i+1,j,k) - sigmaxz(i,j,k) ) / dx
                         dsigmayz_dy = ( sigmayz(i,j,k) - sigmayz(i,j-1,k) ) / dy
                         dsigmazz_dz = ( sigmazz(i,j,k+1) - sigmazz(i,j,k) ) / dz
@@ -873,8 +888,8 @@ module cpmlfdtd
                         dsigmazz_dz = dsigmazz_dz / K_z_half(k) + memory_dsigmazz_dz(i,j,k)
 
                         vz(i,j,k) = vz(i,j,k) + &
-                            (dsigmaxz_dx + dsigmayz_dy + dsigmazz_dz) * &
-                            dt / deltarho !rho(i,k)
+                            (dsigmaxz_dx/rhoxz + dsigmayz_dy/rhoyz + dsigmazz_dz/rhozz) * &
+                            dt !/ deltarho !rho(i,k)
 
                     enddo
                 enddo
@@ -956,7 +971,7 @@ module cpmlfdtd
         logical, intent(in), optional :: SINGLE_OUTPUT
          
         ! Local variabless
-        real(real64), allocatable :: epsilonx(:,:), epsilonz(:,:), &
+        real(real64), allocatable :: epsilon11(:,:), epsilon13(:,:), epsilon33(:,:), &
                                             sigmax(:,:), sigmaz(:,:)
 
         ! real(real64) :: DT
@@ -964,9 +979,12 @@ module cpmlfdtd
         integer :: isource, jsource, i, j, it
 
         ! Coefficients for the finite difference scheme
-        real(real64), allocatable :: caEx(:,:), cbEx(:,:)
-        real(real64), allocatable :: caEz(:,:), cbEz(:,:)
-        real(real64) :: daHy, dbHy
+        ! real(real64), allocatable :: caEx(:,:), cbEx(:,:)
+        ! real(real64), allocatable :: caEz(:,:), cbEz(:,:)
+        real(real64) :: daHy, dbHy 
+        real(real64), allocatable ::det(:,:)
+        real(real64), allocatable :: aEx(:,:), bEx(:,:), dEx(:,:), eEx(:,:), &
+                                    aEz(:,:), bEz(:,:), dEz(:,:), eEz(:,:)
         real(real64) :: value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx
 
         ! 1D arrays for the damping profiles
@@ -974,6 +992,7 @@ module cpmlfdtd
         real(real64), allocatable :: K_z(:), alpha_z(:), a_z(:), b_z(:), K_z_half(:), alpha_z_half(:), a_z_half(:), b_z_half(:)
         
         real(real64), allocatable :: Ex(:,:), Ez(:,:), Hy(:,:) 
+        real(real64), allocatable :: Ex_old(:,:), Ez_old(:,:) 
         real(real64), allocatable :: memory_dEx_dz(:,:), memory_dEz_dx(:,:), &
                                         memory_dHy_dx(:,:), memory_dHy_dz(:,:)
         
@@ -1013,12 +1032,16 @@ module cpmlfdtd
         allocate(srcx(source%time_steps), srcz(source%time_steps))
         
         ! Allocate more
-        allocate(epsilonx(nx, nz), epsilonz(nx, nz))
+        allocate(epsilon11(nx, nz), epsilon13(nx,nz), epsilon33(nx, nz))
         allocate(sigmax(nx, nz), sigmaz(nx, nz))
-        allocate(caEx(nx, nz), cbEx(nx, nz), caEz(nx, nz), cbEz(nx, nz))
+        ! allocate(caEx(nx, nz), cbEx(nx, nz), caEz(nx, nz), cbEz(nx, nz))
+        allocate(aEx(nx,nz), bEx(nx,nz), dEx(nx,nz), eEx(nx,nz) )
+        allocate(aEz(nx,nz), bEz(nx,nz), dEz(nx,nz), eEz(nx,nz) )
+        allocate(det(nx,nz))
         allocate(memory_dEz_dx(nx, nz), memory_dEx_dz(nx, nz))
         allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
         allocate(Ex(nx, nz), Ez(nx, nz), Hy(nx, nz))
+        allocate(Ex_old(nx,nz), Ez_old(nx,nz) )
             
         ! ======================================================================
         ! ----------------------- Load Permittivity Coefficients ----------------------
@@ -1092,26 +1115,45 @@ module cpmlfdtd
         ! ----------------------------------------------------------------------
         ! Compute the coefficients of the FD scheme. First scale the relative 
         ! permittivity and permeabilities to get the absolute values 
-        epsilonx(:,:) = (eps11 + eps13)*eps0
-        epsilonz(:,:) = (eps13 + eps33)*eps0
-        sigmax(:,:) = sig11 + sig13 
-        sigmaz(:,:) = sig13 + sig33 
+        ! epsilonx(:,:) = (eps11 + eps13)*eps0
+        ! epsilonz(:,:) = (eps13 + eps33)*eps0
+        ! sigmax(:,:) = sig11 + sig13 
+        ! sigmaz(:,:) = sig13 + sig33 
 
         ! We need to change sigma to dsigma, same for epsilon
-        caEx(:,:) = ( 1.0d0 - sigmax * dt / ( 2.0d0 * epsilonx ) ) / &
-                    ( 1.0d0 + sigmax * dt / (2.0d0 * epsilonx ) )
-        cbEx(:,:) = (dt / epsilonx ) / ( 1.0d0 + sigmax * dt / ( 2.0d0 * epsilonx ) )
+        ! caEx(:,:) = ( 1.0d0 - sigmax * dt / ( 2.0d0 * epsilonx ) ) / &
+        !             ( 1.0d0 + sigmax * dt / (2.0d0 * epsilonx ) )
+        ! cbEx(:,:) = (dt / epsilonx ) / ( 1.0d0 + sigmax * dt / ( 2.0d0 * epsilonx ) )
 
-        caEz(:,:) = ( 1.0d0 - sigmaz * dt / ( 2.0d0 * epsilonz ) ) / &
-                    ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
-        cbEz(:,:) = (dt / epsilonz ) / ( 1.0d0 + sigmaz * dt / ( 2.0d0 * epsilonz ) )
+        ! caEz(:,:) = ( 1.0d0 - sigmaz * dt / ( 2.0d0 * epsilonz ) ) / &
+        !             ( 1.0d0 + sigmaz * dt / (2.0d0 * epsilonz ) )
+        ! cbEz(:,:) = (dt / epsilonz ) / ( 1.0d0 + sigmaz * dt / ( 2.0d0 * epsilonz ) )
         daHy = dt/(4.0d0*mu0*mu)
         dbHy = dt/mu0 !dt/(mu*mu*dx*(1+daHy) ) 
         daHy = 1.0d0 ! (1-daHy)/(1+daHy) ! 
         
+        
+        epsilon11 = eps11 * eps0
+        epsilon13 = eps13 * eps0
+        epsilon33 = eps33 * eps0
+        
+        det = (epsilon11*epsilon33 - epsilon13*epsilon13)
+        aEx = epsilon33 / det 
+        bEx = - epsilon13 / det 
+        dEx = (epsilon33 * sig11 - epsilon13 * sig13) / det  
+        eEx = (epsilon33 * sig13 - epsilon13 * sig33) / det
+        
+        aEz = - epsilon13 / det 
+        bEz = epsilon11 / det 
+        dEz = (epsilon11 * sig13 - epsilon13 * sig11) / det  
+        eEz = (epsilon11 * sig33 - epsilon13 * sig13) / det
         !---
         !---  beginning of time loop
         !---
+        
+        Ex_old = Ex 
+        Ez_old = Ez
+        
         do it = 1,source%time_steps
             !$omp parallel private(i, j, value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx) &
             !$omp& shared(Ex, Ez, Hy, memory_dEx_dz, memory_dEz_dx, memory_dHy_dz, memory_dHy_dx, b_z, b_x, a_z, a_x, K_z, K_x, caEz, cbEz, caEx, cbEx, daHy, dbHy) & 
@@ -1135,7 +1177,7 @@ module cpmlfdtd
                     value_dEz_dx = value_dEz_dx/ K_x(i) + memory_dEz_dx(i,j)
 
                     ! Now update the Magnetic field
-                    Hy(i,j) = daHy*Hy(i,j) + dbHy*( value_dEz_dx + value_dEx_dz )
+                    Hy(i,j) = daHy*Hy(i,j) + dbHy*( value_dEz_dx - value_dEx_dz )
                     velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
 
                 enddo  
@@ -1145,27 +1187,47 @@ module cpmlfdtd
             ! Electric field and update memory variables for C-PML
             ! Compute the differences in the y-direction
             !$omp do
-            do j = 2,nz
-                do i = 1,nx
-                    ! Update the Ex field
+            ! do j = 2,nz
+            !     do i = 1,nx
+            !         ! Update the Ex field
+            !         value_dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
+            !         memory_dHy_dz(i,j) = b_z(j) * memory_dHy_dz(i,j) + a_z(j) * value_dHy_dz
+            !         value_dHy_dz = value_dHy_dz/K_z(j) + memory_dHy_dz(i,j)
+                    
+            !         ! Ex(i,j) = caEx(i,j) * Ex(i,j) + cbEx(i,j) * value_dHy_dz
+            !         Ex(i,j) = Ex_old(i,j) + ( aEx*value_dHy_dz + bEx*value_dHy_dx - dEx*Ex_old(i,j) - eEx*Ez_old(i,j) ) * dt
+            !     enddo
+            ! enddo
+            ! !$omp end do 
+            
+            ! !$omp do
+            ! do j = 1,nz
+            !     do i = 2,nx
+            !         ! Update the Ez field
+            !         value_dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
+                    
+            !         memory_dHy_dx(i,j) = b_x_half(i) * memory_dHy_dx(i,j) + a_x_half(i) * value_dHy_dx
+            !         value_dHy_dx = value_dHy_dx/K_x_half(i) + memory_dHy_dx(i,j)
+                    
+            !         ! Ez(i,j) = caEz(i,j) * Ez(i,j) + cbEz(i,j) * value_dHy_dx 
+            !         Ez(i,j) = Ez_old(i,j) + aEz * value_dHy_dz + bEx * value_dHy_dx - dEz * Ex_old(i,j) - eEz*Ez_old(i,j)
+            !     enddo
+            ! enddo
+            
+            do j = 2,nz-1
+                do i = 2,nx-1
                     value_dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
+                    value_dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
+
                     memory_dHy_dz(i,j) = b_z(j) * memory_dHy_dz(i,j) + a_z(j) * value_dHy_dz
                     value_dHy_dz = value_dHy_dz/K_z(j) + memory_dHy_dz(i,j)
                     
-                    Ex(i,j) = caEx(i,j) * Ex(i,j) + cbEx(i,j) * value_dHy_dz
-                enddo
-            enddo
-            !$omp end do 
-            
-            !$omp do
-            do j = 1,nz
-                do i = 2,nx
-                    ! Update the Ez field
-                    value_dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
                     memory_dHy_dx(i,j) = b_x_half(i) * memory_dHy_dx(i,j) + a_x_half(i) * value_dHy_dx
                     value_dHy_dx = value_dHy_dx/K_x_half(i) + memory_dHy_dx(i,j)
                     
-                    Ez(i,j) = caEz(i,j) * Ez(i,j) + cbEz(i,j) * value_dHy_dx 
+                    Ez(i,j) = Ez_old(i,j) + ( -aEz(i,j)*value_dHy_dz + bEz(i,j)*value_dHy_dx - dEz(i,j)*Ex_old(i,j) - eEz(i,j)*Ez_old(i,j) ) * dt
+                    Ex(i,j) = Ex_old(i,j) + ( -aEx(i,j)*value_dHy_dz + bEx(i,j)*value_dHy_dx - dEx(i,j)*Ex_old(i,j) - eEx(i,j)*Ez_old(i,j) ) * dt
+                
                 enddo
             enddo
             !$omp end do 
@@ -1192,9 +1254,11 @@ module cpmlfdtd
             Hy(nx,:) = 0.d0
             Hy(:,1) = 0.d0
             Hy(:,nz) = 0.d0
-
+            
+            Ex_old = Ex 
+            Ez_old = Ez
             ! print maximum of norm of velocity
-            ! velocnorm = maxval(sqrt(Ex**2 + Ez**2))
+            velocnorm = maxval(sqrt(Ex**2 + Ez**2))
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
 
             call write_image2(Ex, nx, nz, source, it, 'Ex', SINGLE)
@@ -1205,9 +1269,12 @@ module cpmlfdtd
         deallocate(eps11, eps13,  eps33, sig11, sig13,  sig33, srcx, srcz)
         deallocate(K_x, alpha_x, a_x, b_x, K_x_half, alpha_x_half, a_x_half, b_x_half)
         deallocate(K_z, alpha_z, a_z, b_z, K_z_half, alpha_z_half, a_z_half, b_z_half)
-        deallocate(epsilonx, epsilonz, sigmax, sigmaz, Ex, Ez, Hy)
+        deallocate(Ex, Ez, Hy)
         deallocate(memory_dEz_dx, memory_dEx_dz, memory_dHy_dx, memory_dHy_dz)
-        
+
+        deallocate(aEx, bEx, dEx, eEx, aEz, bEz, dEz, eEz, det)
+        deallocate(Ex_old, Ez_old )
+            
     end subroutine electromag2
 
 
