@@ -71,6 +71,16 @@ if [[ "$(uname)" == "Darwin" ]]; then
     fi
 fi
 
+# !!!! Test
+# Detect OS and ensure correct linking
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS: explicitly link iconv
+    ICONV="-liconv"
+else
+    # Linux: no need to explicitly link iconv
+    ICONV=""
+fi
+
 # -----------------------------------------------------------------------------
 # Compiler and flags
 FC=$(which gfortran)
@@ -109,7 +119,7 @@ mkdir -p "$BIN_PATH"
 
 # Compile the executable
 echo "Compiling the SeidarT CPML FDTD executable..."
-$FC -v $FFLAGS -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
+$FC -v $FFLAGS $ICONV -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
 
 if [[ $? -ne 0 ]]; then
     echo "Compilation failed. Check compile_output.txt for details."
