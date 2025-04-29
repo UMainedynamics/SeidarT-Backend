@@ -983,7 +983,7 @@ module cpmlfdtd
         real(real64), allocatable ::det(:,:)
         real(real64), allocatable :: aEx(:,:), bEx(:,:), dEx(:,:), eEx(:,:), &
                                     aEz(:,:), bEz(:,:), dEz(:,:), eEz(:,:)
-        real(real64) :: value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx
+        real(real64) :: dEx_dz, dEz_dx, dHy_dz, dHy_dx
 
         ! 1D arrays for the damping profiles
         real(real64), allocatable :: K_x(:), alpha_x(:), a_x(:), b_x(:), K_x_half(:), alpha_x_half(:), a_x_half(:), b_x_half(:)
@@ -1032,7 +1032,6 @@ module cpmlfdtd
         ! Allocate more
         allocate(epsilon11(nx, nz), epsilon13(nx,nz), epsilon33(nx, nz))
         allocate(sigmax(nx, nz), sigmaz(nx, nz))
-        ! allocate(caEx(nx, nz), cbEx(nx, nz), caEz(nx, nz), cbEz(nx, nz))
         allocate(aEx(nx,nz), bEx(nx,nz), dEx(nx,nz), eEx(nx,nz) )
         allocate(aEz(nx,nz), bEz(nx,nz), dEz(nx,nz), eEz(nx,nz) )
         allocate(det(nx,nz))
@@ -1113,7 +1112,7 @@ module cpmlfdtd
         ! ----------------------------------------------------------------------
         ! Compute the coefficients of the FD scheme. First scale the relative 
         ! permittivity and permeabilities to get the absolute values 
-        daHy = dt/(4.0d0*mu0*mu)
+        ! daHy = dt/(4.0d0*mu0*mu)
         dbHy = dt/mu0 !dt/(mu*mu*dx*(1+daHy) ) 
         daHy = 1.0d0 ! (1-daHy)/(1+daHy) ! 
         
@@ -1140,7 +1139,7 @@ module cpmlfdtd
         Ez_old = Ez
         
         do it = 1,source%time_steps
-            !$omp parallel private(i, j, value_dEx_dz, value_dEz_dx, value_dHy_dz, value_dHy_dx) &
+            !$omp parallel private(i, j, dEx_dz, dEz_dx, dHy_dz, dHy_dx) &
             !$omp& shared(Ex, Ez, Hy, memory_dEx_dz, memory_dEz_dx, memory_dHy_dz, memory_dHy_dx, b_z, b_x, a_z, a_x, K_z, K_x, caEz, cbEz, caEx, cbEx, daHy, dbHy) & 
             !$omp& reduction(max:velocnorm)
             
@@ -1152,17 +1151,17 @@ module cpmlfdtd
                 do i = 1,nx-1
                 
                     ! Values needed for the magnetic field updates
-                    value_dEx_dz = ( Ex(i,j+1) - Ex(i,j) )/dz
-                    memory_dEx_dz(i,j) = b_z(j) * memory_dEx_dz(i,j) + a_z(j) * value_dEx_dz
-                    value_dEx_dz = value_dEx_dz/ K_z(j) + memory_dEx_dz(i,j)
+                    dEx_dz = ( Ex(i,j+1) - Ex(i,j) )/dz
+                    memory_dEx_dz(i,j) = b_z(j) * memory_dEx_dz(i,j) + a_z(j) * dEx_dz
+                    dEx_dz = dEx_dz/ K_z(j) + memory_dEx_dz(i,j)
 
                     ! The rest of the equation needed for agnetic field updates
-                    value_dEz_dx = ( Ez(i+1,j) - Ez(i,j) )/dx
-                    memory_dEz_dx(i,j) = b_x(i) * memory_dEz_dx(i,j) + a_x(i) * value_dEz_dx
-                    value_dEz_dx = value_dEz_dx/ K_x(i) + memory_dEz_dx(i,j)
+                    dEz_dx = ( Ez(i+1,j) - Ez(i,j) )/dx
+                    memory_dEz_dx(i,j) = b_x(i) * memory_dEz_dx(i,j) + a_x(i) * dEz_dx
+                    dEz_dx = dEz_dx/ K_x(i) + memory_dEz_dx(i,j)
 
                     ! Now update the Magnetic field
-                    Hy(i,j) = daHy*Hy(i,j) + dbHy*( value_dEz_dx - value_dEx_dz )
+                    Hy(i,j) = daHy*Hy(i,j) + dbHy*( dEz_dx - dEx_dz )
                     velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
 
                 enddo  
@@ -1174,17 +1173,17 @@ module cpmlfdtd
             !$omp do
             do j = 2,nz-1
                 do i = 2,nx-1
-                    value_dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
-                    value_dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
+                    dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
+                    dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
 
-                    memory_dHy_dz(i,j) = b_z(j) * memory_dHy_dz(i,j) + a_z(j) * value_dHy_dz
-                    value_dHy_dz = value_dHy_dz/K_z(j) + memory_dHy_dz(i,j)
+                    memory_dHy_dz(i,j) = b_z(j) * memory_dHy_dz(i,j) + a_z(j) * dHy_dz
+                    dHy_dz = dHy_dz/K_z(j) + memory_dHy_dz(i,j)
                     
-                    memory_dHy_dx(i,j) = b_x_half(i) * memory_dHy_dx(i,j) + a_x_half(i) * value_dHy_dx
-                    value_dHy_dx = value_dHy_dx/K_x_half(i) + memory_dHy_dx(i,j)
+                    memory_dHy_dx(i,j) = b_x_half(i) * memory_dHy_dx(i,j) + a_x_half(i) * dHy_dx
+                    dHy_dx = dHy_dx/K_x_half(i) + memory_dHy_dx(i,j)
                     
-                    Ez(i,j) = Ez_old(i,j) + ( -aEz(i,j)*value_dHy_dz + bEz(i,j)*value_dHy_dx - dEz(i,j)*Ex_old(i,j) - eEz(i,j)*Ez_old(i,j) ) * dt
-                    Ex(i,j) = Ex_old(i,j) + ( -aEx(i,j)*value_dHy_dz + bEx(i,j)*value_dHy_dx - dEx(i,j)*Ex_old(i,j) - eEx(i,j)*Ez_old(i,j) ) * dt
+                    Ez(i,j) = Ez_old(i,j) + ( -aEz(i,j)*dHy_dz + bEz(i,j)*dHy_dx - dEz(i,j)*Ex_old(i,j) - eEz(i,j)*Ez_old(i,j) ) * dt
+                    Ex(i,j) = Ex_old(i,j) + ( -aEx(i,j)*dHy_dz + bEx(i,j)*dHy_dx - dEx(i,j)*Ex_old(i,j) - eEx(i,j)*Ez_old(i,j) ) * dt
                 
                 enddo
             enddo
@@ -1338,10 +1337,6 @@ module cpmlfdtd
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         
         ! Allocate more
-        ! allocate(epsilonx(nx,nz), epsilony(nx,nz), epsilonz(nx,nz))
-        ! allocate(sigmax(nx,nz), sigmay(nx,nz), sigmaz(nx, nz))
-        ! allocate(caEx(nx,nz), cbEx(nx,nz), caEy(nx,nz), cbEy(nx,nz), &
-                    ! caEz(nx,nz), cbEz(nx,nz))
         allocate(aEx(nx,nz), bEx(nx,nz), cEx(nx,nz), &
                  aEy(nx,nz), bEy(nx,nz), cEy(nx,nz), &
                  aEz(nx,nz), bEz(nx,nz), cEz(nx,nz))
@@ -1621,13 +1616,13 @@ module cpmlfdtd
                         dHx_dy = dHx_dy/K_y_half(j) + memory_dHx_dy(i,j,k)
                         dHy_dx = dHy_dx/K_x_half(i) + memory_dHy_dx(i,j,k)
                         
-                        rhs_x = dHz_dy - dHy_dz - (sig11(i,j) * Ex_old(i,j,k) + sig12(i,j)*Ey_old(i,j,k) + sig13(i,j) * Ez_old(i,j,k))
-                        rhs_y = dHx_dz - dHz_dx - (sig12(i,j) * Ex_old(i,j,k) + sig22(i,j)*Ey_old(i,j,k) + sig23(i,j) * Ez_old(i,j,k))
-                        rhs_z = dHy_dx - dHx_dy - (sig13(i,j) * Ex_old(i,j,k) + sig23(i,j)*Ey_old(i,j,k) + sig33(i,j) * Ez_old(i,j,k))
+                        rhs_x = dHz_dy - dHy_dz - (sig11(i,k) * Ex_old(i,j,k) + sig12(i,k)*Ey_old(i,j,k) + sig13(i,k) * Ez_old(i,j,k))
+                        rhs_y = dHx_dz - dHz_dx - (sig12(i,k) * Ex_old(i,j,k) + sig22(i,k)*Ey_old(i,j,k) + sig23(i,k) * Ez_old(i,j,k))
+                        rhs_z = dHy_dx - dHx_dy - (sig13(i,k) * Ex_old(i,j,k) + sig23(i,k)*Ey_old(i,j,k) + sig33(i,k) * Ez_old(i,j,k))
                         
-                        Ex(i,j,k) = Ex_old(i,j,k) + ( aEx(i,j) * rhs_x + bEx(i,j) * rhs_y + cEx(i,j) * rhs_z ) * dt
-                        Ey(i,j,k) = Ey_old(i,j,k) + ( aEy(i,j) * rhs_x + bEy(i,j) * rhs_y + cEy(i,j) * rhs_z ) * dt
-                        Ez(i,j,k) = Ez_old(i,j,k) + ( aEz(i,j) * rhs_x + bEz(i,j) * rhs_y + cEz(i,j) * rhs_z ) * dt
+                        Ex(i,j,k) = Ex_old(i,j,k) + ( aEx(i,k) * rhs_x + bEx(i,k) * rhs_y + cEx(i,k) * rhs_z ) * dt
+                        Ey(i,j,k) = Ey_old(i,j,k) + ( aEy(i,k) * rhs_x + bEy(i,k) * rhs_y + cEy(i,k) * rhs_z ) * dt
+                        Ez(i,j,k) = Ez_old(i,j,k) + ( aEz(i,k) * rhs_x + bEz(i,k) * rhs_y + cEz(i,k) * rhs_z ) * dt
                     end do 
                 end do 
             end do 
