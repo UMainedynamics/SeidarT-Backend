@@ -836,8 +836,7 @@ module cpmlfdtd
                         dsigmaxz_dz = dsigmaxz_dz / K_z(k) + memory_dsigmaxz_dz(i,j,k) 
 
                         vx(i,j,k) = vx(i,j,k) + &
-                            (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoxy + dsigmaxz_dz/rhoxz) * &
-                            dt 
+                            (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoxy + dsigmaxz_dz/rhoxz) * dt 
                     enddo
                 enddo
 
@@ -845,7 +844,7 @@ module cpmlfdtd
                     do i = 1,nx-1
                         ! ds6/dx, ds2/dy, ds4/dz
                         rhoxy = face_density(rho(i,k), rho(i+1,k), density_code)
-                        rhoyx = face_density(rho(i,k), rho(i,k), density_code) 
+                        rhoyy = face_density(rho(i,k), rho(i,k), density_code) 
                         rhozy = face_density(rho(i,k), rho(i,k-1), density_code)
                          
                         dsigmaxy_dx = ( sigmaxy(i+1,j,k) - sigmaxy(i,j,k) ) / dx
@@ -861,8 +860,7 @@ module cpmlfdtd
                         dsigmayz_dz = dsigmayz_dz / K_z(k) + memory_dsigmayz_dz(i,j,k)
 
                         vy(i,j,k) = vy(i,j,k) + &
-                            (dsigmaxy_dx/rhoxy + dsigmayy_dy/rhoyy + dsigmayz_dz/rhozy) * &
-                            dt !/ deltarho !rho(i,k)
+                            (dsigmaxy_dx/rhoxy + dsigmayy_dy/rhoyy + dsigmayz_dz/rhozy) * dt
                     enddo
                 enddo
             enddo
