@@ -11,6 +11,8 @@ module cpmlfdtd
     ! =========================================================================    
     ! Computations are done in double precision and written to binary as single
     ! precision unless specified by the optional logical, SINGLE_OUTPUT.
+    ! ==========================================================================
+    
     subroutine seismic2(domain, source, density_method, SINGLE_OUTPUT)
         
         use constants
@@ -170,14 +172,14 @@ module cpmlfdtd
             ! ------------------------------------------------------------
             
             !$omp do
-            do j = 2,nz
-                do i = 1,nx-1
+            do j = 3,nz-1
+                do i = 2,nx-2
                     
-                    value_dvx_dx = (vx(i+1,j) - vx(i,j)) / dx
-                    value_dvz_dz = (vz(i,j) - vz(i,j-1)) / dz
-                    value_dvz_dx = (vz(i+1,j) - vz(i,j)) / dx
-                    value_dvx_dz = (vx(i,j) - vx(i,j-1)) / dz
-                    
+                    value_dvx_dx = ( 27.d0*(vx(i+1,j) - vx(i,j)) - (vx(i+2,j) - vx(i-1,j))) / (24.d0*dx)
+                    value_dvz_dz = ( 27.d0*(vz(i,j) - vz(i,j-1)) - (vz(i,j+1) - vz(i,j-2))) / (24.d0*dz)
+                    value_dvz_dx = ( 27.d0*(vz(i+1,j) - vz(i,j)) - (vz(i+2,j) - vz(i-1,j))) / (24.d0*dx)
+                    value_dvx_dz = ( 27.d0*(vx(i,j) - vx(i,j-1)) - (vx(i,j+1) - vx(i,j-2))) / (24.d0*dz)
+
                     memory_dvx_dx(i,j) = bcoef_half(i,j) * memory_dvx_dx(i,j) + acoef_half(i,j) * value_dvx_dx
                     memory_dvx_dz(i,j) = bcoef_half(i,j) * memory_dvx_dz(i,j) + acoef_half(i,j) * value_dvx_dz 
                     memory_dvz_dz(i,j) = bcoef(i,j) * memory_dvz_dz(i,j) + acoef(i,j) * value_dvz_dz
@@ -203,23 +205,23 @@ module cpmlfdtd
             !$omp end do
             
             !$omp do
-            do j = 1,nz-1
-                do i = 2,nx
+            do j = 2,nz-2
+                do i = 3,nx-1
                     
-                    value_dvx_dx = (vx(i,j) - vx(i-1,j)) / dx
-                    value_dvz_dz = (vz(i,j+1) - vz(i,j)) / dz
-                    value_dvz_dx = (vz(i,j) - vz(i-1,j)) / dx
-                    value_dvx_dz = (vx(i,j+1) - vx(i,j)) / dz
-                    
+                    value_dvx_dx = ( 27.d0*(vx(i,j) - vx(i-1,j)) - (vx(i+1,j) - vx(i-2,j))) / (24.d0*dx)
+                    value_dvz_dz = ( 27.d0*(vz(i,j+1) - vz(i,j)) - (vz(i,j+2) - vz(i,j-1))) / (24.d0*dz)
+                    value_dvz_dx = ( 27.d0*(vz(i,j) - vz(i-1,j)) - (vz(i+1,j) - vz(i-2,j))) / (24.d0*dx)
+                    value_dvx_dz = ( 27.d0*(vx(i,j+1) - vx(i,j)) - (vx(i,j+2) - vx(i,j-1))) / (24.d0*dz)
+
                     memory_dvx_dx(i,j) = bcoef_half(i,j) * memory_dvx_dx(i,j) + acoef_half(i,j) * value_dvx_dx
                     memory_dvx_dz(i,j) = bcoef_half(i,j) * memory_dvx_dz(i,j) + acoef_half(i,j) * value_dvx_dz 
-                    memory_dvz_dz(i,j) = bcoef(i,j) * memory_dvz_dz(i,j) + acoef(i,j) * value_dvz_dz
-                    memory_dvz_dx(i,j) = bcoef(i,j) * memory_dvz_dx(i,j) + acoef(i,j) * value_dvz_dx
+                    memory_dvz_dz(i,j) = bcoef_half(i,j) * memory_dvz_dz(i,j) + acoef_half(i,j) * value_dvz_dz
+                    memory_dvz_dx(i,j) = bcoef_half(i,j) * memory_dvz_dx(i,j) + acoef_half(i,j) * value_dvz_dx
                     
                     value_dvx_dx = value_dvx_dx / kappa_half(i,j) + memory_dvx_dx(i,j)
                     value_dvx_dz = value_dvx_dz / kappa_half(i,j) + memory_dvx_dz(i,j)
-                    value_dvz_dz = value_dvz_dz / kappa(i,j) + memory_dvz_dz(i,j)
-                    value_dvz_dx = value_dvz_dx / kappa(i,j) + memory_dvz_dx(i,j)
+                    value_dvz_dz = value_dvz_dz / kappa_half(i,j) + memory_dvz_dz(i,j)
+                    value_dvz_dx = value_dvz_dx / kappa_half(i,j) + memory_dvz_dx(i,j)
                     
                     sigmaxz(i,j) = ( sigmaxz(i,j) + &
                         (   c15(i,j)  * value_dvx_dx + & 
@@ -235,14 +237,14 @@ module cpmlfdtd
             ! --------------------------------------------------------
             
             !$omp do 
-            do j = 2,nz
-                do i = 2,nx
+            do j = 3,nz-1
+                do i = 3,nx-1
                     
                     rhoxx = face_density(rho(i,j), rho(i-1,j), density_code) 
                     rhozx = face_density(rho(i,j), rho(i,j-1), density_code) 
-                    
-                    value_dsigmaxx_dx = (sigmaxx(i,j) - sigmaxx(i-1,j)) / dx
-                    value_dsigmaxz_dz = (sigmaxz(i,j) - sigmaxz(i,j-1)) / dz
+
+                    value_dsigmaxx_dx = (27.d0*sigmaxx(i,j) - 27.d0*sigmaxx(i-1,j) + sigmaxx(i-2,j)) / (24.d0*dx)
+                    value_dsigmaxz_dz = (27.d0*sigmaxz(i,j) - 27.d0*sigmaxz(i,j-1) + sigmaxz(i,j-2)) / (24.d0*dz)
                     
                     memory_dsigmaxx_dx(i,j) = bcoef(i,j) * memory_dsigmaxx_dx(i,j) + acoef(i,j) * value_dsigmaxx_dx
                     memory_dsigmaxz_dz(i,j) = bcoef(i,j) * memory_dsigmaxz_dz(i,j) + acoef(i,j) * value_dsigmaxz_dz
@@ -256,14 +258,15 @@ module cpmlfdtd
             !$omp end do
             
             !$omp do
-            do j = 1,nz-1
-                do i = 1,nx-1
+            do j = 2,nz-2
+                do i = 2,nx-2
                     
                     rhoxz = face_density(rho(i,j), rho(i+1,j), density_code) 
                     rhozz = face_density(rho(i,j), rho(i,j+1), density_code) 
 
-                    value_dsigmaxz_dx = (sigmaxz(i+1,j) - sigmaxz(i,j)) / dx
-                    value_dsigmazz_dz = (sigmazz(i,j+1) - sigmazz(i,j)) / dz
+                    value_dsigmaxz_dx = (-27.d0*sigmaxz(i,j) + 27.d0*sigmaxz(i+1,j) - sigmaxz(i+2,j)) / (24.d0*dx)
+                    value_dsigmazz_dz = (-27.d0*sigmazz(i,j) + 27.d0*sigmazz(i,j+1) - sigmazz(i,j+2)) / (24.d0*dz)
+
             
                     memory_dsigmaxz_dx(i,j) = bcoef_half(i,j) * memory_dsigmaxz_dx(i,j) + acoef_half(i,j) * value_dsigmaxz_dx
                     memory_dsigmazz_dz(i,j) = bcoef_half(i,j) * memory_dsigmazz_dz(i,j) + acoef_half(i,j) * value_dsigmazz_dz
@@ -546,26 +549,31 @@ module cpmlfdtd
             ! compute stress sigma and update memory variables for C-PML
             !------------------------------------------------------------
             ! Update in the x direction
-            do k = 2,nz
-                do j = 2,ny
-                    do i = 1,nx-1
-
-                        dvx_dx = (vx(i+1,j,k) - vx(i,j,k) ) / dx
-                        dvy_dx = (vy(i+1,j,k) - vy(i,j,k) ) / dx
-                        dvz_dx = (vz(i+1,j,k) - vz(i,j,k) ) / dx 
-                        dvy_dy = (vy(i,j,k) - vy(i,j-1,k) ) / dy
-                        dvx_dy = (vx(i,j,k) - vx(i,j-1,k) ) / dy
-                        dvz_dy = (vz(i,j,k) - vz(i,j-1,k) ) / dy
-                        dvz_dz = (vz(i,j,k) - vz(i,j,k-1) ) / dz
-                        dvx_dz = (vx(i,j,k) - vx(i,j,k-1) ) / dz
-                        dvy_dz = (vy(i,j,k) - vy(i,j,k-1) ) / dz
-
+            ! Loop 1
+            do k = 3,nz-1
+                do j = 3,ny-1
+                    do i = 2,nx-2
+                        ! Forward step on half grid
+                        dvx_dx = ( 27.d0*(vx(i+1,j,k) - vx(i,j,k)) - (vx(i+2,j,k) - vx(i-1,j,k))) / (24.d0*dx)
+                        dvy_dx = ( 27.d0*(vy(i+1,j,k) - vy(i,j,k)) - (vy(i+2,j,k) - vy(i-1,j,k))) / (24.d0*dx)
+                        dvz_dx = ( 27.d0*(vz(i+1,j,k) - vz(i,j,k)) - (vz(i+2,j,k) - vz(i-1,j,k))) / (24.d0*dx)
+                        ! Backward step on full grid
+                        dvx_dy = ( 27.d0*(vx(i,j,k) - vx(i,j-1,k)) - (vx(i,j+1,k) - vx(i,j-2,k))) / (24.d0*dy)
+                        dvy_dy = ( 27.d0*(vy(i,j,k) - vy(i,j-1,k)) - (vy(i,j+1,k) - vy(i,j-2,k))) / (24.d0*dy)
+                        dvz_dy = ( 27.d0*(vz(i,j,k) - vz(i,j-1,k)) - (vz(i,j+1,k) - vz(i,j-2,k))) / (24.d0*dy)
+                        ! Backward step on full grid
+                        dvx_dz = ( 27.d0*(vx(i,j,k) - vx(i,j,k-1)) - (vx(i,j,k+1) - vx(i,j,k-2))) / (24.d0*dz)
+                        dvy_dz = ( 27.d0*(vy(i,j,k) - vy(i,j,k-1)) - (vy(i,j,k+1) - vy(i,j,k-2))) / (24.d0*dz)
+                        dvz_dz = ( 27.d0*(vz(i,j,k) - vz(i,j,k-1)) - (vz(i,j,k+1) - vz(i,j,k-2))) / (24.d0*dz)
+                        
                         memory_dvx_dx(i,j,k) = bcoef_half(i,k) * memory_dvx_dx(i,j,k) + acoef_half(i,k) * dvx_dx
                         memory_dvy_dx(i,j,k) = bcoef_half(i,k) * memory_dvy_dx(i,j,k) + acoef_half(i,k) * dvy_dx
                         memory_dvz_dx(i,j,k) = bcoef_half(i,k) * memory_dvz_dx(i,j,k) + acoef_half(i,k) * dvz_dx
+                        
                         memory_dvy_dy(i,j,k) = bcoef(i,k) * memory_dvy_dy(i,j,k) + acoef(i,k) * dvy_dy
                         memory_dvx_dy(i,j,k) = bcoef(i,k) * memory_dvx_dy(i,j,k) + acoef(i,k) * dvx_dy
                         memory_dvz_dy(i,j,k) = bcoef(i,k) * memory_dvz_dy(i,j,k) + acoef(i,k) * dvz_dy
+                        
                         memory_dvz_dz(i,j,k) = bcoef(i,k) * memory_dvz_dz(i,j,k) + acoef(i,k) * dvz_dz
                         memory_dvx_dz(i,j,k) = bcoef(i,k) * memory_dvx_dz(i,j,k) + acoef(i,k) * dvx_dz
                         memory_dvy_dz(i,j,k) = bcoef(i,k) * memory_dvy_dz(i,j,k) + acoef(i,k) * dvy_dz
@@ -583,41 +591,43 @@ module cpmlfdtd
                         sigmaxx(i,j,k) = ( sigmaxx(i,j,k) + &
                         (   c11(i,k) * dvx_dx + c12(i,k) * dvy_dy + c13(i,k) * dvz_dz + &
                             c14(i,k) * (dvy_dz + dvz_dy) + c15(i,k) * (dvx_dz + dvz_dx) + &
-                            c16(i,k) * (dvx_dy + dvz_dy) ) * dt ) / &
-                                (1 + gamma_x(i,j) * dt )
+                            c16(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
+                                (1 + gamma_x(i,k) * dt )
 
                         ! Full 3D will need a gradient in the y-direction
                         sigmayy(i,j,k) = ( sigmayy(i,j,k) + &
                         (   c12(i,k) * dvx_dx + c22(i,k) * dvy_dy + c23(i,k) * dvz_dz + &
                             c24(i,k) * (dvy_dz + dvz_dy) + c25(i,k) * (dvx_dz + dvz_dx) + &
                             c26(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
-                                (1 + gamma_y(i,j) * dt )
+                                (1 + gamma_y(i,k) * dt )
 
                         sigmazz(i,j,k) = ( sigmazz(i,j,k) + &
                         (   c13(i,k) * dvx_dx + c23(i,k) * dvy_dy + c33(i,k) * dvz_dz + &
                             c34(i,k) * (dvy_dz + dvz_dy) + c35(i,k) * (dvx_dz + dvz_dx) + &
                             c36(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
-                                (1 + gamma_z(i,j) * dt )
+                                (1 + gamma_z(i,k) * dt )
 
                     enddo
                 enddo
             enddo
-
+            ! Loop 2
             ! Update sigmaxy, x-direction is full nodes
-            do k = 2,nz
-                do j = 1,ny-1
-                    do i = 2,nx
-
-                        dvx_dx = (vx(i,j,k) - vx(i-1,j,k)) / dx
-                        dvy_dx = (vy(i,j,k) - vy(i-1,j,k)) / dx
-                        dvz_dx = (vz(i,j,k) - vz(i-1,j,k)) / dx
-                        dvy_dy = (vy(i,j+1,k) - vy(i,j,k)) / dy
-                        dvx_dy = (vx(i,j+1,k) - vx(i,j,k)) / dy
-                        dvz_dy = (vz(i,j+1,k) - vz(i,j,k)) / dy
-                        dvz_dz = (vz(i,j,k) - vz(i,j,k-1)) / dz
-                        dvx_dz = (vx(i,j,k) - vx(i,j,k-1)) / dz
-                        dvy_dz = (vy(i,j,k) - vy(i,j,k-1)) / dz
-
+            do k = 3,nz-1
+                do j = 2,ny-2
+                    do i = 3,nx-1
+                        ! Backward step full grid
+                        dvx_dx = ( 27.d0*(vx(i,j,k) - vx(i-1,j,k)) - (vx(i+1,j,k) - vx(i-2,j,k))) / (24.d0*dx)
+                        dvy_dx = ( 27.d0*(vy(i,j,k) - vy(i-1,j,k)) - (vy(i+1,j,k) - vy(i-2,j,k))) / (24.d0*dx)
+                        dvz_dx = ( 27.d0*(vz(i,j,k) - vz(i-1,j,k)) - (vz(i+1,j,k) - vz(i-2,j,k))) / (24.d0*dx)
+                        ! Forward step half grid
+                        dvx_dy = ( 27.d0*(vx(i,j+1,k) - vx(i,j,k)) - (vx(i,j+2,k) - vx(i,j-1,k))) / (24.d0*dy)
+                        dvy_dy = ( 27.d0*(vy(i,j+1,k) - vy(i,j,k)) - (vy(i,j+2,k) - vy(i,j-1,k))) / (24.d0*dy)
+                        dvz_dy = ( 27.d0*(vz(i,j+1,k) - vz(i,j,k)) - (vz(i,j+2,k) - vz(i,j-1,k))) / (24.d0*dy)
+                        ! Backward step half grid
+                        dvx_dz = ( 27.d0*(vx(i,j,k) - vx(i,j,k-1)) - (vx(i,j,k+1) - vx(i,j,k-2))) / (24.d0*dz)
+                        dvy_dz = ( 27.d0*(vy(i,j,k) - vy(i,j,k-1)) - (vy(i,j,k+1) - vy(i,j,k-2))) / (24.d0*dz)
+                        dvz_dz = ( 27.d0*(vz(i,j,k) - vz(i,j,k-1)) - (vz(i,j,k+1) - vz(i,j,k-2))) / (24.d0*dz)
+                        
                         memory_dvx_dx(i,j,k) = bcoef(i,k) * memory_dvx_dx(i,j,k) + acoef(i,k) * dvx_dx
                         memory_dvy_dx(i,j,k) = bcoef(i,k) * memory_dvy_dx(i,j,k) + acoef(i,k) * dvy_dx
                         memory_dvz_dx(i,j,k) = bcoef(i,k) * memory_dvz_dx(i,j,k) + acoef(i,k) * dvz_dx
@@ -639,29 +649,31 @@ module cpmlfdtd
 
                         sigmaxy(i,j,k) = ( sigmaxy(i,j,k) + &
                         (   c16(i,k) * dvx_dx + c26(i,k) * dvy_dy + c36(i,k) * dvz_dz + &
-                            c46(i,k) * (dvz_dy + dvy_dz) + c56(i,k) * (dvz_dx + dvx_dz) + &
+                            c46(i,k) * (dvy_dz + dvz_dy) + c56(i,k) * (dvx_dz + dvz_dx) + &
                             c66(i,k) * (dvy_dx + dvx_dy) ) * dt ) / &
-                                (1 + gamma_xy(i,j) * dt )
+                                (1 + gamma_xy(i,k) * dt )
 
                     enddo
                 enddo
             enddo
-
+            ! Loop 3
             ! Update sigmaxz, z-direction is full nodes
-            do k = 1,nz-1
-                do j = 2,ny
-                    do i = 2,nx
-
-                        dvx_dx = (vx(i,j,k) - vx(i-1,j,k)) / dx
-                        dvy_dx = (vy(i,j,k) - vy(i-1,j,k)) / dx
-                        dvz_dx = (vz(i,j,k) - vz(i-1,j,k)) / dx
-                        dvy_dy = (vy(i,j,k) - vy(i,j-1,k)) / dy
-                        dvz_dy = (vz(i,j,k) - vz(i,j-1,k)) / dy
-                        dvx_dy = (vx(i,j,k) - vx(i,j-1,k)) / dy
-                        dvz_dz = (vz(i,j,k+1) - vz(i,j,k)) / dz
-                        dvx_dz = (vx(i,j,k+1) - vx(i,j,k)) / dz
-                        dvy_dz = (vy(i,j,k+1) - vy(i,j,k)) / dz
-
+            do k = 2,nz-2
+                do j = 3,ny-1
+                    do i = 3,nx-1
+                        ! Backward difference full grid
+                        dvx_dx = ( 27.d0*(vx(i,j,k) - vx(i-1,j,k)) - (vx(i+1,j,k) - vx(i-2,j,k))) / (24.d0*dx)
+                        dvy_dx = ( 27.d0*(vy(i,j,k) - vy(i-1,j,k)) - (vy(i+1,j,k) - vy(i-2,j,k))) / (24.d0*dx)
+                        dvz_dx = ( 27.d0*(vz(i,j,k) - vz(i-1,j,k)) - (vz(i+1,j,k) - vz(i-2,j,k))) / (24.d0*dx)
+                        ! Backward difference full grid
+                        dvx_dy = ( 27.d0*(vx(i,j,k) - vx(i,j-1,k)) - (vx(i,j+1,k) - vx(i,j-2,k))) / (24.d0*dy)
+                        dvy_dy = ( 27.d0*(vy(i,j,k) - vy(i,j-1,k)) - (vy(i,j+1,k) - vy(i,j-2,k))) / (24.d0*dy)
+                        dvz_dy = ( 27.d0*(vz(i,j,k) - vz(i,j-1,k)) - (vz(i,j+1,k) - vz(i,j-2,k))) / (24.d0*dy)
+                        ! Forward difference half grid
+                        dvx_dz = ( 27.d0*(vx(i,j,k+1) - vx(i,j,k)) - (vx(i,j,k+2) - vx(i,j,k-1))) / (24.d0*dz)
+                        dvy_dz = ( 27.d0*(vy(i,j,k+1) - vy(i,j,k)) - (vy(i,j,k+2) - vy(i,j,k-1))) / (24.d0*dz)
+                        dvz_dz = ( 27.d0*(vz(i,j,k+1) - vz(i,j,k)) - (vz(i,j,k+2) - vz(i,j,k-1))) / (24.d0*dz)
+                        
                         memory_dvx_dx(i,j,k) = bcoef(i,k) * memory_dvx_dx(i,j,k) + acoef(i,k) * dvx_dx
                         memory_dvy_dx(i,j,k) = bcoef(i,k) * memory_dvy_dx(i,j,k) + acoef(i,k) * dvy_dx
                         memory_dvz_dx(i,j,k) = bcoef(i,k) * memory_dvz_dx(i,j,k) + acoef(i,k) * dvz_dx
@@ -684,27 +696,29 @@ module cpmlfdtd
 
                         sigmaxz(i,j,k) = ( sigmaxz(i,j,k) + &
                             (   c15(i,k) * dvx_dx + c25(i,k) * dvy_dy + c35(i,k) * dvz_dz + &
-                                c45(i,k) * ( dvx_dz + dvz_dx) + c55(i,k) * ( dvx_dz + dvz_dx) + &
-                                c56(i,k) * ( dvx_dy + dvy_dx) ) * dt  ) / &
-                                    (1 + gamma_xz(i,j) * dt )
+                                c45(i,k) * ( dvy_dz + dvz_dy) + c55(i,k) * ( dvx_dz + dvz_dx) + &
+                                c56(i,k) * ( dvy_dx + dvx_dy) ) * dt  ) / &
+                                    (1 + gamma_xz(i,k) * dt )
 
                     enddo
                 enddo
-
+                ! Loop 4
                 !   ! update sigmayz, y-direction is full nodes
-                do j = 1,ny-1
-                    do i = 1,nx-1
-
-                        dvx_dx = (vx(i+1,j,k) - vx(i,j,k)) / dx
-                        dvy_dx = (vy(i+1,j,k) - vy(i,j,k)) / dx
-                        dvz_dx = (vz(i+1,j,k) - vz(i,j,k)) / dx
-                        dvy_dy = (vy(i,j+1,k) - vy(i,j,k)) / dy
-                        dvx_dy = (vx(i,j+1,k) - vx(i,j,k)) / dy
-                        dvz_dy = (vz(i,j+1,k) - vz(i,j,k)) / dy
-                        dvz_dz = (vz(i,j,k+1) - vz(i,j,k)) / dz
-                        dvx_dz = (vx(i,j,k+1) - vx(i,j,k)) / dz 
-                        dvy_dz = (vy(i,j,k+1) - vy(i,j,k)) / dz
-
+                do j = 2,ny-2
+                    do i = 2,nx-2
+                        ! Forward difference half grid
+                        dvx_dx = ( 27.d0*(vx(i+1,j,k) - vx(i,j,k)) - (vx(i+2,j,k) - vx(i-1,j,k))) / (24.d0*dx)
+                        dvy_dx = ( 27.d0*(vy(i+1,j,k) - vy(i,j,k)) - (vy(i+2,j,k) - vy(i-1,j,k))) / (24.d0*dx)
+                        dvz_dx = ( 27.d0*(vz(i+1,j,k) - vz(i,j,k)) - (vz(i+2,j,k) - vz(i-1,j,k))) / (24.d0*dx)
+                        ! Forward difference half grid
+                        dvx_dy = ( 27.d0*(vx(i,j+1,k) - vx(i,j,k)) - (vx(i,j+2,k) - vx(i,j-1,k))) / (24.d0*dy)
+                        dvy_dy = ( 27.d0*(vy(i,j+1,k) - vy(i,j,k)) - (vy(i,j+2,k) - vy(i,j-1,k))) / (24.d0*dy)
+                        dvz_dy = ( 27.d0*(vz(i,j+1,k) - vz(i,j,k)) - (vz(i,j+2,k) - vz(i,j-1,k))) / (24.d0*dy)
+                        ! Forwar difference half grid
+                        dvx_dz = ( 27.d0*(vx(i,j,k+1) - vx(i,j,k)) - (vx(i,j,k+2) - vx(i,j,k-1))) / (24.d0*dz)
+                        dvy_dz = ( 27.d0*(vy(i,j,k+1) - vy(i,j,k)) - (vy(i,j,k+2) - vy(i,j,k-1))) / (24.d0*dz)
+                        dvz_dz = ( 27.d0*(vz(i,j,k+1) - vz(i,j,k)) - (vz(i,j,k+2) - vz(i,j,k-1))) / (24.d0*dz)
+                        
                         memory_dvx_dx(i,j,k) = bcoef_half(i,k) * memory_dvx_dx(i,j,k) + acoef_half(i,k) * dvx_dx
                         memory_dvy_dx(i,j,k) = bcoef_half(i,k) * memory_dvy_dx(i,j,k) + acoef_half(i,k) * dvy_dx
                         memory_dvz_dx(i,j,k) = bcoef_half(i,k) * memory_dvz_dx(i,j,k) + acoef_half(i,k) * dvz_dx
@@ -729,7 +743,7 @@ module cpmlfdtd
                             (   c14(i,k) * dvx_dx + c24(i,k) * dvy_dy + c34(i,k) * dvz_dz + &
                                 c44(i,k) * ( dvy_dz + dvz_dy) + c45(i,k) * ( dvx_dz + dvz_dx) + &
                                 c46(i,k) * ( dvy_dx + dvx_dy) ) * dt  ) / & 
-                                    (1 + gamma_yz(i,j) * dt )
+                                    (1 + gamma_yz(i,k) * dt )
                     enddo
                 enddo
             enddo
@@ -737,46 +751,48 @@ module cpmlfdtd
             !--------------------------------------------------------
             ! compute velocity and update memory variables for C-PML
             !--------------------------------------------------------
-            do k = 2,nz
-                do j = 2,ny
-                    do i = 2,nx
+            ! Loop 5
+            do k = 3,nz-1
+                do j = 3,ny-1
+                    do i = 3,nx-1
                         ! ds1/dx, ds6/dy, ds5,dz
                         rhoxx = face_density(rho(i,k), rho(i-1,k), density_code)
                         rhoyx = face_density(rho(i,k), rho(i,k), density_code) 
                         rhozx = face_density(rho(i,k), rho(i,k-1), density_code) 
+                        ! Backward difference half grid
+                        dsigmaxx_dx = (27.d0*sigmaxx(i,j,k) - 27.d0*sigmaxx(i-1,j,k) + sigmaxx(i-2,j,k)) / (24.d0*dx)
+                        dsigmaxy_dy = (27.d0*sigmaxy(i,j,k) - 27.d0*sigmaxy(i,j-1,k) + sigmaxy(i,j-2,k)) / (24.d0*dy)
+                        dsigmaxz_dz = (27.d0*sigmaxz(i,j,k) - 27.d0*sigmaxz(i,j,k-1) + sigmaxz(i,j,k-2)) / (24.d0*dz)
                         
-                        dsigmaxx_dx = (sigmaxx(i,j,k) - sigmaxx(i-1,j,k) ) / dx
-                        dsigmaxy_dy = (sigmaxy(i,j,k) - sigmaxy(i,j-1,k) ) / dy
-                        dsigmaxz_dz = (sigmaxz(i,j,k) - sigmaxz(i,j,k-1) ) / dz
+                        memory_dsigmaxx_dx(i,j,k) = bcoef_half(i,k) * memory_dsigmaxx_dx(i,j,k) + acoef_half(i,k) * dsigmaxx_dx
+                        memory_dsigmaxy_dy(i,j,k) = bcoef_half(i,k) * memory_dsigmaxy_dy(i,j,k) + acoef_half(i,k) * dsigmaxy_dy
+                        memory_dsigmaxz_dz(i,j,k) = bcoef_half(i,k) * memory_dsigmaxz_dz(i,j,k) + acoef_half(i,k) * dsigmaxz_dz
 
-                        memory_dsigmaxx_dx(i,j,k) = bcoef(i,k) * memory_dsigmaxx_dx(i,j,k) + acoef(i,k) * dsigmaxx_dx
-                        memory_dsigmaxy_dy(i,j,k) = bcoef(i,k) * memory_dsigmaxy_dy(i,j,k) + acoef(i,k) * dsigmaxy_dy
-                        memory_dsigmaxz_dz(i,j,k) = bcoef(i,k) * memory_dsigmaxz_dz(i,j,k) + acoef(i,k) * dsigmaxz_dz
-
-                        dsigmaxx_dx = dsigmaxx_dx / kappa(i,k) + memory_dsigmaxx_dx(i,j,k)
-                        dsigmaxy_dy = dsigmaxy_dy / kappa(i,k) + memory_dsigmaxy_dy(i,j,k)
-                        dsigmaxz_dz = dsigmaxz_dz / kappa(i,k) + memory_dsigmaxz_dz(i,j,k) 
+                        dsigmaxx_dx = dsigmaxx_dx / kappa_half(i,k) + memory_dsigmaxx_dx(i,j,k)
+                        dsigmaxy_dy = dsigmaxy_dy / kappa_half(i,k) + memory_dsigmaxy_dy(i,j,k)
+                        dsigmaxz_dz = dsigmaxz_dz / kappa_half(i,k) + memory_dsigmaxz_dz(i,j,k) 
 
                         vx(i,j,k) = vx(i,j,k) + &
-                            (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoxy + dsigmaxz_dz/rhoxz) * dt 
+                            (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoyx + dsigmaxz_dz/rhozx) * dt 
                     enddo
                 enddo
 
-                do j = 1,ny-1
-                    do i = 1,nx-1
+                do j = 2,ny-2
+                    do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
                         rhoxy = face_density(rho(i,k), rho(i+1,k), density_code)
                         rhoyy = face_density(rho(i,k), rho(i,k), density_code) 
                         rhozy = face_density(rho(i,k), rho(i,k-1), density_code)
-                         
-                        dsigmaxy_dx = ( sigmaxy(i+1,j,k) - sigmaxy(i,j,k) ) / dx
-                        dsigmayy_dy = ( sigmayy(i,j+1,k) - sigmayy(i,j,k) ) / dy
-                        dsigmayz_dz = ( sigmayz(i,j,k) - sigmayz(i,j,k-1) ) / dz
-
+                        ! Forward difference half grid
+                        dsigmaxy_dx = (-27.d0*sigmaxy(i,j,k) + 27.d0*sigmaxy(i+1,j,k) - sigmaxy(i+2,j,k)) / (24.d0*dx)
+                        dsigmayy_dy = (-27.d0*sigmayy(i,j,k) + 27.d0*sigmayy(i,j+1,k) - sigmayy(i,j+2,k)) / (24.d0*dy)
+                        ! Backward difference full grid
+                        dsigmayz_dz = (27.d0*sigmayz(i,j,k) - 27.d0*sigmayz(i,j,k-1) + sigmayz(i,j,k-2)) / (24.d0*dz)
+                        
                         memory_dsigmaxy_dx(i,j,k) = bcoef_half(i,k) * memory_dsigmaxy_dx(i,j,k) + acoef_half(i,k) * dsigmaxy_dx
                         memory_dsigmayy_dy(i,j,k) = bcoef_half(i,k) * memory_dsigmayy_dy(i,j,k) + acoef_half(i,k) * dsigmayy_dy
                         memory_dsigmayz_dz(i,j,k) = bcoef(i,k) * memory_dsigmayz_dz(i,j,k) + acoef(i,k) * dsigmayz_dz
-
+                        
                         dsigmaxy_dx = dsigmaxy_dx / kappa_half(i,k) + memory_dsigmaxy_dx(i,j,k)
                         dsigmayy_dy = dsigmayy_dy / kappa_half(i,k) + memory_dsigmayy_dy(i,j,k)
                         dsigmayz_dz = dsigmayz_dz / kappa(i,k) + memory_dsigmayz_dz(i,j,k)
@@ -787,18 +803,21 @@ module cpmlfdtd
                 enddo
             enddo
 
-            do k = 1,nz-1
-                do j = 2,ny
-                    do i = 1,nx-1
+            do k = 2,nz-2
+                do j = 3,ny-1
+                    do i = 2,nx-2
                         ! ds5/dx, ds4/dy, ds3/dz
                         rhoxz = face_density(rho(i,k), rho(i+1,k), density_code)
                         rhoyz = face_density(rho(i,k), rho(i,k), density_code) 
                         rhozz = face_density(rho(i,k), rho(i,k+1), density_code)
                         
-                        dsigmaxz_dx = ( sigmaxz(i+1,j,k) - sigmaxz(i,j,k) ) / dx
-                        dsigmayz_dy = ( sigmayz(i,j,k) - sigmayz(i,j-1,k) ) / dy
-                        dsigmazz_dz = ( sigmazz(i,j,k+1) - sigmazz(i,j,k) ) / dz
-
+                        ! Forward difference half grid
+                        dsigmaxz_dx = (-27.d0*sigmaxz(i,j,k) + 27.d0*sigmaxz(i+1,j,k) - sigmaxz(i+2,j,k)) / (24.d0*dx)
+                        ! Backward difference full grid
+                        dsigmayz_dy = (27.d0*sigmayz(i,j,k) - 27.d0*sigmayz(i,j-1,k) + sigmayz(i,j-2,k)) / (24.d0*dy)
+                        ! Forward difference half grid
+                        dsigmazz_dz = (-27.d0*sigmazz(i,j,k) + 27.d0*sigmazz(i,j,k+1) - sigmazz(i,j,k+2)) / (24.d0*dz)
+                        
                         memory_dsigmaxz_dx(i,j,k) = bcoef_half(i,k) * memory_dsigmaxz_dx(i,j,k) + acoef_half(i,k) * dsigmaxz_dx
                         memory_dsigmayz_dy(i,j,k) = bcoef(i,k) * memory_dsigmayz_dy(i,j,k) + acoef(i,k) * dsigmayz_dy
                         memory_dsigmazz_dz(i,j,k) = bcoef_half(i,k) * memory_dsigmazz_dz(i,j,k) + acoef_half(i,k) * dsigmazz_dz
@@ -1585,7 +1604,6 @@ module cpmlfdtd
 
     end subroutine electromag25
     
-    ! ==========================================================================
-    ! =========================================================================
- 
+
+    
 end module cpmlfdtd
