@@ -940,7 +940,8 @@ module cpmlfdtd
         real(real64) :: daHy, dbHy 
         real(real64), allocatable ::det(:,:)
         real(real64), allocatable :: aEx(:,:), bEx(:,:), dEx(:,:), eEx(:,:), &
-                                    aEz(:,:), bEz(:,:), dEz(:,:), eEz(:,:)
+                                    aEz(:,:), bEz(:,:), dEz(:,:), eEz(:,:), &
+                                    caEx(:,:), cbEx(:,:), caEz(:,:), cbEz(:,:)
         real(real64) :: dEx_dz, dEz_dx, dHy_dz, dHy_dx
 
         ! 1D arrays for the damping profiles
@@ -961,6 +962,9 @@ module cpmlfdtd
         
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
+        
+        real(real64) :: m11,m12,m21,m22,n11,n12,n21,n22,detM
+        real(real64) :: rhs1,rhs2, exn, ezn, exnp1, eznp1
 
         ! Check if SINGLE_OUTPUT is provided, default to single precision if not
         if (present(SINGLE_OUTPUT)) then
@@ -968,6 +972,8 @@ module cpmlfdtd
         else
             SINGLE = .TRUE.
         endif
+        
+        
         
         ! ----------------------------------------------------------------------
         nx = domain%nx 
@@ -989,6 +995,7 @@ module cpmlfdtd
         allocate(sigmax(nx, nz), sigmaz(nx, nz))
         allocate(aEx(nx,nz), bEx(nx,nz), dEx(nx,nz), eEx(nx,nz) )
         allocate(aEz(nx,nz), bEz(nx,nz), dEz(nx,nz), eEz(nx,nz) )
+        allocate(caEx(nx,nz), cbEx(nx,nz), caEz(nx,nz), cbEz(nx,nz))
         allocate(det(nx,nz))
         allocate(memory_dEz_dx(nx, nz), memory_dEx_dz(nx, nz))
         allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
@@ -1003,7 +1010,7 @@ module cpmlfdtd
         call material_rw2('s11.dat', sig11, .TRUE.)
         call material_rw2('s13.dat', sig13, .TRUE.)
         call material_rw2('s33.dat', sig33, .TRUE.)
-
+        
         ! ------------------------ Assign some constants -----------------------
         ! Assign the source location indices
         isource = source%xind + domain%cpml
@@ -1023,22 +1030,21 @@ module cpmlfdtd
         acoef_half(:,:) = 0.0d0
         bcoef(:,:) = 0.0d0 
         bcoef_half(:,:) = 0.0d0 
-
-        call material_rw2('kappax_cpml.dat', kappa, .TRUE.)
-        call material_rw2('alphax_cpml.dat', alpha, .TRUE.)
-        call material_rw2('acoefx_cpml.dat', acoef, .TRUE.)
-        call material_rw2('bcoefx_cpml.dat', bcoef, .TRUE.)
-
+        
+        call material_rw2('kappa_cpml.dat', kappa, .TRUE.)
+        call material_rw2('alpha_cpml.dat', alpha, .TRUE.)
+        call material_rw2('acoef_cpml.dat', acoef, .TRUE.)
+        call material_rw2('bcoef_cpml.dat', bcoef, .TRUE.)
 
         call material_rw2('kappa_half_cpml.dat', kappa_half, .TRUE.)
         call material_rw2('alpha_half_cpml.dat', alpha_half, .TRUE.)
         call material_rw2('acoef_half_cpml.dat', acoef_half, .TRUE.)
         call material_rw2('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
 
+
         ! ----------------------------------------------------------------------
         ! Load initial conditions and initialize variables
         call material_rw2('initialconditionEx.dat', Ex, .TRUE.)
-        ! call material_rw2('initialconditionHy.dat', Hy, .TRUE.)
         call material_rw2('initialconditionEz.dat', Ez, .TRUE.)
     
         Hy(:,:) = 0.d0
@@ -1061,15 +1067,27 @@ module cpmlfdtd
         epsilon33 = eps33 * eps0
         
         det = (epsilon11*epsilon33 - epsilon13*epsilon13)
+        where (det <= 1.0d-18*eps0*eps0)
+            det = 1.0d-18*eps0*eps0
+        end where
+        
         aEx = epsilon33 / det 
-        bEx = - epsilon13 / det 
+        bEx = -epsilon13 / det 
         dEx = (epsilon33 * sig11 - epsilon13 * sig13) / det  
         eEx = (epsilon33 * sig13 - epsilon13 * sig33) / det
         
-        aEz = - epsilon13 / det 
+        aEz = -epsilon13 / det 
         bEz = epsilon11 / det 
         dEz = (epsilon11 * sig13 - epsilon13 * sig11) / det  
         eEz = (epsilon11 * sig33 - epsilon13 * sig13) / det
+        
+        caEx(:,:) = ( 1.0d0 - sig11 * dt / ( 2.0d0 * epsilon11 ) ) / &
+                    ( 1.0d0 + sig11 * dt / ( 2.0d0 * epsilon11 ) )
+        cbEx(:,:) = (dt / epsilon11 ) / ( 1.0d0 + sig11 * dt / ( 2.0d0 * epsilon11 ) )
+
+        caEz(:,:) = ( 1.0d0 - sig33 * dt / ( 2.0d0 * epsilon33 ) ) / &
+                    ( 1.0d0 + sig33 * dt / ( 2.0d0 * epsilon33 ) )
+        cbEz(:,:) = (dt / epsilon33 ) / ( 1.0d0 + sig33 * dt / ( 2.0d0 * epsilon33 ) )
         !---
         !---  beginning of time loop
         !---
@@ -1078,15 +1096,14 @@ module cpmlfdtd
         Ez_old = Ez
         
         do it = 1,source%time_steps
+            velocnorm = 0.d0
             !$omp parallel private(i, j, dEx_dz, dEz_dx, dHy_dz, dHy_dx) &
-            !$omp& shared(Ex, Ez, Hy, memory_dEx_dz, memory_dEz_dx, memory_dHy_dz, memory_dHy_dx, bcoef, acoef, kappa, caEz, cbEz, caEx, cbEx, daHy, dbHy) & 
-            !$omp& reduction(max:velocnorm)
-            
+            !$omp& shared(Ex, Ez, Hy, memory_dEx_dz, memory_dEz_dx, memory_dHy_dz, memory_dHy_dx, bcoef, acoef, kappa, aEz, bEz, aEx, bEx, dEz, eEz, dEx, eEx, daHy, dbHy) & 
             !--------------------------------------------------------
             ! compute magnetic field and update memory variables for C-PML
             !--------------------------------------------------------
             !$omp do
-            do j = 1,nz-1  
+            do j = 1,nz-1 
                 do i = 1,nx-1
                 
                     ! Values needed for the magnetic field updates
@@ -1094,15 +1111,15 @@ module cpmlfdtd
                     dEz_dx = ( Ez(i+1,j) - Ez(i,j) )/dx
                     
                     memory_dEx_dz(i,j) = bcoef(i,j) * memory_dEx_dz(i,j) + acoef(i,j) * dEx_dz
-                    memory_dEz_dx(i,j) = bcoef(i,j) * memory_dEz_dx(i,j) + acoef(i,j) * dEz_dx
+                    memory_dEz_dx(i,j) = bcoef_half(i,j) * memory_dEz_dx(i,j) + acoef_half(i,j) * dEz_dx
                     
-                    dEz_dx = dEz_dx/ kappa(i,j) + memory_dEz_dx(i,j)
+                    dEz_dx = dEz_dx/ kappa_half(i,j) + memory_dEz_dx(i,j)
                     dEx_dz = dEx_dz/ kappa(i,j) + memory_dEx_dz(i,j)
                     
                     ! Now update the Magnetic field
                     Hy(i,j) = daHy*Hy(i,j) + dbHy*( dEz_dx - dEx_dz )
-                    velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
-
+                    ! velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
+                    
                 enddo  
             enddo
             !$omp end do 
@@ -1110,8 +1127,8 @@ module cpmlfdtd
             ! Electric field and update memory variables for C-PML
             ! Compute the differences in the y-direction
             !$omp do
-            do j = 2,nz-1
-                do i = 2,nx-1
+            do j = 2,nz
+                do i = 2,nx
                     dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
                     dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
                     
@@ -1126,14 +1143,61 @@ module cpmlfdtd
                 
                 enddo
             enddo
+            ! do j = 2, nz                          ! needs j-1
+            !     do i = 1, nx
+            !         dHy_dz = (Hy(i,j) - Hy(i,j-1)) / dz
+            !         memory_dHy_dz(i,j) = bcoef(i,j) * memory_dHy_dz(i,j) + acoef(i,j) * dHy_dz    ! FULL z
+            !         dHy_dz = dHy_dz / kappa(i,j) + memory_dHy_dz(i,j)
+
+            !         ! coupled Ex update (explicit σ-terms as in your code)
+            !         Ex(i,j) = Ex_old(i,j) + ( -aEx(i,j)*dHy_dz + bEx(i,j)*0d0 - dEx(i,j)*Ex_old(i,j) - eEx(i,j)*Ez_old(i,j) ) * dt
+            !     end do
+            ! end do
+
+            ! --- E_z update (uses ∂Hy/∂x → HALF x CPML) ---
+            ! do j = 1, nz
+            !     do i = 2, nx                        ! needs i-1
+            !         dHy_dx = (Hy(i,j) - Hy(i-1,j)) / dx
+            !         memory_dHy_dx(i,j) = bcoef_half(i,j) * memory_dHy_dx(i,j) + acoef_half(i,j) * dHy_dx   ! HALF x
+            !         dHy_dx = dHy_dx / kappa_half(i,j) + memory_dHy_dx(i,j)
+
+            !         Ez(i,j) = Ez_old(i,j) + ( -aEz(i,j)*0d0 + bEz(i,j)*dHy_dx - dEz(i,j)*Ex_old(i,j) - eEz(i,j)*Ez_old(i,j) ) * dt
+            !     end do
+            ! end do
+            
+            ! do j = 2,nz
+            !     do i = 1,nx
+            !         ! Update the Ex field
+            !         dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
+            !         memory_dHy_dz(i,j) = bcoef(i,j) * memory_dHy_dz(i,j) + acoef(i,j) * dHy_dz
+            !         dHy_dz = dHy_dz/kappa(i,j) + memory_dHy_dz(i,j)
+
+            !         ! Ex(i,j) = (( caEx(i,j) + caEx(i,j-1) )/2) * Ex(i,j) + &
+            !         !     (( cbEx(i,j) + cbEx(i,j-1) )/2 ) * value_dHy_dz
+            !         Ex(i,j) = caEx(i,j) * Ex(i,j) + cbEx(i,j) * dHy_dz
+            !     enddo
+            ! enddo
+
+            ! do j = 1,nz
+            !     do i = 2,nx
+            !         ! Update the Ez field
+            !         dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
+            !         memory_dHy_dx(i,j) = bcoef_half(i,j) * memory_dHy_dx(i,j) + acoef_half(i,j) * dHy_dx
+            !         dHy_dx = dHy_dx/kappa_half(i,j) + memory_dHy_dx(i,j)
+                    
+            !         ! Ez(i,j) = (( caEz(i,j) + caEz(i-1,j) )/2) * Ez(i,j) + &
+            !         !     (( cbEz(i,j) + cbEz(i-1,j) )/2) * value_dHy_dx 
+            !         Ez(i,j) = caEz(i,j) * Ez(i,j) + cbEz(i,j) * dHy_dx 
+            !     enddo
+            ! enddo
             !$omp end do 
             
             !$omp end parallel
             !----------------------------------------------------------------------------
             Ex(isource,jsource) = Ex(isource,jsource) + &
-                            srcx(it) * dt / eps11(isource,jsource)
+                            srcx(it) * dt / epsilon11(isource,jsource)
             Ez(isource,jsource) = Ez(isource,jsource) + &
-                            srcz(it) * dt / eps33(isource,jsource) 
+                            srcz(it) * dt / epsilon33(isource,jsource) 
             
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             Ex(1,:) = 0.d0

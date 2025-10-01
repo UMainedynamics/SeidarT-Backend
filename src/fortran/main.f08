@@ -23,7 +23,6 @@ program main
     character(len=256) :: arg
     character(len=256) :: input_json_file 
     logical :: seismic
-    logical :: seismoacoustic
     integer :: argc, i
     character(len=256) :: key, value, density_method
     
@@ -33,7 +32,7 @@ program main
 
      ! Check if the right number of arguments are provided
     if (argc < 1) then
-        print *, 'Usage: main <input.json> [seismic=<true|false>] [seismoacoustic=<true|false>]'
+        print *, 'Usage: main <input.json> [seismic=<true|false>]'
         stop
     end if
      
