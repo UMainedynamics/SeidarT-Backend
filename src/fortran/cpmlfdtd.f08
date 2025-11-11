@@ -37,8 +37,9 @@ module cpmlfdtd
 
         real(real64), allocatable :: kappa(:,:), alpha(:,:), acoef(:,:), bcoef(:,:)
         real(real64), allocatable :: kappa_half(:,:), alpha_half(:,:), acoef_half(:,:), bcoef_half(:,:) 
-        real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:)        
-        real(real64), allocatable :: srcx(:), srcz(:) ! The vector time series of the source
+        real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:) 
+        real(real64), allocatable :: srcx(:), srcz(:)       ! Velocity injection
+        real(real64), allocatable :: srcxx(:), srczz(:), srcxz(:) ! Stress injection
         
         ! Model variables
         real(real64), allocatable :: vx(:,:),vz(:,:),sigmaxx(:,:),sigmazz(:,:),sigmaxz(:,:)
@@ -84,6 +85,8 @@ module cpmlfdtd
                  kappa_half(nx,nz), alpha_half(nx,nz), acoef_half(nx,nz), bcoef_half(nx,nz) )
         allocate(gamma_x(nx, nz), gamma_z(nx, nz), gamma_xz(nx, nz))
         allocate(srcx(source%time_steps), srcz(source%time_steps))
+        allocate(srcxx(source%time_steps), srcxz(source%time_steps),srczz(source%time_steps))
+        
         
         ! Allocate more
         allocate(memory_dvx_dx1(nx, nz), memory_dvx_dz1(nx, nz))
@@ -117,8 +120,9 @@ module cpmlfdtd
     
         ! ================================ LOAD SOURCE =========================
     
-        call loadsource('seismicsourcex.dat', source%time_steps, srcx)
-        call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
+        call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
+        call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
         
         ! -----------------------------------------------------------------------------
         !--- define profile of absorption in PML region
@@ -289,11 +293,11 @@ module cpmlfdtd
             
             !$omp end parallel
             
-            ! Add the source term
-            ! sigmaxz(isource,jsource) = sigmaxz(isource, jsource) + srcxz(it) / rho(isource,jsource)  
-            ! sigmazz(isource,jsource) = sigmaxz(isource, jsource) + srczz(it) / rho(isource,jsource) 
-            ! vx(isource,jsource) = vx(isource,jsource) + srcx(it) * dt / rho(isource,jsource)
-            ! vz(isource,jsource) = vz(isource,jsource) + srcz(it) * dt / rho(isource,jsource)
+            ! Add the source term. If it is an accelerated weight drop the src_ij terms are zero
+            ! If it is any other source, the src_i terms are zero
+            sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
+            sigmaxz(isource,jsource) = sigmaxz(isource, jsource) + srcxz(it) / rho(isource,jsource)  
+            sigmazz(isource,jsource) = sigmaxz(isource, jsource) + srczz(it) / rho(isource,jsource) 
             vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
             vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
         
@@ -322,9 +326,9 @@ module cpmlfdtd
         
         deallocate(c11, c13, c15, c33, c35, c55, rho)
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
-        deallocate(gamma_x, gamma_z, gamma_xz, srcx, srcz)
-        
-        ! Allocate more
+        deallocate(gamma_x, gamma_z, gamma_xz, srcxx, srcxz, srczz)
+        deallocate(srcx, srcz)
+        deallocate(srcxx, srcxz, srczz)
         deallocate(memory_dvx_dx1, memory_dvx_dz1)
         deallocate(memory_dvz_dx1, memory_dvz_dz1)
         deallocate(memory_dvx_dx2, memory_dvx_dz2)
@@ -730,6 +734,7 @@ module cpmlfdtd
 
         ! Source arrays
         real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
+        real(real64), allocatable :: srcxx(:), srcxy(:), srcxz(:), srcyy(:), srcyz(:), srczz(:)
         
         real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), &
                         sigmaxx(:,:,:), sigmaxy(:,:,:), sigmaxz(:,:,:), &
@@ -796,7 +801,9 @@ module cpmlfdtd
         allocate(gamma_xy(nx, nz), gamma_yz(nx, nz), gamma_xz(nx, nz))
         
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
-                
+        allocate(srcxx(source%time_steps), srcxy(source%time_steps), srcxz(source%time_steps), &
+                 srcyy(source%time_steps), srcyz(source%time_steps), srczz(source%time_steps) )                
+        
         ! Allocate more
         allocate(memory_dvx_dx1(nx,ny,nz), memory_dvx_dy1(nx,ny,nz), memory_dvx_dz1(nx,ny,nz) )
         allocate(memory_dvy_dx1(nx,ny,nz), memory_dvy_dy1(nx,ny,nz), memory_dvy_dz1(nx,ny,nz) )
@@ -865,6 +872,13 @@ module cpmlfdtd
         call loadsource('seismicsourcex.dat', source%time_steps, srcx)
         call loadsource('seismicsourcey.dat', source%time_steps, srcy)
         call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        
+        call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
+        call loadsource('seismicsourcexy.dat', source%time_steps, srcxy)
+        call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
+        call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
+        call loadsource('seismicsourceyz.dat', source%time_steps, srcyz)
+        call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
 
         ! ==================================== PML ====================================
         ! Initialize PML 
@@ -1249,12 +1263,12 @@ module cpmlfdtd
                 enddo
             enddo
             
-            ! sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)  
-            ! sigmaxy(isource,jsource) = sigmaxy(isource, jsource) + srcxy(it) / rho(isource,jsource)
-            ! sigmaxz(isource,jsource) = sigmaxz(isource, jsource) + srcxz(it) / rho(isource,jsource)  
-            ! sigmayy(isource,jsource) = sigmayy(isource, jsource) + srcyy(it) / rho(isource,jsource)
-            ! sigmayz(isource,jsource) = sigmayz(isource, jsource) + srcyz(it) / rho(isource,jsource)  
-            ! sigmazz(isource,jsource) = sigmazz(isource, jsource) + srczz(it) / rho(isource,jsource)
+            sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource)  
+            sigmaxy(isource,jsource,ksource) = sigmaxy(isource,jsource,ksource) + srcxy(it) / rho(isource,jsource)
+            sigmaxz(isource,jsource,ksource) = sigmaxz(isource,jsource,ksource) + srcxz(it) / rho(isource,jsource)  
+            sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,jsource)
+            sigmayz(isource,jsource,ksource) = sigmayz(isource,jsource,ksource) + srcyz(it) / rho(isource,jsource)  
+            sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,jsource)
             vx(isource,jsource,ksource) = vx(isource,jsource,ksource) + &
                     srcx(it) * dt / rho(isource,ksource)
             vy(isource,jsource,ksource) = vy(isource,jsource,ksource) + &
@@ -1315,6 +1329,7 @@ module cpmlfdtd
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
         deallocate(gamma_x, gamma_y, gamma_z, gamma_xy, gamma_yz, gamma_xz)
         deallocate(srcx, srcy, srcz)
+        deallocate(srcxx, srcyy, srczz, srcxz, srcxy, srcyz)
         deallocate(memory_dvx_dx1, memory_dvx_dy1, memory_dvx_dz1 )
         deallocate(memory_dvy_dx1, memory_dvy_dy1, memory_dvy_dz1 )
         deallocate(memory_dvz_dx1, memory_dvz_dy1, memory_dvz_dz1 )
