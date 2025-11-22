@@ -55,6 +55,7 @@ module seidartio
         call json%get('Seismic.Source.source_frequency', seismic_source%source_frequency)
         call json%get('Seismic.Source.x-z_rotation', seismic_source%x_z_rotation)
         call json%get('Seismic.Source.x-y_rotation', seismic_source%x_y_rotation)
+        call json%get('Seismic.Source.y-z_rotation', seismic_source%y_z_rotation)
         call json%get('Seismic.Source.amplitude', seismic_source%amplitude)
         ! call json%get('Seismic.Source.source_type', seismic_source%source_type)
         call json%get('Seismic.Source.dt', seismic_source%dt)
@@ -62,6 +63,8 @@ module seidartio
         
         call json%get('Seismic.Source.source_type', temp_string)
         seismic_source%source_type = trim(adjustl(temp_string))
+        call json%get('Seismic.Source.source_wavelet', temp_string)
+        seismic_source%source_wavelet = trim(adjustl(temp_string))
         
         ! Parse the EM Source
         call json%get('Electromagnetic.Source.x', electromagnetic_source%x)
@@ -73,6 +76,7 @@ module seidartio
         call json%get('Electromagnetic.Source.source_frequency', electromagnetic_source%source_frequency)
         call json%get('Electromagnetic.Source.x-z_rotation', electromagnetic_source%x_z_rotation)
         call json%get('Electromagnetic.Source.x-y_rotation', electromagnetic_source%x_y_rotation)
+        call json%get('Electromagnetic.Source.y-z_rotation', electromagnetic_source%y_z_rotation)
         call json%get('Electromagnetic.Source.amplitude', electromagnetic_source%amplitude)
         ! call json%get('Electromagnetic.Source.source_type', electromagnetic_source%source_type)
         call json%get('Electromagnetic.Source.dt', electromagnetic_source%dt)

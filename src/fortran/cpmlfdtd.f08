@@ -119,10 +119,20 @@ module cpmlfdtd
         jsource = source%zind + domain%cpml
     
         ! ================================ LOAD SOURCE =========================
-    
-        call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
-        call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
-        call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
+        srcxx(:) = 0.0_real64
+        srcxz(:) = 0.0_real64
+        srczz(:) = 0.0_real64
+        srcx(:) = 0.0_real64
+        srcz(:) = 0.0_real64
+        
+        if ( source%source_type == 'ac') then 
+            call loadsource('seismicsourcex.dat', source%time_steps, srcx)
+            call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        else
+            call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
+            call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
+            call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
+        endif 
         
         ! -----------------------------------------------------------------------------
         !--- define profile of absorption in PML region
@@ -296,10 +306,10 @@ module cpmlfdtd
             ! Add the source term. If it is an accelerated weight drop the src_ij terms are zero
             ! If it is any other source, the src_i terms are zero
             sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
-            sigmaxz(isource,jsource) = sigmaxz(isource, jsource) + srcxz(it) / rho(isource,jsource)  
+            sigmaxz(isource+1,jsource+1) = sigmaxz(isource+1, jsource+1) + srcxz(it) / rho(isource+1,jsource+1)  
             sigmazz(isource,jsource) = sigmaxz(isource, jsource) + srczz(it) / rho(isource,jsource) 
-            vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
-            vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
+            vx(isource+1,jsource) = vx(isource+1,jsource) + srcx(it) / rho(isource+1,jsource)
+            vz(isource,jsource+1) = vz(isource,jsource+1) + srcz(it) / rho(isource,jsource+1)
         
             ! Dirichlet conditions (rigid boundaries) on the edges or at the 
             ! bottom of the PML layers
@@ -868,18 +878,29 @@ module cpmlfdtd
         ksource = source%zind + domain%cpml
 
         ! ================================ LOAD SOURCE ================================
-
-        call loadsource('seismicsourcex.dat', source%time_steps, srcx)
-        call loadsource('seismicsourcey.dat', source%time_steps, srcy)
-        call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        srcxx(:) = 0.0_real64
+        srcxy(:) = 0.0_real64
+        srcxz(:) = 0.0_real64
+        srcyy(:) = 0.0_real64
+        srcyz(:) = 0.0_real64
+        srczz(:) = 0.0_real64
+        srcx(:) = 0.0_real64
+        srcy(:) = 0.0_real64
+        srcz(:) = 0.0_real64
         
-        call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
-        call loadsource('seismicsourcexy.dat', source%time_steps, srcxy)
-        call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
-        call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
-        call loadsource('seismicsourceyz.dat', source%time_steps, srcyz)
-        call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
-
+        if ( source%source_type == 'ac') then 
+            call loadsource('seismicsourcex.dat', source%time_steps, srcx)
+            call loadsource('seismicsourcey.dat', source%time_steps, srcy)
+            call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        else
+            call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
+            call loadsource('seismicsourcexy.dat', source%time_steps, srcxy)
+            call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
+            call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
+            call loadsource('seismicsourceyz.dat', source%time_steps, srcyz)
+            call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
+        endif 
+        
         ! ==================================== PML ====================================
         ! Initialize PML 
         kappa(:,:) = 1.0_real64
@@ -1264,17 +1285,17 @@ module cpmlfdtd
             enddo
             
             sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource)  
-            sigmaxy(isource,jsource,ksource) = sigmaxy(isource,jsource,ksource) + srcxy(it) / rho(isource,jsource)
-            sigmaxz(isource,jsource,ksource) = sigmaxz(isource,jsource,ksource) + srcxz(it) / rho(isource,jsource)  
+            sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource+1)
+            sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource)  
             sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,jsource)
-            sigmayz(isource,jsource,ksource) = sigmayz(isource,jsource,ksource) + srcyz(it) / rho(isource,jsource)  
+            sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,jsource+1)  
             sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,jsource)
-            vx(isource,jsource,ksource) = vx(isource,jsource,ksource) + &
-                    srcx(it) * dt / rho(isource,ksource)
-            vy(isource,jsource,ksource) = vy(isource,jsource,ksource) + &
+            vx(isource+1,jsource,ksource) = vx(isource+1,jsource,ksource) + &
+                    srcx(it) * dt / rho(isource+1,ksource)
+            vy(isource,jsource+1,ksource) = vy(isource,jsource+1,ksource) + &
                     srcy(it) * dt / rho(isource,ksource)
-            vz(isource,jsource,ksource) = vz(isource,jsource,ksource) + &
-                    srcz(it) * dt / rho(isource,ksource)
+            vz(isource,jsource,ksource+1) = vz(isource,jsource,ksource+1) + &
+                    srcz(it) * dt / rho(isource,ksource+1)
 
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             vx(1,:,:) = 0.0_real64

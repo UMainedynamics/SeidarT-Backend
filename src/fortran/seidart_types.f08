@@ -26,10 +26,10 @@ module seidart_types
         real(real64) :: x, y, z
         integer :: xind, yind, zind
         real(real64) :: source_frequency
-        real(real64) :: x_z_rotation, x_y_rotation
+        real(real64) :: x_z_rotation, x_y_rotation, y_z_rotation
         real(real64) :: amplitude
         character(len=:), allocatable :: source_type
-        ! character(len=5) :: source_type
+        character(len=:), allocatable :: source_wavelet
     end type Source_Type
     
     ! Seismic attenuation properties
