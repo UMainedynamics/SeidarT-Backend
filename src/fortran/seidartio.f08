@@ -155,6 +155,23 @@ module seidartio
     end subroutine loadsource
     
     ! --------------------------------------------------------------------------
+    subroutine write_array(filename, length, array)
+        
+        implicit none
+        
+        character(len=*) :: filename
+        integer :: length
+        real(real64),dimension(length) :: array
+        integer :: unit_number
+        
+        open(newunit=unit_number, form="unformatted", file = trim(filename))
+        
+        write(unit_number) array
+        close(unit_number)
+
+    end subroutine write_array
+    
+    ! --------------------------------------------------------------------------
     subroutine material_rw(filename, image_data, readfile)
 
         implicit none

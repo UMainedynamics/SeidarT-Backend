@@ -711,10 +711,10 @@ module cpmlfdtd
         ! Local variables
         real(real64) :: rhoxx, rhoyx, rhozx, &
                         rhoxy, rhoyy, rhozy, &
-                        rhoxz, rhoyz, rhozz, &
-                        velocnorm
-
+                        rhoxz, rhoyz, rhozz
         
+        real(real64), allocatable :: velocnorm(:), stressnorm(:)
+
         real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c14(:,:), c15(:,:), c16(:,:), &
                                     c22(:,:), c23(:,:), c24(:,:), c25(:,:), c26(:,:), &
                                     c33(:,:), c34(:,:), c35(:,:), c36(:,:), &
@@ -809,6 +809,8 @@ module cpmlfdtd
                 kappa_half(nx, nz), alpha_half(nx, nz), acoef_half(nx, nz), bcoef_half(nx, nz))
         allocate(gamma_x(nx, nz), gamma_y(nx, nz), gamma_z(nx, nz))
         allocate(gamma_xy(nx, nz), gamma_yz(nx, nz), gamma_xz(nx, nz))
+        
+        allocate(velocnorm(source%time_steps), stressnorm(source%time_steps))
         
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         allocate(srcxx(source%time_steps), srcxy(source%time_steps), srcxz(source%time_steps), &
@@ -992,7 +994,10 @@ module cpmlfdtd
         memory_dsigmaxz_dz(:,:,:) = 0.0_real64
         memory_dsigmayz_dy(:,:,:) = 0.0_real64
         memory_dsigmayz_dz(:,:,:) = 0.0_real64
-
+        
+        ! Initialize velocnorm and stressnorm 
+        velocnorm(:) = 0.0_real64
+        stressnorm(:) = 0.0_real64 
         ! Do it 
         
         ! =============================== Forward Model ===============================
@@ -1323,12 +1328,15 @@ module cpmlfdtd
             vz(:,:,nz) = 0.0_real64
 
             ! check norm of velocity to make sure the solution isn't diverging
-            velocnorm = maxval( sqrt(vx**2 + vy**2 + vz**2) )
+            velocnorm(it) = maxval( sqrt(vx**2 + vy**2 + vz**2) )
+            stressnorm(it) = maxval( &
+                        sqrt(sigmaxx**2 + sigmayy**2 + sigmazz**2 + &
+                        2.0_real64*(sigmaxy**2 + sigmayz**2 + sigmaxz**2) ) )
             ! print *,'Time step # ',it,' out of ',time_step
             ! print *,'Time: ',(it-1)*DT,' seconds'
             ! print *,'Max vals for vx, vy, vz: ', maxval(vx), maxval(vy), maxval(vz)
 
-            if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
+            if (velocnorm(it) > stability_threshold) stop 'code became unstable and blew up'
 
             ! Write the velocity values to an unformatted binary file
             call write_image3(vx, nx, ny, nz, source, it, 'Vx', SINGLE)
@@ -1344,11 +1352,15 @@ module cpmlfdtd
 
         enddo   ! end of time loop
         
+        call write_array('velocity_norm.dat', source%time_steps, velocnorm )
+        call write_array('stress_norm.dat', source%time_steps, stressnorm )
+        
         deallocate(c11, c12, c13, c14, c15, c16, c22, c23, c24, c25, c26, &
                     c33, c34, c35, c36, c44, c45, c46, c55, c56, c66 )
         deallocate(rho)
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
         deallocate(gamma_x, gamma_y, gamma_z, gamma_xy, gamma_yz, gamma_xz)
+        deallocate(velocnorm, stressnorm)
         deallocate(srcx, srcy, srcz)
         deallocate(srcxx, srcyy, srczz, srcxz, srcxy, srcyz)
         deallocate(memory_dvx_dx1, memory_dvx_dy1, memory_dvx_dz1 )
@@ -1429,8 +1441,8 @@ module cpmlfdtd
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
         
-        real(real64) :: m11,m12,m21,m22,n11,n12,n21,n22,detM
-        real(real64) :: rhs1,rhs2, exn, ezn, exnp1, eznp1
+        ! real(real64) :: m11,m12,m21,m22,n11,n12,n21,n22,detM
+        ! real(real64) :: rhs1,rhs2, exn, ezn, exnp1, eznp1
 
         ! Check if SINGLE_OUTPUT is provided, default to single precision if not
         if (present(SINGLE_OUTPUT)) then
