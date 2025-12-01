@@ -1,7 +1,7 @@
 module seidartio 
 
     use iso_fortran_env, only: real64, real32
-    use json_module
+    use json_module 
     use seidart_types 
     
     implicit none 
@@ -9,10 +9,8 @@ module seidartio
     public :: parse_json
     
     ! private :: 
-    
     ! ---------------------------- Declarations --------------------------------
-    
-    
+
     ! --------------------- Subroutine Definitions -----------------------------
     contains 
     
@@ -433,5 +431,3 @@ module seidartio
     end subroutine loadcpml
 
 end module seidartio
-    
-    
