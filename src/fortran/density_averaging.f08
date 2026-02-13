@@ -17,6 +17,8 @@ contains
       r = 0.5d0*(a + b)
     case (4) !'none'
       r = a    ! sentinel—means “use deltarho fallback”
+    case default 
+      error stop "face_density in density_averaging.f08: invalid code"
     end select
   end function face_density
 

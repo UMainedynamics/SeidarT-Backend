@@ -1975,7 +1975,7 @@ module cpmlfdtd
         allocate(c11(nx, ny, nz), c12(nx, ny, nz), c13(nx, ny, nz), &
                  c22(nx, ny, nz), c23(nx, ny, nz), c33(nx, ny, nz), &
                  c44(nx, ny, nz), c55(nx, ny, nz), c66(nx, ny, nz) )
-        allocate(rho(nx,nz))
+        allocate(rho(nx,ny,nz))
                 
         allocate(kappa(nx, ny, nz), alpha(nx, ny, nz), acoef(nx, ny, nz), bcoef(nx, ny, nz), &
                 kappa_half(nx, ny, nz), alpha_half(nx, ny, nz), acoef_half(nx, ny, nz), bcoef_half(nx, ny, nz))
@@ -2004,24 +2004,24 @@ module cpmlfdtd
                 
         
         ! ------------------------ Load Stiffness Coefficients ------------------------
-            call material_rw2('c11.dat', c11, .TRUE.)
-            call material_rw2('c12.dat', c12, .TRUE.)
-            call material_rw2('c13.dat', c13, .TRUE.)
-            call material_rw2('c22.dat', c22, .TRUE.)
-            call material_rw2('c23.dat', c23, .TRUE.)
-            call material_rw2('c33.dat', c33, .TRUE.)
-            call material_rw2('c44.dat', c44, .TRUE.)
-            call material_rw2('c55.dat', c55, .TRUE.)
-            call material_rw2('c66.dat', c66, .TRUE.)
-            call material_rw2('rho.dat', rho, .TRUE.)
+            call material_rw3('c11.dat', c11, .TRUE.)
+            call material_rw3('c12.dat', c12, .TRUE.)
+            call material_rw3('c13.dat', c13, .TRUE.)
+            call material_rw3('c22.dat', c22, .TRUE.)
+            call material_rw3('c23.dat', c23, .TRUE.)
+            call material_rw3('c33.dat', c33, .TRUE.)
+            call material_rw3('c44.dat', c44, .TRUE.)
+            call material_rw3('c55.dat', c55, .TRUE.)
+            call material_rw3('c66.dat', c66, .TRUE.)
+            call material_rw3('rho.dat', rho, .TRUE.)
         
         ! ------------------- Load Attenuation Coefficients --------------------
-            call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
-            call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
-            call material_rw2('gamma_y.dat', gamma_y, .TRUE.)
-            call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
-            call material_rw2('gamma_yz.dat', gamma_yz, .TRUE.)
-            call material_rw2('gamma_xy.dat', gamma_xy, .TRUE.)
+            call material_rw3('gamma_x.dat', gamma_x, .TRUE.)
+            call material_rw3('gamma_z.dat', gamma_z, .TRUE.)
+            call material_rw3('gamma_y.dat', gamma_y, .TRUE.)
+            call material_rw3('gamma_xz.dat', gamma_xz, .TRUE.)
+            call material_rw3('gamma_yz.dat', gamma_yz, .TRUE.)
+            call material_rw3('gamma_xy.dat', gamma_xy, .TRUE.)
         ! ------------------------ Assign some constants -----------------------
         isource = source%xind + domain%cpml
         jsource = source%yind + domain%cpml
@@ -2061,15 +2061,15 @@ module cpmlfdtd
         acoef_half(:,:,:) = 0.0_real64
 
         ! ------------------------- Boundary Conditions -------------------------
-        call material_rw2('kappa_cpml.dat', kappa, .TRUE.)
-        call material_rw2('alpha_cpml.dat', alpha, .TRUE.)
-        call material_rw2('acoef_cpml.dat', acoef, .TRUE.)
-        call material_rw2('bcoef_cpml.dat', bcoef, .TRUE.)
+        call material_rw3('kappa_cpml.dat', kappa, .TRUE.)
+        call material_rw3('alpha_cpml.dat', alpha, .TRUE.)
+        call material_rw3('acoef_cpml.dat', acoef, .TRUE.)
+        call material_rw3('bcoef_cpml.dat', bcoef, .TRUE.)
 
-        call material_rw2('kappa_half_cpml.dat', kappa_half, .TRUE.)
-        call material_rw2('alpha_half_cpml.dat', alpha_half, .TRUE.)
-        call material_rw2('acoef_half_cpml.dat', acoef_half, .TRUE.)
-        call material_rw2('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
+        call material_rw3('kappa_half_cpml.dat', kappa_half, .TRUE.)
+        call material_rw3('alpha_half_cpml.dat', alpha_half, .TRUE.)
+        call material_rw3('acoef_half_cpml.dat', acoef_half, .TRUE.)
+        call material_rw3('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
 
         ! Load initial condition
         call material_rw3('initialconditionVx.dat', vx, .TRUE.)
@@ -2495,7 +2495,7 @@ module cpmlfdtd
                                                        c44(nx,ny,nz), c45(nx,ny,nz), c46(nx, ny, nz), &
                                                                    c55(nx,ny,nz), c56(nx, ny, nz), &
                                                                                c66(nx, ny, nz) )
-        allocate(rho(nx,nz))
+        allocate(rho(nx,ny,nz))
                 
         allocate(kappa(nx, ny, nz), alpha(nx, ny, nz), acoef(nx, ny, nz), bcoef(nx, ny, nz), &
                 kappa_half(nx, ny, nz), alpha_half(nx, ny, nz), acoef_half(nx, ny, nz), bcoef_half(nx, ny, nz))
@@ -2535,36 +2535,36 @@ module cpmlfdtd
         allocate(sigmayy(nx, ny, nz), sigmayz(nx, ny, nz), sigmazz(nx, ny, nz))        
         
         ! ------------------------ Load Stiffness Coefficients ------------------------
-        call material_rw2('c11.dat', c11, .TRUE.)
-        call material_rw2('c12.dat', c12, .TRUE.)
-        call material_rw2('c13.dat', c13, .TRUE.)
-        call material_rw2('c14.dat', c14, .TRUE.)
-        call material_rw2('c15.dat', c15, .TRUE.)
-        call material_rw2('c16.dat', c16, .TRUE.)
-        call material_rw2('c22.dat', c22, .TRUE.)
-        call material_rw2('c23.dat', c23, .TRUE.)
-        call material_rw2('c24.dat', c24, .TRUE.)
-        call material_rw2('c25.dat', c25, .TRUE.)
-        call material_rw2('c26.dat', c26, .TRUE.)
-        call material_rw2('c33.dat', c33, .TRUE.)
-        call material_rw2('c34.dat', c34, .TRUE.)
-        call material_rw2('c35.dat', c35, .TRUE.)
-        call material_rw2('c36.dat', c36, .TRUE.)
-        call material_rw2('c44.dat', c44, .TRUE.)
-        call material_rw2('c45.dat', c45, .TRUE.)
-        call material_rw2('c46.dat', c46, .TRUE.)
-        call material_rw2('c55.dat', c55, .TRUE.)
-        call material_rw2('c56.dat', c56, .TRUE.)
-        call material_rw2('c66.dat', c66, .TRUE.)
-        call material_rw2('rho.dat', rho, .TRUE.)
+        call material_rw3('c11.dat', c11, .TRUE.)
+        call material_rw3('c12.dat', c12, .TRUE.)
+        call material_rw3('c13.dat', c13, .TRUE.)
+        call material_rw3('c14.dat', c14, .TRUE.)
+        call material_rw3('c15.dat', c15, .TRUE.)
+        call material_rw3('c16.dat', c16, .TRUE.)
+        call material_rw3('c22.dat', c22, .TRUE.)
+        call material_rw3('c23.dat', c23, .TRUE.)
+        call material_rw3('c24.dat', c24, .TRUE.)
+        call material_rw3('c25.dat', c25, .TRUE.)
+        call material_rw3('c26.dat', c26, .TRUE.)
+        call material_rw3('c33.dat', c33, .TRUE.)
+        call material_rw3('c34.dat', c34, .TRUE.)
+        call material_rw3('c35.dat', c35, .TRUE.)
+        call material_rw3('c36.dat', c36, .TRUE.)
+        call material_rw3('c44.dat', c44, .TRUE.)
+        call material_rw3('c45.dat', c45, .TRUE.)
+        call material_rw3('c46.dat', c46, .TRUE.)
+        call material_rw3('c55.dat', c55, .TRUE.)
+        call material_rw3('c56.dat', c56, .TRUE.)
+        call material_rw3('c66.dat', c66, .TRUE.)
+        call material_rw3('rho.dat', rho, .TRUE.)
             
         ! ------------------- Load Attenuation Coefficients --------------------
-        call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
-        call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
-        call material_rw2('gamma_y.dat', gamma_y, .TRUE.)
-        call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
-        call material_rw2('gamma_yz.dat', gamma_yz, .TRUE.)
-        call material_rw2('gamma_xy.dat', gamma_xy, .TRUE.)
+        call material_rw3('gamma_x.dat', gamma_x, .TRUE.)
+        call material_rw3('gamma_z.dat', gamma_z, .TRUE.)
+        call material_rw3('gamma_y.dat', gamma_y, .TRUE.)
+        call material_rw3('gamma_xz.dat', gamma_xz, .TRUE.)
+        call material_rw3('gamma_yz.dat', gamma_yz, .TRUE.)
+        call material_rw3('gamma_xy.dat', gamma_xy, .TRUE.)
     
         ! ------------------------ Assign some constants -----------------------
         isource = source%xind + domain%cpml
@@ -2605,15 +2605,15 @@ module cpmlfdtd
         acoef_half(:,:,:) = 0.0_real64
 
         ! ------------------------- Boundary Conditions -------------------------
-        call material_rw2('kappa_cpml.dat', kappa, .TRUE.)
-        call material_rw2('alpha_cpml.dat', alpha, .TRUE.)
-        call material_rw2('acoef_cpml.dat', acoef, .TRUE.)
-        call material_rw2('bcoef_cpml.dat', bcoef, .TRUE.)
+        call material_rw3('kappa_cpml.dat', kappa, .TRUE.)
+        call material_rw3('alpha_cpml.dat', alpha, .TRUE.)
+        call material_rw3('acoef_cpml.dat', acoef, .TRUE.)
+        call material_rw3('bcoef_cpml.dat', bcoef, .TRUE.)
 
-        call material_rw2('kappa_half_cpml.dat', kappa_half, .TRUE.)
-        call material_rw2('alpha_half_cpml.dat', alpha_half, .TRUE.)
-        call material_rw2('acoef_half_cpml.dat', acoef_half, .TRUE.)
-        call material_rw2('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
+        call material_rw3('kappa_half_cpml.dat', kappa_half, .TRUE.)
+        call material_rw3('alpha_half_cpml.dat', alpha_half, .TRUE.)
+        call material_rw3('acoef_half_cpml.dat', acoef_half, .TRUE.)
+        call material_rw3('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
 
         ! Load initial condition
         call material_rw3('initialconditionVx.dat', vx, .TRUE.)
@@ -2887,7 +2887,7 @@ module cpmlfdtd
                         dvy_dz = dvy_dz / kappa_half(i,j,k) + memory_dvy_dz4(i,j,k)
 
                         sigmayz(i,j,k) = ( sigmayz(i,j,k)  + &
-                            (   c14(i,k) * dvx_dx + c24(i,j,k) * dvy_dy + c34(i,j,k) * dvz_dz + &
+                            (   c14(i,j,k) * dvx_dx + c24(i,j,k) * dvy_dy + c34(i,j,k) * dvz_dz + &
                                 c44(i,j,k) * ( dvy_dz + dvz_dy) + c45(i,j,k) * ( dvx_dz + dvz_dx) + &
                                 c46(i,j,k) * ( dvy_dx + dvx_dy) ) * dt  ) / & 
                                     (1 + gamma_yz(i,j,k) * dt )
@@ -2911,13 +2911,13 @@ module cpmlfdtd
                         dsigmaxy_dy = (27.0_real64*sigmaxy(i,j,k) - 27.0_real64*sigmaxy(i,j-1,k) + sigmaxy(i,j-2,k)) / (24.0_real64*dy)
                         dsigmaxz_dz = (27.0_real64*sigmaxz(i,j,k) - 27.0_real64*sigmaxz(i,j,k-1) + sigmaxz(i,j,k-2)) / (24.0_real64*dz)
                         
-                        memory_dsigmaxx_dx(i,j,k) = bcoef_half(i,k) * memory_dsigmaxx_dx(i,j,k) + acoef_half(i,k) * dsigmaxx_dx
-                        memory_dsigmaxy_dy(i,j,k) = bcoef_half(i,k) * memory_dsigmaxy_dy(i,j,k) + acoef_half(i,k) * dsigmaxy_dy
-                        memory_dsigmaxz_dz(i,j,k) = bcoef_half(i,k) * memory_dsigmaxz_dz(i,j,k) + acoef_half(i,k) * dsigmaxz_dz
+                        memory_dsigmaxx_dx(i,j,k) = bcoef_half(i,j,k) * memory_dsigmaxx_dx(i,j,k) + acoef_half(i,j,k) * dsigmaxx_dx
+                        memory_dsigmaxy_dy(i,j,k) = bcoef_half(i,j,k) * memory_dsigmaxy_dy(i,j,k) + acoef_half(i,j,k) * dsigmaxy_dy
+                        memory_dsigmaxz_dz(i,j,k) = bcoef_half(i,j,k) * memory_dsigmaxz_dz(i,j,k) + acoef_half(i,j,k) * dsigmaxz_dz
 
-                        dsigmaxx_dx = dsigmaxx_dx / kappa_half(i,k) + memory_dsigmaxx_dx(i,j,k)
-                        dsigmaxy_dy = dsigmaxy_dy / kappa_half(i,k) + memory_dsigmaxy_dy(i,j,k)
-                        dsigmaxz_dz = dsigmaxz_dz / kappa_half(i,k) + memory_dsigmaxz_dz(i,j,k) 
+                        dsigmaxx_dx = dsigmaxx_dx / kappa_half(i,j,k) + memory_dsigmaxx_dx(i,j,k)
+                        dsigmaxy_dy = dsigmaxy_dy / kappa_half(i,j,k) + memory_dsigmaxy_dy(i,j,k)
+                        dsigmaxz_dz = dsigmaxz_dz / kappa_half(i,j,k) + memory_dsigmaxz_dz(i,j,k) 
 
                         vx(i,j,k) = vx(i,j,k) + &
                             (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoyx + dsigmaxz_dz/rhozx) * dt 
@@ -3956,19 +3956,19 @@ module cpmlfdtd
         
         ! ------------------------ Load Permittivity Coefficients ------------------------
         ! Load Epsilon
-        call material_rw2('e11.dat', eps11, .TRUE.)
-        call material_rw2('e12.dat', eps12, .TRUE.)
-        call material_rw2('e13.dat', eps13, .TRUE.)
-        call material_rw2('e22.dat', eps22, .TRUE.)
-        call material_rw2('e23.dat', eps23, .TRUE.)
-        call material_rw2('e33.dat', eps33, .TRUE.)
+        call material_rw3('e11.dat', eps11, .TRUE.)
+        call material_rw3('e12.dat', eps12, .TRUE.)
+        call material_rw3('e13.dat', eps13, .TRUE.)
+        call material_rw3('e22.dat', eps22, .TRUE.)
+        call material_rw3('e23.dat', eps23, .TRUE.)
+        call material_rw3('e33.dat', eps33, .TRUE.)
         ! Load Sigma
-        call material_rw2('s11.dat', sig11, .TRUE.)
-        call material_rw2('s12.dat', sig12, .TRUE.)
-        call material_rw2('s13.dat', sig13, .TRUE.)
-        call material_rw2('s22.dat', sig22, .TRUE.)
-        call material_rw2('s23.dat', sig23, .TRUE.)
-        call material_rw2('s33.dat', sig33, .TRUE.)
+        call material_rw3('s11.dat', sig11, .TRUE.)
+        call material_rw3('s12.dat', sig12, .TRUE.)
+        call material_rw3('s13.dat', sig13, .TRUE.)
+        call material_rw3('s22.dat', sig22, .TRUE.)
+        call material_rw3('s23.dat', sig23, .TRUE.)
+        call material_rw3('s33.dat', sig33, .TRUE.)
 
         ! ------------------------ Assign some constants -----------------------
         ! Assign the source location indices
@@ -4018,16 +4018,16 @@ module cpmlfdtd
 
 
         ! ------------------------------ Load the boundary ----------------------------
-        call material_rw2('kappa_cpml.dat', kappa, .TRUE.)
-        call material_rw2('alpha_cpml.dat', alpha, .TRUE.)
-        call material_rw2('acoef_cpml.dat', acoef, .TRUE.)
-        call material_rw2('bcoef_cpml.dat', bcoef, .TRUE.)
+        call material_rw3('kappa_cpml.dat', kappa, .TRUE.)
+        call material_rw3('alpha_cpml.dat', alpha, .TRUE.)
+        call material_rw3('acoef_cpml.dat', acoef, .TRUE.)
+        call material_rw3('bcoef_cpml.dat', bcoef, .TRUE.)
 
 
-        call material_rw2('kappa_half_cpml.dat', kappa_half, .TRUE.)
-        call material_rw2('alpha_half_cpml.dat', alpha_half, .TRUE.)
-        call material_rw2('acoef_half_cpml.dat', acoef_half, .TRUE.)
-        call material_rw2('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
+        call material_rw3('kappa_half_cpml.dat', kappa_half, .TRUE.)
+        call material_rw3('alpha_half_cpml.dat', alpha_half, .TRUE.)
+        call material_rw3('acoef_half_cpml.dat', acoef_half, .TRUE.)
+        call material_rw3('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
 
         ! -----------------------------------------------------------------------------
         ! Load initial conditions
@@ -4167,10 +4167,10 @@ module cpmlfdtd
                         
                         memory_dHz_dy(i,j,k) = bcoef_half(i,j,k) * memory_dHz_dy(i,j,k) + acoef_half(i,j,k) * dHz_dy
                         memory_dHy_dz(i,j,k) = bcoef(i,j,k) * memory_dHy_dz(i,j,k) + acoef(i,j,k) * dHy_dz
-                        memory_dHz_dx(i,j,k) = bcoef_half(i,k) * memory_dHz_dx(i,j,k) + acoef_half(i,j,k) * dHz_dx
-                        memory_dHx_dz(i,j,k) = bcoef_half(i,k) * memory_dHx_dz(i,j,k) + acoef_half(i,j,k) * dHx_dz
-                        memory_dHx_dy(i,j,k) = bcoef_half(i,k) * memory_dHx_dy(i,j,k) + acoef_half(i,j,k) * dHx_dy
-                        memory_dHy_dx(i,j,k) = bcoef_half(i,k) * memory_dHy_dx(i,j,k) + acoef_half(i,j,k) * dHy_dx
+                        memory_dHz_dx(i,j,k) = bcoef_half(i,j,k) * memory_dHz_dx(i,j,k) + acoef_half(i,j,k) * dHz_dx
+                        memory_dHx_dz(i,j,k) = bcoef_half(i,j,k) * memory_dHx_dz(i,j,k) + acoef_half(i,j,k) * dHx_dz
+                        memory_dHx_dy(i,j,k) = bcoef_half(i,j,k) * memory_dHx_dy(i,j,k) + acoef_half(i,j,k) * dHx_dy
+                        memory_dHy_dx(i,j,k) = bcoef_half(i,j,k) * memory_dHy_dx(i,j,k) + acoef_half(i,j,k) * dHy_dx
                         
                         dHz_dy = dHz_dy/kappa_half(i,j,k) + memory_dHz_dy(i,j,k)
                         dHy_dz = dHy_dz/kappa(i,j,k) + memory_dHy_dz(i,j,k)
@@ -4179,9 +4179,9 @@ module cpmlfdtd
                         dHx_dy = dHx_dy/kappa_half(i,j,k) + memory_dHx_dy(i,j,k)
                         dHy_dx = dHy_dx/kappa_half(i,j,k) + memory_dHy_dx(i,j,k)
                         
-                        rhs_x = dHz_dy - dHy_dz - (sig11(i,j,k) * Ex_old(i,j,k) + sig12(i,k)*Ey_old(i,j,k) + sig13(i,k) * Ez_old(i,j,k))
-                        rhs_y = dHx_dz - dHz_dx - (sig12(i,j,k) * Ex_old(i,j,k) + sig22(i,k)*Ey_old(i,j,k) + sig23(i,k) * Ez_old(i,j,k))
-                        rhs_z = dHy_dx - dHx_dy - (sig13(i,j,k) * Ex_old(i,j,k) + sig23(i,k)*Ey_old(i,j,k) + sig33(i,k) * Ez_old(i,j,k))
+                        rhs_x = dHz_dy - dHy_dz - (sig11(i,j,k) * Ex_old(i,j,k) + sig12(i,j,k)*Ey_old(i,j,k) + sig13(i,j,k) * Ez_old(i,j,k))
+                        rhs_y = dHx_dz - dHz_dx - (sig12(i,j,k) * Ex_old(i,j,k) + sig22(i,j,k)*Ey_old(i,j,k) + sig23(i,j,k) * Ez_old(i,j,k))
+                        rhs_z = dHy_dx - dHx_dy - (sig13(i,j,k) * Ex_old(i,j,k) + sig23(i,j,k)*Ey_old(i,j,k) + sig33(i,j,k) * Ez_old(i,j,k))
                         
                         Ex(i,j,k) = Ex_old(i,j,k) + ( aEx(i,j,k) * rhs_x + bEx(i,j,k) * rhs_y + cEx(i,j,k) * rhs_z ) * dt
                         Ey(i,j,k) = Ey_old(i,j,k) + ( aEy(i,j,k) * rhs_x + bEy(i,j,k) * rhs_y + cEy(i,j,k) * rhs_z ) * dt
@@ -4192,11 +4192,11 @@ module cpmlfdtd
 
             ! add the source (force vector located at a given grid point)
             Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
-                        srcx(it) * dt / eps11(isource,ksource)
+                        srcx(it) * dt / eps11(isource,jsource,ksource)
             Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
-                        srcy(it) * dt / eps22(isource,ksource) 
+                        srcy(it) * dt / eps22(isource,jsource,ksource) 
             Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
-                        srcz(it) * dt / eps33(isource,ksource)
+                        srcz(it) * dt / eps33(isource,jsource,ksource)
             
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             Ex(1,:,:) = 0.0_real64
