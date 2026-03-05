@@ -2,8 +2,8 @@ module cpmlfdtd
     
     use seidartio
     use seidart_types
-    use density_averaging, only: face_density   
-     
+    use averaging!, only: scalar_mean    
+    
     implicit none 
     
     contains
@@ -29,12 +29,12 @@ module cpmlfdtd
         ! Local variables
         real(real64) :: velocnorm, value_dvx_dx, value_dvx_dz, &
             value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, &
-            value_dsigmaxz_dx, value_dsigmaxz_dz, &
-            rhoxx, rhozx, rhoxz, rhozz !deltarho,  
+            value_dsigmaxz_dx, value_dsigmaxz_dz  
 
         ! 1D arrays for damping profiles
         real(real64), allocatable :: c11(:,:), c13(:,:), c15(:,:), c33(:,:), c35(:,:), c55(:,:), rho(:,:)
-
+        
+        real(real64), allocatable :: rhoxx(:,:), rhozx(:,:), rhoxz(:,:), rhozz(:,:)
         real(real64), allocatable :: kappa(:,:), alpha(:,:), acoef(:,:), bcoef(:,:)
         real(real64), allocatable :: kappa_half(:,:), alpha_half(:,:), acoef_half(:,:), bcoef_half(:,:) 
         real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:) 
@@ -66,10 +66,10 @@ module cpmlfdtd
         end if
         
         select case (trim(adjustl(density_method)))
-            case ('none'      ); density_code = 0
             case ('harmonic'  ); density_code = 1
             case ('geometric'); density_code = 2
             case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 4
         end select
         
         nx = domain%nx 
@@ -97,6 +97,7 @@ module cpmlfdtd
         allocate(memory_dsigmaxz_dx(nx, nz), memory_dsigmaxz_dz(nx, nz))
         allocate(vx(nx, nz), vz(nx, nz))
         allocate(sigmaxx(nx, nz), sigmazz(nx, nz), sigmaxz(nx, nz))
+        allocate(rhoxx(nx, nz), rhoxz(nx, nz), rhozx(nx, nz), rhozz(nx, nz) )
         
         ! -------------------- Load Stiffness Coefficients --------------------
     
@@ -107,7 +108,11 @@ module cpmlfdtd
         call material_rw2('c35.dat', c35, .TRUE.)
         call material_rw2('c55.dat', c55, .TRUE.)
         call material_rw2('rho.dat', rho, .TRUE.)
-                
+        
+        rhoxx(:,:) = rho!0.0_real64
+        rhoxz(:,:) = rho!0.0_real64
+        rhozx(:,:) = rho!0.0_real64
+        rhozz(:,:) = rho!0.0_real64
         ! ------------------- Load Attenuation Coefficients --------------------
         call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
         call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
@@ -186,7 +191,20 @@ module cpmlfdtd
         !---
         !---  beginning of time loop
         !---
+        call array_averaging2d(rhoxx, density_code, '+i') 
+        call array_averaging2d(rhoxz, density_code, '-i') 
+        call array_averaging2d(rhozz, density_code, '-j')
+        call array_averaging2d(rhozx, density_code, '+j')
         
+        if (density_code /= 4) then 
+            call array_averaging2d(c11, density_code, 'cc')
+            call array_averaging2d(c13, density_code, 'cc')
+            call array_averaging2d(c15, density_code, 'cc')
+            call array_averaging2d(c33, density_code, 'cc')
+            call array_averaging2d(c35, density_code, 'cc')
+            call array_averaging2d(c55, density_code, 'cc')
+        end if 
+                    
         do it = 1,source%time_steps
             !$omp parallel private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
             ! ------------------------------------------------------------
@@ -262,8 +280,8 @@ module cpmlfdtd
             do j = 3,nz-1
                 do i = 3,nx-1
                     
-                    rhoxx = face_density(rho(i,j), rho(i-1,j), density_code) 
-                    rhozx = face_density(rho(i,j), rho(i,j-1), density_code) 
+                    !rhoxx = scalar_mean(rho(i,j), rho(i-1,j), density_code) 
+                    !rhozx = scalar_mean(rho(i,j), rho(i,j-1), density_code) 
 
                     value_dsigmaxx_dx = (27.0_real64*sigmaxx(i,j) - 27.0_real64*sigmaxx(i-1,j) + sigmaxx(i-2,j)) / (24.0_real64*dx)
                     value_dsigmaxz_dz = (27.0_real64*sigmaxz(i,j) - 27.0_real64*sigmaxz(i,j-1) + sigmaxz(i,j-2)) / (24.0_real64*dz)
@@ -273,7 +291,7 @@ module cpmlfdtd
                     
                     value_dsigmaxx_dx = value_dsigmaxx_dx / kappa(i,j) + memory_dsigmaxx_dx(i,j)
                     value_dsigmaxz_dz = value_dsigmaxz_dz / kappa(i,j) + memory_dsigmaxz_dz(i,j)
-                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx/rhoxx + value_dsigmaxz_dz/rhozx ) !deltarho
+                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx/rhoxx(i,j) + value_dsigmaxz_dz/rhozx(i,j) ) !deltarho
                     
                 enddo
             enddo
@@ -283,8 +301,8 @@ module cpmlfdtd
             do j = 2,nz-2
                 do i = 2,nx-2
                     
-                    rhoxz = face_density(rho(i,j), rho(i+1,j), density_code) 
-                    rhozz = face_density(rho(i,j), rho(i,j+1), density_code) 
+                    !rhoxz = scalar_mean(rho(i,j), rho(i+1,j), density_code) 
+                    !rhozz = scalar_mean(rho(i,j), rho(i,j+1), density_code) 
 
                     value_dsigmaxz_dx = (-27.0_real64*sigmaxz(i,j) + 27.0_real64*sigmaxz(i+1,j) - sigmaxz(i+2,j)) / (24.0_real64*dx)
                     value_dsigmazz_dz = (-27.0_real64*sigmazz(i,j) + 27.0_real64*sigmazz(i,j+1) - sigmazz(i,j+2)) / (24.0_real64*dz)
@@ -296,7 +314,7 @@ module cpmlfdtd
                     value_dsigmaxz_dx = value_dsigmaxz_dx / kappa_half(i,j) + memory_dsigmaxz_dx(i,j)
                     value_dsigmazz_dz = value_dsigmazz_dz / kappa_half(i,j) + memory_dsigmazz_dz(i,j)
 
-                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz + value_dsigmazz_dz/rhozz) !deltarho
+                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz(i,j) + value_dsigmazz_dz/rhozz(i,j)) !deltarho
                 enddo
             enddo
             !$omp end do
@@ -307,9 +325,9 @@ module cpmlfdtd
             ! If it is any other source, the src_i terms are zero
             sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
             sigmaxz(isource+1,jsource+1) = sigmaxz(isource+1, jsource+1) + srcxz(it) / rho(isource+1,jsource+1)  
-            sigmazz(isource,jsource) = sigmaxz(isource, jsource) + srczz(it) / rho(isource,jsource) 
-            vx(isource+1,jsource) = vx(isource+1,jsource) + srcx(it) / rho(isource+1,jsource)
-            vz(isource,jsource+1) = vz(isource,jsource+1) + srcz(it) / rho(isource,jsource+1)
+            sigmazz(isource,jsource) = sigmazz(isource, jsource) + srczz(it) / rho(isource,jsource) 
+            vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
+            vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
         
             ! Dirichlet conditions (rigid boundaries) on the edges or at the 
             ! bottom of the PML layers
@@ -336,7 +354,7 @@ module cpmlfdtd
         
         deallocate(c11, c13, c15, c33, c35, c55, rho)
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
-        deallocate(gamma_x, gamma_z, gamma_xz, srcxx, srcxz, srczz)
+        deallocate(gamma_x, gamma_z, gamma_xz)
         deallocate(srcx, srcz)
         deallocate(srcxx, srcxz, srczz)
         deallocate(memory_dvx_dx1, memory_dvx_dz1)
@@ -412,10 +430,10 @@ module cpmlfdtd
         endif
         
         select case (trim(adjustl(density_method)))
-            case ('none'      ); density_code = 0
             case ('harmonic'  ); density_code = 1
             case ('geometric'); density_code = 2
             case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 4
         end select
         
         nx = domain%nx
@@ -453,16 +471,16 @@ module cpmlfdtd
                 
         
         ! --------------------- Load Stiffness Coefficients --------------------
-            call material_rw2('c11.dat', c11, .TRUE.)
-            call material_rw2('c13.dat', c13, .TRUE.)
-            call material_rw2('c33.dat', c33, .TRUE.)
-            call material_rw2('c55.dat', c55, .TRUE.)
-            call material_rw2('rho.dat', rho, .TRUE.)
+        call material_rw2('c11.dat', c11, .TRUE.)
+        call material_rw2('c13.dat', c13, .TRUE.)
+        call material_rw2('c33.dat', c33, .TRUE.)
+        call material_rw2('c55.dat', c55, .TRUE.)
+        call material_rw2('rho.dat', rho, .TRUE.)
         
         ! ------------------- Load Attenuation Coefficients --------------------
-            call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
-            call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
-            call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
+        call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
+        call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
+        call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
 
         ! ------------------------ Assign some constants -----------------------
         isource = source%xind + domain%cpml
@@ -589,8 +607,8 @@ module cpmlfdtd
             do k = 3,nz-1
                 do i = 3,nx-1
                     ! ds1/dx, ds6/dy, ds5,dz
-                    rhoxx = face_density(rho(i,k), rho(i-1,k), density_code)
-                    rhozx = face_density(rho(i,k), rho(i,k-1), density_code) 
+                    rhoxx = scalar_mean(rho(i,k), rho(i-1,k), density_code)
+                    rhozx = scalar_mean(rho(i,k), rho(i,k-1), density_code) 
                     ! Backward difference half grid
                     dsigmaxx_dx = (27.0_real64*sigmaxx(i,k) - 27.0_real64*sigmaxx(i-1,k) + sigmaxx(i-2,k)) / (24.0_real64*dx)
                     dsigmaxz_dz = (27.0_real64*sigmaxz(i,k) - 27.0_real64*sigmaxz(i,k-1) + sigmaxz(i,k-2)) / (24.0_real64*dz)
@@ -609,8 +627,8 @@ module cpmlfdtd
             do k = 2,nz-2
                 do i = 2,nx-2
                     ! ds5/dx, ds4/dy, ds3/dz
-                    rhoxz = face_density(rho(i,k), rho(i+1,k), density_code)
-                    rhozz = face_density(rho(i,k), rho(i,k+1), density_code)
+                    rhoxz = scalar_mean(rho(i,k), rho(i+1,k), density_code)
+                    rhozz = scalar_mean(rho(i,k), rho(i,k+1), density_code)
                     
                     ! Forward difference half grid
                     dsigmaxz_dx = (-27.0_real64*sigmaxz(i,k) + 27.0_real64*sigmaxz(i+1,k) - sigmaxz(i+2,k)) / (24.0_real64*dx)
@@ -764,10 +782,10 @@ module cpmlfdtd
         endif
         
         select case (trim(adjustl(density_method)))
-            case ('none'      ); density_code = 0
             case ('harmonic'  ); density_code = 1
             case ('geometric'); density_code = 2
             case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 4
         end select
         
         nx = domain%nx
@@ -1033,9 +1051,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 3,nx-1
                         ! ds1/dx, ds6/dy, ds5,dz
-                        rhoxx = face_density(rho(i,k), rho(i-1,k), density_code)
-                        rhoyx = face_density(rho(i,k), rho(i,k), density_code) 
-                        rhozx = face_density(rho(i,k), rho(i,k-1), density_code) 
+                        rhoxx = scalar_mean(rho(i,k), rho(i-1,k), density_code)
+                        rhoyx = scalar_mean(rho(i,k), rho(i,k), density_code) 
+                        rhozx = scalar_mean(rho(i,k), rho(i,k-1), density_code) 
                         ! Backward difference half grid
                         dsigmaxx_dx = (27.0_real64*sigmaxx(i,j,k) - 27.0_real64*sigmaxx(i-1,j,k) + sigmaxx(i-2,j,k)) / (24.0_real64*dx)
                         dsigmaxy_dy = (27.0_real64*sigmaxy(i,j,k) - 27.0_real64*sigmaxy(i,j-1,k) + sigmaxy(i,j-2,k)) / (24.0_real64*dy)
@@ -1057,9 +1075,9 @@ module cpmlfdtd
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
-                        rhoxy = face_density(rho(i,k), rho(i+1,k), density_code)
-                        rhoyy = face_density(rho(i,k), rho(i,k), density_code) 
-                        rhozy = face_density(rho(i,k), rho(i,k-1), density_code)
+                        rhoxy = scalar_mean(rho(i,k), rho(i+1,k), density_code)
+                        rhoyy = scalar_mean(rho(i,k), rho(i,k), density_code) 
+                        rhozy = scalar_mean(rho(i,k), rho(i,k-1), density_code)
                         ! Forward difference half grid
                         dsigmaxy_dx = (-27.0_real64*sigmaxy(i,j,k) + 27.0_real64*sigmaxy(i+1,j,k) - sigmaxy(i+2,j,k)) / (24.0_real64*dx)
                         dsigmayy_dy = (-27.0_real64*sigmayy(i,j,k) + 27.0_real64*sigmayy(i,j+1,k) - sigmayy(i,j+2,k)) / (24.0_real64*dy)
@@ -1084,9 +1102,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 2,nx-2
                         ! ds5/dx, ds4/dy, ds3/dz
-                        rhoxz = face_density(rho(i,k), rho(i+1,k), density_code)
-                        rhoyz = face_density(rho(i,k), rho(i,k), density_code) 
-                        rhozz = face_density(rho(i,k), rho(i,k+1), density_code)
+                        rhoxz = scalar_mean(rho(i,k), rho(i+1,k), density_code)
+                        rhoyz = scalar_mean(rho(i,k), rho(i,k), density_code) 
+                        rhozz = scalar_mean(rho(i,k), rho(i,k+1), density_code)
                         
                         ! Forward difference half grid
                         dsigmaxz_dx = (-27.0_real64*sigmaxz(i,j,k) + 27.0_real64*sigmaxz(i+1,j,k) - sigmaxz(i+2,j,k)) / (24.0_real64*dx)
@@ -1209,9 +1227,9 @@ module cpmlfdtd
         logical, intent(in), optional :: SINGLE_OUTPUT
         character(len=256), intent(in) :: density_method
         ! Local variables
-        real(real64) :: rhoxx, rhoyx, rhozx, &
-                        rhoxy, rhoyy, rhozy, &
-                        rhoxz, rhoyz, rhozz
+        real(real64), allocatable ::    rhoxx(:,:), rhoyx(:,:), rhozx(:,:), &
+                                        rhoxy(:,:), rhoyy(:,:), rhozy(:,:), &
+                                        rhoxz(:,:), rhoyz(:,:), rhozz(:,:)
         
         real(real64), allocatable :: velocnorm(:), stressnorm(:)
 
@@ -1282,10 +1300,10 @@ module cpmlfdtd
         endif
         
         select case (trim(adjustl(density_method)))
-            case ('none'      ); density_code = 0
             case ('harmonic'  ); density_code = 1
             case ('geometric'); density_code = 2
             case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 4
         end select
         
         nx = domain%nx
@@ -1304,7 +1322,10 @@ module cpmlfdtd
                                                                    c55(nx,nz), c56(nx,nz), &
                                                                                c66(nx,nz) )
         allocate(rho(nx,nz))
-                
+        allocate(   rhoxx(nx,nz), rhoyx(nx,nz), rhozx(nx,nz), &
+                    rhoxy(nx,nz), rhoyy(nx,nz), rhoyz(nx,nz), &
+                    rhoxz(nx,nz), rhozy(nx,nz), rhozz(nx,nz) )
+        
         allocate(kappa(nx, nz), alpha(nx, nz), acoef(nx, nz), bcoef(nx, nz), &
                 kappa_half(nx, nz), alpha_half(nx, nz), acoef_half(nx, nz), bcoef_half(nx, nz))
         allocate(gamma_x(nx, nz), gamma_y(nx, nz), gamma_z(nx, nz))
@@ -1499,6 +1520,26 @@ module cpmlfdtd
         velocnorm(:) = 0.0_real64
         stressnorm(:) = 0.0_real64 
         ! Do it 
+        
+        rhoxx = rho
+        rhoyx = rho
+        rhozx = rho
+        rhoxy = rho
+        rhoyy = rho
+        rhozy = rho 
+        rhoxz = rho 
+        rhoyz = rho 
+        rhozz = rho
+        
+        call array_averaging2d(rhoxx, density_code, '+i')
+        ! call array_averaging2d(rhoyx, density_code, 'cc')
+        call array_averaging2d(rhozx, density_code, '+j')
+        call array_averaging2d(rhoxy, density_code, '-i')
+        ! call array_averaging2d(rhoyy, density_code, 'cc')
+        call array_averaging2d(rhozy, density_code, '+j')
+        call array_averaging2d(rhoxz, density_code, '-i')
+        ! call array_averaging2d(rhoyz, density_code, 'cc')
+        call array_averaging2d(rhozz, density_code, '-j')
         
         ! =============================== Forward Model ===============================
         do it = 1,source%time_steps
@@ -1711,9 +1752,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 3,nx-1
                         ! ds1/dx, ds6/dy, ds5,dz
-                        rhoxx = face_density(rho(i,k), rho(i-1,k), density_code)
-                        rhoyx = face_density(rho(i,k), rho(i,k), density_code) 
-                        rhozx = face_density(rho(i,k), rho(i,k-1), density_code) 
+                        ! rhoxx = scalar_mean(rho(i,k), rho(i-1,k), density_code)
+                        ! rhoyx = scalar_mean(rho(i,k), rho(i,k), density_code) 
+                        ! rhozx = scalar_mean(rho(i,k), rho(i,k-1), density_code) 
                         ! Backward difference half grid
                         dsigmaxx_dx = (27.0_real64*sigmaxx(i,j,k) - 27.0_real64*sigmaxx(i-1,j,k) + sigmaxx(i-2,j,k)) / (24.0_real64*dx)
                         dsigmaxy_dy = (27.0_real64*sigmaxy(i,j,k) - 27.0_real64*sigmaxy(i,j-1,k) + sigmaxy(i,j-2,k)) / (24.0_real64*dy)
@@ -1728,16 +1769,16 @@ module cpmlfdtd
                         dsigmaxz_dz = dsigmaxz_dz / kappa_half(i,k) + memory_dsigmaxz_dz(i,j,k) 
 
                         vx(i,j,k) = vx(i,j,k) + &
-                            (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoyx + dsigmaxz_dz/rhozx) * dt 
+                            (dsigmaxx_dx/rhoxx(i,j) + dsigmaxy_dy/rhoyx(i,j) + dsigmaxz_dz/rhozx(i,j)) * dt 
                     enddo
                 enddo
 
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
-                        rhoxy = face_density(rho(i,k), rho(i+1,k), density_code)
-                        rhoyy = face_density(rho(i,k), rho(i,k), density_code) 
-                        rhozy = face_density(rho(i,k), rho(i,k-1), density_code)
+                        ! rhoxy = scalar_mean(rho(i,k), rho(i+1,k), density_code)
+                        ! rhoyy = scalar_mean(rho(i,k), rho(i,k), density_code) 
+                        ! rhozy = scalar_mean(rho(i,k), rho(i,k-1), density_code)
                         ! Forward difference half grid
                         dsigmaxy_dx = (-27.0_real64*sigmaxy(i,j,k) + 27.0_real64*sigmaxy(i+1,j,k) - sigmaxy(i+2,j,k)) / (24.0_real64*dx)
                         dsigmayy_dy = (-27.0_real64*sigmayy(i,j,k) + 27.0_real64*sigmayy(i,j+1,k) - sigmayy(i,j+2,k)) / (24.0_real64*dy)
@@ -1753,7 +1794,7 @@ module cpmlfdtd
                         dsigmayz_dz = dsigmayz_dz / kappa(i,k) + memory_dsigmayz_dz(i,j,k)
 
                         vy(i,j,k) = vy(i,j,k) + &
-                            (dsigmaxy_dx/rhoxy + dsigmayy_dy/rhoyy + dsigmayz_dz/rhozy) * dt
+                            (dsigmaxy_dx/rhoxy(i,j) + dsigmayy_dy/rhoyy(i,j) + dsigmayz_dz/rhozy(i,j)) * dt
                     enddo
                 enddo
             enddo
@@ -1762,9 +1803,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 2,nx-2
                         ! ds5/dx, ds4/dy, ds3/dz
-                        rhoxz = face_density(rho(i,k), rho(i+1,k), density_code)
-                        rhoyz = face_density(rho(i,k), rho(i,k), density_code) 
-                        rhozz = face_density(rho(i,k), rho(i,k+1), density_code)
+                        ! rhoxz = scalar_mean(rho(i,k), rho(i+1,k), density_code)
+                        ! rhoyz = scalar_mean(rho(i,k), rho(i,k), density_code) 
+                        ! rhozz = scalar_mean(rho(i,k), rho(i,k+1), density_code)
                         
                         ! Forward difference half grid
                         dsigmaxz_dx = (-27.0_real64*sigmaxz(i,j,k) + 27.0_real64*sigmaxz(i+1,j,k) - sigmaxz(i+2,j,k)) / (24.0_real64*dx)
@@ -1782,7 +1823,7 @@ module cpmlfdtd
                         dsigmazz_dz = dsigmazz_dz / kappa_half(i,k) + memory_dsigmazz_dz(i,j,k)
 
                         vz(i,j,k) = vz(i,j,k) + &
-                            (dsigmaxz_dx/rhoxz + dsigmayz_dy/rhoyz + dsigmazz_dz/rhozz) * &
+                            (dsigmaxz_dx/rhoxz(i,j) + dsigmayz_dy/rhoyz(i,j) + dsigmazz_dz/rhozz(i,j)) * &
                             dt !/ deltarho !rho(i,k)
 
                     enddo
@@ -1957,10 +1998,10 @@ module cpmlfdtd
         endif
         
         select case (trim(adjustl(density_method)))
-            case ('none'      ); density_code = 0
             case ('harmonic'  ); density_code = 1
             case ('geometric'); density_code = 2
             case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 4
         end select
         
         nx = domain%nx
@@ -2226,9 +2267,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 3,nx-1
                         ! ds1/dx, ds6/dy, ds5,dz
-                        rhoxx = face_density(rho(i,j,k), rho(i-1,j,k), density_code)
-                        rhoyx = face_density(rho(i,j,k), rho(i,j,k), density_code) 
-                        rhozx = face_density(rho(i,j,k), rho(i,j,k-1), density_code) 
+                        rhoxx = scalar_mean(rho(i,j,k), rho(i-1,j,k), density_code)
+                        rhoyx = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhozx = scalar_mean(rho(i,j,k), rho(i,j,k-1), density_code) 
                         ! Backward difference half grid
                         dsigmaxx_dx = (27.0_real64*sigmaxx(i,j,k) - 27.0_real64*sigmaxx(i-1,j,k) + sigmaxx(i-2,j,k)) / (24.0_real64*dx)
                         dsigmaxy_dy = (27.0_real64*sigmaxy(i,j,k) - 27.0_real64*sigmaxy(i,j-1,k) + sigmaxy(i,j-2,k)) / (24.0_real64*dy)
@@ -2250,9 +2291,9 @@ module cpmlfdtd
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
-                        rhoxy = face_density(rho(i,j,k), rho(i+1,j,k), density_code)
-                        rhoyy = face_density(rho(i,j,k), rho(i,j,k), density_code) 
-                        rhozy = face_density(rho(i,j,k), rho(i,j,k-1), density_code)
+                        rhoxy = scalar_mean(rho(i,j,k), rho(i+1,j,k), density_code)
+                        rhoyy = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhozy = scalar_mean(rho(i,j,k), rho(i,j,k-1), density_code)
                         ! Forward difference half grid
                         dsigmaxy_dx = (-27.0_real64*sigmaxy(i,j,k) + 27.0_real64*sigmaxy(i+1,j,k) - sigmaxy(i+2,j,k)) / (24.0_real64*dx)
                         dsigmayy_dy = (-27.0_real64*sigmayy(i,j,k) + 27.0_real64*sigmayy(i,j+1,k) - sigmayy(i,j+2,k)) / (24.0_real64*dy)
@@ -2277,9 +2318,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 2,nx-2
                         ! ds5/dx, ds4/dy, ds3/dz
-                        rhoxz = face_density(rho(i,j,k), rho(i+1,j,k), density_code)
-                        rhoyz = face_density(rho(i,j,k), rho(i,j,k), density_code) 
-                        rhozz = face_density(rho(i,j,k), rho(i,j,k+1), density_code)
+                        rhoxz = scalar_mean(rho(i,j,k), rho(i+1,j,k), density_code)
+                        rhoyz = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhozz = scalar_mean(rho(i,j,k), rho(i,j,k+1), density_code)
                         
                         ! Forward difference half grid
                         dsigmaxz_dx = (-27.0_real64*sigmaxz(i,j,k) + 27.0_real64*sigmaxz(i+1,j,k) - sigmaxz(i+2,j,k)) / (24.0_real64*dx)
@@ -2474,10 +2515,10 @@ module cpmlfdtd
         endif
         
         select case (trim(adjustl(density_method)))
-            case ('none'      ); density_code = 0
             case ('harmonic'  ); density_code = 1
             case ('geometric'); density_code = 2
             case ('arithmetic'); density_code = 3
+            case ('none'      ); density_code = 4
         end select
         
         nx = domain%nx
@@ -2903,9 +2944,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 3,nx-1
                         ! ds1/dx, ds6/dy, ds5,dz
-                        rhoxx = face_density(rho(i,j,k), rho(i-1,j,k), density_code)
-                        rhoyx = face_density(rho(i,j,k), rho(i,j,k), density_code) 
-                        rhozx = face_density(rho(i,j,k), rho(i,j,k-1), density_code) 
+                        rhoxx = scalar_mean(rho(i,j,k), rho(i-1,j,k), density_code)
+                        rhoyx = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhozx = scalar_mean(rho(i,j,k), rho(i,j,k-1), density_code) 
                         ! Backward difference half grid
                         dsigmaxx_dx = (27.0_real64*sigmaxx(i,j,k) - 27.0_real64*sigmaxx(i-1,j,k) + sigmaxx(i-2,j,k)) / (24.0_real64*dx)
                         dsigmaxy_dy = (27.0_real64*sigmaxy(i,j,k) - 27.0_real64*sigmaxy(i,j-1,k) + sigmaxy(i,j-2,k)) / (24.0_real64*dy)
@@ -2927,9 +2968,9 @@ module cpmlfdtd
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
-                        rhoxy = face_density(rho(i,j,k), rho(i+1,j,k), density_code)
-                        rhoyy = face_density(rho(i,j,k), rho(i,j,k), density_code) 
-                        rhozy = face_density(rho(i,j,k), rho(i,j,k-1), density_code)
+                        rhoxy = scalar_mean(rho(i,j,k), rho(i+1,j,k), density_code)
+                        rhoyy = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhozy = scalar_mean(rho(i,j,k), rho(i,j,k-1), density_code)
                         ! Forward difference half grid
                         dsigmaxy_dx = (-27.0_real64*sigmaxy(i,j,k) + 27.0_real64*sigmaxy(i+1,j,k) - sigmaxy(i+2,j,k)) / (24.0_real64*dx)
                         dsigmayy_dy = (-27.0_real64*sigmayy(i,j,k) + 27.0_real64*sigmayy(i,j+1,k) - sigmayy(i,j+2,k)) / (24.0_real64*dy)
@@ -2954,9 +2995,9 @@ module cpmlfdtd
                 do j = 3,ny-1
                     do i = 2,nx-2
                         ! ds5/dx, ds4/dy, ds3/dz
-                        rhoxz = face_density(rho(i,j,k), rho(i+1,j,k), density_code)
-                        rhoyz = face_density(rho(i,j,k), rho(i,j,k), density_code) 
-                        rhozz = face_density(rho(i,j,k), rho(i,j,k+1), density_code)
+                        rhoxz = scalar_mean(rho(i,j,k), rho(i+1,j,k), density_code)
+                        rhoyz = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhozz = scalar_mean(rho(i,j,k), rho(i,j,k+1), density_code)
                         
                         ! Forward difference half grid
                         dsigmaxz_dx = (-27.0_real64*sigmaxz(i,j,k) + 27.0_real64*sigmaxz(i+1,j,k) - sigmaxz(i+2,j,k)) / (24.0_real64*dx)
@@ -4519,8 +4560,8 @@ module cpmlfdtd
     !         do j = 3, nz-1
     !             do i = 3, nx-1
 
-    !                 rhoxx = face_density(rho(i,j), rho(i-1,j), density_code)
-    !                 rhozx = face_density(rho(i,j), rho(i,j-1), density_code)
+    !                 rhoxx = scalar_mean(rho(i,j), rho(i-1,j), density_code)
+    !                 rhozx = scalar_mean(rho(i,j), rho(i,j-1), density_code)
 
     !                 ! ==== Rotated finite‑difference derivatives for σxx ====
     !                 fdx_plus  = ( 27.0_real64*(sigmaxx(i+1,j+1) - sigmaxx(i,j)) - (sigmaxx(i+2,j+2) - sigmaxx(i-1,j-1)) ) / (24.0_real64 * dl)
@@ -4551,8 +4592,8 @@ module cpmlfdtd
     !         do j = 2, nz-2
     !             do i = 2, nx-2
 
-    !                 rhoxz = face_density(rho(i,j), rho(i+1,j), density_code)
-    !                 rhozz = face_density(rho(i,j), rho(i,j+1), density_code)
+    !                 rhoxz = scalar_mean(rho(i,j), rho(i+1,j), density_code)
+    !                 rhozz = scalar_mean(rho(i,j), rho(i,j+1), density_code)
 
     !                 ! ===== Rotated derivative of σxz (along x+z and x−z diagonals) =====
     !                 fdx_plus  = ( 27.0_real64*(sigmaxz(i+1,j+1) - sigmaxz(i,j)) - (sigmaxz(i+2,j+2) - sigmaxz(i-1,j-1)) ) / (24.0_real64 * dl)
