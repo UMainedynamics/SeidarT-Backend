@@ -34,7 +34,7 @@ module cpmlfdtd
         ! 1D arrays for damping profiles
         real(real64), allocatable :: c11(:,:), c13(:,:), c15(:,:), c33(:,:), c35(:,:), c55(:,:), rho(:,:)
         
-        real(real64), allocatable :: rhoxx(:,:), rhozx(:,:), rhoxz(:,:), rhozz(:,:)
+        real(real64) :: rhoxx, rhozx, rhoxz, rhozz
         real(real64), allocatable :: kappa(:,:), alpha(:,:), acoef(:,:), bcoef(:,:)
         real(real64), allocatable :: kappa_half(:,:), alpha_half(:,:), acoef_half(:,:), bcoef_half(:,:) 
         real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:) 
@@ -97,7 +97,7 @@ module cpmlfdtd
         allocate(memory_dsigmaxz_dx(nx, nz), memory_dsigmaxz_dz(nx, nz))
         allocate(vx(nx, nz), vz(nx, nz))
         allocate(sigmaxx(nx, nz), sigmazz(nx, nz), sigmaxz(nx, nz))
-        allocate(rhoxx(nx, nz), rhoxz(nx, nz), rhozx(nx, nz), rhozz(nx, nz) )
+        ! allocate(rhoxx(nx, nz), rhoxz(nx, nz), rhozx(nx, nz), rhozz(nx, nz) )
         
         ! -------------------- Load Stiffness Coefficients --------------------
     
@@ -109,10 +109,10 @@ module cpmlfdtd
         call material_rw2('c55.dat', c55, .TRUE.)
         call material_rw2('rho.dat', rho, .TRUE.)
         
-        rhoxx(:,:) = rho!0.0_real64
-        rhoxz(:,:) = rho!0.0_real64
-        rhozx(:,:) = rho!0.0_real64
-        rhozz(:,:) = rho!0.0_real64
+        rhoxx = 0.0_real64
+        rhoxz = 0.0_real64
+        rhozx = 0.0_real64
+        rhozz = 0.0_real64
         ! ------------------- Load Attenuation Coefficients --------------------
         call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
         call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
@@ -191,10 +191,6 @@ module cpmlfdtd
         !---
         !---  beginning of time loop
         !---
-        call array_averaging2d(rhoxx, density_code, '+i') 
-        call array_averaging2d(rhoxz, density_code, '-i') 
-        call array_averaging2d(rhozz, density_code, '-j')
-        call array_averaging2d(rhozx, density_code, '+j')
         
         if (density_code /= 4) then 
             call array_averaging2d(c11, density_code, 'cc')
@@ -280,8 +276,8 @@ module cpmlfdtd
             do j = 3,nz-1
                 do i = 3,nx-1
                     
-                    !rhoxx = scalar_mean(rho(i,j), rho(i-1,j), density_code) 
-                    !rhozx = scalar_mean(rho(i,j), rho(i,j-1), density_code) 
+                    rhoxx = scalar_mean(rho(i,j), rho(i-1,j), density_code) 
+                    rhozx = scalar_mean(rho(i,j), rho(i,j-1), density_code) 
 
                     value_dsigmaxx_dx = (27.0_real64*sigmaxx(i,j) - 27.0_real64*sigmaxx(i-1,j) + sigmaxx(i-2,j)) / (24.0_real64*dx)
                     value_dsigmaxz_dz = (27.0_real64*sigmaxz(i,j) - 27.0_real64*sigmaxz(i,j-1) + sigmaxz(i,j-2)) / (24.0_real64*dz)
@@ -291,7 +287,7 @@ module cpmlfdtd
                     
                     value_dsigmaxx_dx = value_dsigmaxx_dx / kappa(i,j) + memory_dsigmaxx_dx(i,j)
                     value_dsigmaxz_dz = value_dsigmaxz_dz / kappa(i,j) + memory_dsigmaxz_dz(i,j)
-                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx/rhoxx(i,j) + value_dsigmaxz_dz/rhozx(i,j) ) !deltarho
+                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx/rhoxx + value_dsigmaxz_dz/rhozx ) !deltarho
                     
                 enddo
             enddo
@@ -301,8 +297,8 @@ module cpmlfdtd
             do j = 2,nz-2
                 do i = 2,nx-2
                     
-                    !rhoxz = scalar_mean(rho(i,j), rho(i+1,j), density_code) 
-                    !rhozz = scalar_mean(rho(i,j), rho(i,j+1), density_code) 
+                    rhoxz = scalar_mean(rho(i,j), rho(i+1,j), density_code) 
+                    rhozz = scalar_mean(rho(i,j), rho(i,j+1), density_code) 
 
                     value_dsigmaxz_dx = (-27.0_real64*sigmaxz(i,j) + 27.0_real64*sigmaxz(i+1,j) - sigmaxz(i+2,j)) / (24.0_real64*dx)
                     value_dsigmazz_dz = (-27.0_real64*sigmazz(i,j) + 27.0_real64*sigmazz(i,j+1) - sigmazz(i,j+2)) / (24.0_real64*dz)
@@ -314,7 +310,7 @@ module cpmlfdtd
                     value_dsigmaxz_dx = value_dsigmaxz_dx / kappa_half(i,j) + memory_dsigmaxz_dx(i,j)
                     value_dsigmazz_dz = value_dsigmazz_dz / kappa_half(i,j) + memory_dsigmazz_dz(i,j)
 
-                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz(i,j) + value_dsigmazz_dz/rhozz(i,j)) !deltarho
+                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz + value_dsigmazz_dz/rhozz) !deltarho
                 enddo
             enddo
             !$omp end do
