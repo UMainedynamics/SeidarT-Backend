@@ -192,14 +192,14 @@ module cpmlfdtd
         !---  beginning of time loop
         !---
         
-        if (density_code /= 4) then 
-            call array_averaging2d(c11, density_code, 'cc')
-            call array_averaging2d(c13, density_code, 'cc')
-            call array_averaging2d(c15, density_code, 'cc')
-            call array_averaging2d(c33, density_code, 'cc')
-            call array_averaging2d(c35, density_code, 'cc')
-            call array_averaging2d(c55, density_code, 'cc')
-        end if 
+        ! if (density_code /= 4) then 
+        !     call array_averaging2d(c11, density_code, 'cc')
+        !     call array_averaging2d(c13, density_code, 'cc')
+        !     call array_averaging2d(c15, density_code, 'cc')
+        !     call array_averaging2d(c33, density_code, 'cc')
+        !     call array_averaging2d(c35, density_code, 'cc')
+        !     call array_averaging2d(c55, density_code, 'cc')
+        ! end if 
                     
         do it = 1,source%time_steps
             !$omp parallel private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
