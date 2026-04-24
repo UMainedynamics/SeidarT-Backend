@@ -96,7 +96,7 @@ echo "Using GFortran from $FC"
 #                                           -finit-real=snan -finit-integer=0 \
 #                                           -Wall"
 # else
-FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
+FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
 # fi 
 
 # OpenMP support (optional)
@@ -110,6 +110,8 @@ SOURCES="$SRC_DIR/constants.f08 \
          $SRC_DIR/seidart_types.f08 \
          $SRC_DIR/seidartio.f08 \
          $SRC_DIR/averaging.f08 \
+         $SRC_DIR/plane_wave_source.f08 \
+         $SRC_DIR/tensor_operations.f08 \
          $SRC_DIR/cpmlfdtd.f08 \
          $SRC_DIR/main.f08"
 EXECUTABLE="seidartfdtd-$os-$arch"

@@ -2,8 +2,11 @@ module cpmlfdtd
     
     use seidartio
     use seidart_types
+    use plane_wave_source
+    use tensor_operations
     use averaging!, only: scalar_mean    
-    
+    use iso_fortran_env, only: real64, real32
+
     implicit none 
     
     contains
@@ -53,6 +56,8 @@ module cpmlfdtd
         integer :: nx, nz 
         real(real64) :: dx, dz, dt 
         
+        ! real(real64) :: p, p0, ehat ! values for plane wave
+
         integer :: i, j, it, isource, jsource
         logical :: SINGLE
         integer :: density_code 
@@ -130,7 +135,13 @@ module cpmlfdtd
         srcx(:) = 0.0_real64
         srcz(:) = 0.0_real64
         
-        if ( source%source_type == 'ac') then 
+        if ( source%source_type == 'pw' ) then 
+            ! call direction_polarization_vector( source%x_z_rotation, &
+            !                                     source%x_y_rotation, &
+            !                                     source%y_z_rotation, &
+            !                                     p, ehat)
+            ! p0 = (/ domain%dx*domain%nx/2, domain%dx*domain%nx/2, domain%dx*domain%nx/2 /) 
+        else if ( source%source_type == 'ac') then 
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
             call loadsource('seismicsourcez.dat', source%time_steps, srcz)
         else
@@ -3165,8 +3176,17 @@ module cpmlfdtd
         real(real64) :: velocnorm
         
         integer :: nx, nz
-        real(real64) :: dx, dz, dt   
-        
+        real(real64) :: dx, dz, dt
+
+        ! values for plane wave
+        real(real64) :: t, eta, eps_r_min, vbackground
+        real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3) 
+        real(real64), allocatable :: eig_array(:,:,:) 
+        logical :: active(6)
+        integer :: i_min, i_max, k_min, k_max, ip, xi, zi
+        real(real64) :: XMIN, XMAX, XMID, XLOC
+        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
         
@@ -3179,8 +3199,6 @@ module cpmlfdtd
         else
             SINGLE = .TRUE.
         endif
-        
-        
         
         ! ----------------------------------------------------------------------
         nx = domain%nx 
@@ -3208,7 +3226,8 @@ module cpmlfdtd
         allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
         allocate(Ex(nx, nz), Ez(nx, nz), Hy(nx, nz))
         allocate(Ex_old(nx,nz), Ez_old(nx,nz) )
-            
+        
+        allocate(eig_array(nx, nz, 2) )
         ! ======================================================================
         ! ----------------------- Load Permittivity Coefficients ----------------------
         call material_rw2('e11.dat', eps11, .TRUE.)
@@ -3224,9 +3243,61 @@ module cpmlfdtd
         jsource = source%zind + domain%cpml
 
         ! ================================ LOAD SOURCE ================================
-        call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
-        call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
-
+        if ( source%source_type == 'pw' ) then 
+            XMIN = domain%dx * (1 + domain%cpml) 
+            XMAX = domain%dx * ( domain%nx - domain%cpml) !2*cpml was added in python so we have to correct. 
+            XMID = 0.50_real64 * (XMIN + XMAX)
+            ZMIN = domain%dz * (1 + domain%cpml) 
+            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMID = 0.50_real64 * (ZMIN + ZMAX)
+            call direction_polarization_vector( source%x_z_rotation, &
+                                                source%x_y_rotation, &
+                                                source%y_z_rotation, &
+                                                p, ehat)
+            call select_injection_faces(p, active)
+            if ( active(1) .and. active(5)) then ! XMIN + ZMIN
+                r0 = (/ XMIN, 0.0_real64, ZMIN /)
+                XLOC = XMIN
+                ZLOC = ZMIN
+            else if ( active(2) .and. active(5)) then ! XMAX + ZMIN
+                r0 = (/ XMAX, 0.0_real64, ZMIN /)
+                XLOC = XMAX
+                ZLOC = ZMIN
+            else if ( active(1) .and. active(6)) then ! XMIN + ZMAX
+                r0 = (/ XMIN, 0.0_real64, ZMAX /)
+                XLOC = XMIN
+                ZLOC = ZMAX
+            else if ( active(2) .and. active(6)) then ! XMAX + ZMAX
+                r0 = (/ XMAX, 0.0_real64, ZMAX /)
+                XLOC = XMAX
+                ZLOC = ZMAX
+            else if ( active(1) ) then ! XMIN + ZMID
+                r0 = (/ XMIN, 0.0_real64, ZMID /)
+                XLOC = XMIN
+            else if ( active(2) ) then ! XMAX + ZMID
+                r0 = (/ XMAX, 0.0_real64, ZMID /)
+                XLOC = XMAX
+            else if ( active(5) ) then ! XMID + ZMIN 
+                r0 = (/ XMID, 0.0_real64, ZMIN/)
+                ZLOC = ZMIN
+            else ! active(6) XMID + ZMAX
+                r0 = (/ XMID, 0.0_real64, ZMAX/)
+                ZLOC = ZMAX
+            endif
+            i_min = domain%cpml + 2
+            i_max = domain%nx - domain%cpml -1
+            k_min = domain%cpml + 2 
+            k_max = domain%nz - domain%cpml - 1
+            
+            call array_eigenvalues22(eps11, eps13, eps33, eig_array, nx, nz)
+            eps_r_min = minval(eig_array)
+            vbackground = clight / sqrt(eps_r_min)
+            eta = sqrt(mu0 / (eps0*eps_r_min))
+        else
+            call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
+            call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
+        end if 
+        
         ! ----------------------------------------------------------------------
         ! Initialize CPML damping variables
         kappa(:,:) = 1.0_real64
@@ -3330,7 +3401,7 @@ module cpmlfdtd
                 enddo  
             enddo
             !$omp end do 
-            
+
             ! Electric field and update memory variables for C-PML
             ! Compute the differences in the y-direction
             !$omp do
@@ -3350,62 +3421,60 @@ module cpmlfdtd
                 
                 enddo
             enddo
-            ! do j = 2, nz                          ! needs j-1
-            !     do i = 1, nx
-            !         dHy_dz = (Hy(i,j) - Hy(i,j-1)) / dz
-            !         memory_dHy_dz(i,j) = bcoef(i,j) * memory_dHy_dz(i,j) + acoef(i,j) * dHy_dz    ! FULL z
-            !         dHy_dz = dHy_dz / kappa(i,j) + memory_dHy_dz(i,j)
-
-            !         ! coupled Ex update (explicit σ-terms as in your code)
-            !         Ex(i,j) = Ex_old(i,j) + ( -aEx(i,j)*dHy_dz + bEx(i,j)*0d0 - dEx(i,j)*Ex_old(i,j) - eEx(i,j)*Ez_old(i,j) ) * dt
-            !     end do
-            ! end do
-
-            ! --- E_z update (uses ∂Hy/∂x → HALF x CPML) ---
-            ! do j = 1, nz
-            !     do i = 2, nx                        ! needs i-1
-            !         dHy_dx = (Hy(i,j) - Hy(i-1,j)) / dx
-            !         memory_dHy_dx(i,j) = bcoef_half(i,j) * memory_dHy_dx(i,j) + acoef_half(i,j) * dHy_dx   ! HALF x
-            !         dHy_dx = dHy_dx / kappa_half(i,j) + memory_dHy_dx(i,j)
-
-            !         Ez(i,j) = Ez_old(i,j) + ( -aEz(i,j)*0d0 + bEz(i,j)*dHy_dx - dEz(i,j)*Ex_old(i,j) - eEz(i,j)*Ez_old(i,j) ) * dt
-            !     end do
-            ! end do
-            
-            ! do j = 2,nz
-            !     do i = 1,nx
-            !         ! Update the Ex field
-            !         dHy_dz = ( Hy(i,j) - Hy(i,j-1) )/dz ! this is nz-1 length vector
-            !         memory_dHy_dz(i,j) = bcoef(i,j) * memory_dHy_dz(i,j) + acoef(i,j) * dHy_dz
-            !         dHy_dz = dHy_dz/kappa(i,j) + memory_dHy_dz(i,j)
-
-            !         ! Ex(i,j) = (( caEx(i,j) + caEx(i,j-1) )/2) * Ex(i,j) + &
-            !         !     (( cbEx(i,j) + cbEx(i,j-1) )/2 ) * value_dHy_dz
-            !         Ex(i,j) = caEx(i,j) * Ex(i,j) + cbEx(i,j) * dHy_dz
-            !     enddo
-            ! enddo
-
-            ! do j = 1,nz
-            !     do i = 2,nx
-            !         ! Update the Ez field
-            !         dHy_dx = ( Hy(i,j) - Hy(i-1,j) )/dx
-            !         memory_dHy_dx(i,j) = bcoef_half(i,j) * memory_dHy_dx(i,j) + acoef_half(i,j) * dHy_dx
-            !         dHy_dx = dHy_dx/kappa_half(i,j) + memory_dHy_dx(i,j)
-                    
-            !         ! Ez(i,j) = (( caEz(i,j) + caEz(i-1,j) )/2) * Ez(i,j) + &
-            !         !     (( cbEz(i,j) + cbEz(i-1,j) )/2) * value_dHy_dx 
-            !         Ez(i,j) = caEz(i,j) * Ez(i,j) + cbEz(i,j) * dHy_dx 
-            !     enddo
-            ! enddo
             !$omp end do 
             
             !$omp end parallel
             !----------------------------------------------------------------------------
-            Ex(isource,jsource) = Ex(isource,jsource) + &
-                            srcx(it) * dt / epsilon11(isource,jsource)
-            Ez(isource,jsource) = Ez(isource,jsource) + &
-                            srcz(it) * dt / epsilon33(isource,jsource) 
-            
+            if ( source%source_type == 'pw' ) then 
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then 
+                    xi = nint(XLOC / domain%dx)
+                    do ip = k_min,k_max
+                        r = (/ XLOC, 0.0_real64, ip * domain%dz /)
+                        Ev = (/ Ex(xi,ip), 0.0_real64, Ez(xi,ip) /)
+                        Hv = (/ 0.0_real64, Hy(xi,ip), 0.0_real64 /)
+                        call boundary_em_field(r, r0, t, &
+                                        source%source_frequency, &
+                                        source%x_z_rotation, &
+                                        source%x_y_rotation, &
+                                        source%y_z_rotation, &
+                                        vbackground, eta, &
+                                        source%amplitude, &
+                                        source%source_wavelet, &
+                                        Ev, Hv )
+                        Ex(xi,ip) = Ex(xi,ip) + Ev(1) 
+                        Ez(xi,ip) = Ez(xi,ip) + Ev(3) 
+                        Hy(xi,ip) = Hy(xi,ip) + Hv(2)
+                    enddo
+                endif 
+                if ( active(5) .or. active(6)) then 
+                    zi = nint(ZLOC / domain%dz)
+                    do ip = i_min, i_max 
+                        r = (/ ip*domain%dx, 0.0_real64, ZLOC /)
+                        Ev = (/ Ex(ip,zi), 0.0_real64, Ez(ip,zi) /)
+                        Hv = (/ 0.0_real64, Hy(ip,zi), 0.0_real64 /)
+                        call boundary_em_field(r, r0, t, &
+                                        source%source_frequency, &
+                                        source%x_z_rotation, &
+                                        source%x_y_rotation, &
+                                        source%y_z_rotation, &
+                                        vbackground, eta, &
+                                        source%amplitude, &
+                                        source%source_wavelet, &
+                                        Ev, Hv )
+                        Ex(ip,zi) = Ex(ip,zi) + Ev(1) 
+                        Ez(ip,zi) = Ez(ip,zi) + Ev(3) 
+                        Hy(ip,zi) = Hy(ip,zi) + Hv(2)
+                    enddo 
+                endif 
+            else
+                Ex(isource,jsource) = Ex(isource,jsource) + &
+                                srcx(it) * dt / epsilon11(isource,jsource)
+                Ez(isource,jsource) = Ez(isource,jsource) + &
+                                srcz(it) * dt / epsilon33(isource,jsource) 
+            endif 
+
+
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             Ex(1,:) = 0.0_real64
             Ex(nx,:) = 0.0_real64
