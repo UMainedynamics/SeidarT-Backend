@@ -3255,33 +3255,23 @@ module cpmlfdtd
                                                 source%y_z_rotation, &
                                                 p, ehat)
             call select_injection_faces(p, active)
-            if ( active(1) .and. active(5)) then ! XMIN + ZMIN
-                r0 = (/ XMIN, 0.0_real64, ZMIN /)
+            r0 = (/ XMID, 0.0_real64, ZMID /)
+            XLOC = XMID 
+            ZLOC = ZMID
+           if ( active(1) ) then 
+                r0(1) = XMIN
                 XLOC = XMIN
-                ZLOC = ZMIN
-            else if ( active(2) .and. active(5)) then ! XMAX + ZMIN
-                r0 = (/ XMAX, 0.0_real64, ZMIN /)
+            endif
+            if ( active(2) ) then 
+                r0(1) = XMAX
                 XLOC = XMAX
+            endif
+            if ( active(5) ) then
+                r0(3) = ZMIN
                 ZLOC = ZMIN
-            else if ( active(1) .and. active(6)) then ! XMIN + ZMAX
-                r0 = (/ XMIN, 0.0_real64, ZMAX /)
-                XLOC = XMIN
-                ZLOC = ZMAX
-            else if ( active(2) .and. active(6)) then ! XMAX + ZMAX
-                r0 = (/ XMAX, 0.0_real64, ZMAX /)
-                XLOC = XMAX
-                ZLOC = ZMAX
-            else if ( active(1) ) then ! XMIN + ZMID
-                r0 = (/ XMIN, 0.0_real64, ZMID /)
-                XLOC = XMIN
-            else if ( active(2) ) then ! XMAX + ZMID
-                r0 = (/ XMAX, 0.0_real64, ZMID /)
-                XLOC = XMAX
-            else if ( active(5) ) then ! XMID + ZMIN 
-                r0 = (/ XMID, 0.0_real64, ZMIN/)
-                ZLOC = ZMIN
-            else ! active(6) XMID + ZMAX
-                r0 = (/ XMID, 0.0_real64, ZMAX/)
+            endif 
+            if ( active(6) ) then
+                r0(3) = ZMAX
                 ZLOC = ZMAX
             endif
             i_min = domain%cpml + 2
@@ -3583,6 +3573,16 @@ module cpmlfdtd
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
 
+        ! values for plane wave
+        real(real64) :: t, eta, eps_r_min, vbackground
+        real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3) 
+        real(real64), allocatable :: eig_array(:,:,:) 
+        logical :: active(6)
+        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
+        real(real64) :: XMIN, XMAX, XMID, XLOC
+        real(real64) :: YMIN, YMAX, YMID, YLOC
+        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+
         ! Check if SINGLE_OUTPUT is provided, default to single precision if not
         if (present(SINGLE_OUTPUT)) then
             SINGLE = SINGLE_OUTPUT
@@ -3624,6 +3624,8 @@ module cpmlfdtd
         allocate(Ex_old(nx, ny, nz), Ey_old(nx, ny, nz), Ez_old(nx, ny, nz))
         allocate(Hx(nx, ny, nz), Hy(nx, ny, nz), Hz(nx, ny, nz))
         
+        allocate(eig_array(nx, ny, 3) )
+
         ! ------------------------ Load Permittivity Coefficients ------------------------
         ! Load Epsilon
         call material_rw2('e11.dat', eps11, .TRUE.)
@@ -3667,11 +3669,66 @@ module cpmlfdtd
         !---
         
         ! ================================ LOAD SOURCE ================================
+        if ( source%source_type == 'pw' ) then 
+            XMIN = domain%dx * (1 + domain%cpml) 
+            XMAX = domain%dx * ( domain%nx - domain%cpml) !2*cpml was added in python so we have to correct. 
+            XMID = 0.50_real64 * (XMIN + XMAX)
+            YMIN = domain%dy * (1 + domain%cpml)
+            YMAX = domain%dy * ( domain%ny - domain%cpml)
+            YMID = 0.50_real64 * (YMIN + YMAX)
+            ZMIN = domain%dz * (1 + domain%cpml) 
+            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMID = 0.50_real64 * (ZMIN + ZMAX)
+            call direction_polarization_vector( source%x_z_rotation, &
+                                                source%x_y_rotation, &
+                                                source%y_z_rotation, &
+                                                p, ehat)
+            call select_injection_faces(p, active)
+            r0 = (/ XMID, YMID, ZMID /)
+            XLOC = XMID 
+            YLOC = YMID 
+            ZLOC = ZMID 
+            if ( active(1) ) then 
+                r0(1) = XMIN
+                XLOC = XMIN
+            endif
+            if ( active(2) ) then 
+                r0(1) = XMAX
+                XLOC = XMAX
+            endif
+            if ( active(3) ) then 
+                r0(2) = YMIN 
+                YLOC = YMIN
+            endif
+            if ( active(4) ) then 
+                r0(2) = YMAX 
+                YLOC = YMAX 
+            endif
+            if ( active(5) ) then
+                r0(3) = ZMIN
+                ZLOC = ZMIN
+            endif 
+            if ( active(6) ) then 
+                r0(3) = ZMAX
+                ZLOC = ZMAX
+            endif
 
-        call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
-        call loadsource('electromagneticsourcey.dat', source%time_steps, srcy)
-        call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
-
+            i_min = domain%cpml + 2
+            i_max = domain%nx - domain%cpml -1
+            j_min = domain%cpml + 2 
+            j_max = domain%ny - domain%cpml -1
+            k_min = domain%cpml + 2 
+            k_max = domain%nz - domain%cpml - 1
+            
+            call array_eigenvalues23(eps11, eps12, eps13, eps22, eps23, eps33, eig_array, nx, nz)
+            eps_r_min = minval(eig_array)
+            vbackground = clight / sqrt(eps_r_min)
+            eta = sqrt(mu0 / (eps0*eps_r_min))
+        else
+            call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
+            call loadsource('electromagneticsourcey.dat', source%time_steps, srcy)
+            call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
+        endif
         ! =============================================================================
 
         !--- define profile of absorption in PML region
@@ -3860,14 +3917,93 @@ module cpmlfdtd
                 end do 
             end do 
 
-            ! add the source (force vector located at a given grid point)
-            Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
-                        srcx(it) * dt / eps11(isource,ksource)
-            Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
-                        srcy(it) * dt / eps22(isource,ksource) 
-            Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
-                        srcz(it) * dt / eps33(isource,ksource)
-            
+            if ( source%source_type == 'pw' ) then 
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then 
+                    ii = nint(XLOC / domain%dx)
+                    do jj = j_min,j_max
+                        do kk = k_min, k_max
+                            r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+                            Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
+                            Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif 
+                if ( active(3) .or. active(4)) then 
+                    jj = nint(YLOC / domain%dy)
+                    do ii = i_min,i_max
+                        do kk = k_min, k_max
+                            r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
+                            Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
+                            Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif 
+                if ( active(5) .or. active(6)) then 
+                    kk = nint(ZLOC / domain%dz)
+                    do ii = i_min,i_max
+                        do jj = j_min, j_max
+                            r = (/ ii * domain%dx, jj * domain%dy, ZLOC/)
+                            Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
+                            Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif 
+            else
+                ! add the source (force vector located at a given grid point)
+                Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
+                            srcx(it) * dt / eps11(isource,ksource)
+                Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
+                            srcy(it) * dt / eps22(isource,ksource) 
+                Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
+                            srcz(it) * dt / eps33(isource,ksource)
+            endif 
+
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             Ex(1,:,:) = 0.0_real64
             Ex(:,1,:) = 0.0_real64
