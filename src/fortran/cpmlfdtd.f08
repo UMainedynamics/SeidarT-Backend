@@ -3499,6 +3499,7 @@ module cpmlfdtd
 
         deallocate(aEx, bEx, dEx, eEx, aEz, bEz, dEz, eEz, det)
         deallocate(Ex_old, Ez_old )
+        deallocate(eig_array)
             
     end subroutine electromag2
 
@@ -4077,7 +4078,8 @@ module cpmlfdtd
                     memory_dHx_dy, memory_dHy_dx )
         
         deallocate(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
-
+        deallocate(eig_array)
+        
     end subroutine electromag25
     
     
