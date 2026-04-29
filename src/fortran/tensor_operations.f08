@@ -246,7 +246,7 @@ contains
         integer :: i,j,k
         real(real64) :: lambda(3) 
 
-        eig_array(:,:,:) = 0.0_real64 
+        eig_array(:,:,:,:) = 0.0_real64 
         
         do k = 1,nz 
             do j = 1,ny 
