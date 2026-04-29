@@ -10,6 +10,42 @@ module cpmlfdtd
     implicit none 
     
     contains
+
+    subroutine add_plane_wave_stress(c11, c12, c13, c14, c15, c16, &
+                                     c22, c23, c24, c25, c26, &
+                                     c33, c34, c35, c36, &
+                                     c44, c45, c46, &
+                                     c55, c56, c66, strain_vec, &
+                                     sigmaxx, sigmayy, sigmazz, &
+                                     sigmayz, sigmaxz, sigmaxy)
+        real(real64), intent(in) :: c11, c12, c13, c14, c15, c16
+        real(real64), intent(in) :: c22, c23, c24, c25, c26
+        real(real64), intent(in) :: c33, c34, c35, c36
+        real(real64), intent(in) :: c44, c45, c46
+        real(real64), intent(in) :: c55, c56, c66
+        real(real64), intent(in) :: strain_vec(6)
+        real(real64), intent(inout) :: sigmaxx, sigmayy, sigmazz
+        real(real64), intent(inout) :: sigmayz, sigmaxz, sigmaxy
+
+        sigmaxx = sigmaxx + c11*strain_vec(1) + c12*strain_vec(2) + &
+                            c13*strain_vec(3) + c14*strain_vec(4) + &
+                            c15*strain_vec(5) + c16*strain_vec(6)
+        sigmayy = sigmayy + c12*strain_vec(1) + c22*strain_vec(2) + &
+                            c23*strain_vec(3) + c24*strain_vec(4) + &
+                            c25*strain_vec(5) + c26*strain_vec(6)
+        sigmazz = sigmazz + c13*strain_vec(1) + c23*strain_vec(2) + &
+                            c33*strain_vec(3) + c34*strain_vec(4) + &
+                            c35*strain_vec(5) + c36*strain_vec(6)
+        sigmayz = sigmayz + c14*strain_vec(1) + c24*strain_vec(2) + &
+                            c34*strain_vec(3) + c44*strain_vec(4) + &
+                            c45*strain_vec(5) + c46*strain_vec(6)
+        sigmaxz = sigmaxz + c15*strain_vec(1) + c25*strain_vec(2) + &
+                            c35*strain_vec(3) + c45*strain_vec(4) + &
+                            c55*strain_vec(5) + c56*strain_vec(6)
+        sigmaxy = sigmaxy + c16*strain_vec(1) + c26*strain_vec(2) + &
+                            c36*strain_vec(3) + c46*strain_vec(4) + &
+                            c56*strain_vec(5) + c66*strain_vec(6)
+    end subroutine add_plane_wave_stress
     
     ! =========================================================================    
     ! Computations are done in double precision and written to binary as single
@@ -62,6 +98,15 @@ module cpmlfdtd
         logical :: SINGLE
         integer :: density_code 
 
+        ! values for plane wave
+        real(real64) :: t, cbackground
+        real(real64) :: p(3), ehat(3), r(3), r0(3), Vvec(3), strain_vec(6)
+        real(real64), allocatable :: eig_array(:,:,:)
+        logical :: active(6)
+        integer :: i_min, i_max, j_min, j_max, ip, xi, zi
+        real(real64) :: XMIN, XMAX, XMID, XLOC
+        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
         if (present(SINGLE_OUTPUT)) then
@@ -102,6 +147,7 @@ module cpmlfdtd
         allocate(memory_dsigmaxz_dx(nx, nz), memory_dsigmaxz_dz(nx, nz))
         allocate(vx(nx, nz), vz(nx, nz))
         allocate(sigmaxx(nx, nz), sigmazz(nx, nz), sigmaxz(nx, nz))
+        allocate(eig_array(nx, nz, 4))
         ! allocate(rhoxx(nx, nz), rhoxz(nx, nz), rhozx(nx, nz), rhozz(nx, nz) )
         
         ! -------------------- Load Stiffness Coefficients --------------------
@@ -135,12 +181,48 @@ module cpmlfdtd
         srcx(:) = 0.0_real64
         srcz(:) = 0.0_real64
         
-        if ( source%source_type == 'pw' ) then 
-            ! call direction_polarization_vector( source%x_z_rotation, &
-            !                                     source%x_y_rotation, &
-            !                                     source%y_z_rotation, &
-            !                                     p, ehat)
-            ! p0 = (/ domain%dx*domain%nx/2, domain%dx*domain%nx/2, domain%dx*domain%nx/2 /) 
+        if ( is_plane_wave_source(source%source_type) ) then 
+            XMIN = domain%dx * (1 + domain%cpml)
+            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMID = 0.50_real64 * (XMIN + XMAX)
+            ZMIN = domain%dz * (1 + domain%cpml)
+            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMID = 0.50_real64 * (ZMIN + ZMAX)
+
+            call direction_polarization_vector( source%x_z_rotation, &
+                                                source%x_y_rotation, &
+                                                source%y_z_rotation, &
+                                                p, ehat)
+            call select_injection_faces(p, active)
+
+            r0 = (/ XMID, 0.0_real64, ZMID /)
+            XLOC = XMID
+            ZLOC = ZMID
+            if ( active(1) ) then
+                r0(1) = XMIN
+                XLOC = XMIN
+            endif
+            if ( active(2) ) then
+                r0(1) = XMAX
+                XLOC = XMAX
+            endif
+            if ( active(5) ) then
+                r0(3) = ZMIN
+                ZLOC = ZMIN
+            endif
+            if ( active(6) ) then
+                r0(3) = ZMAX
+                ZLOC = ZMAX
+            endif
+
+            i_min = domain%cpml + 2
+            i_max = domain%nx - domain%cpml - 1
+            j_min = domain%cpml + 2
+            j_max = domain%nz - domain%cpml - 1
+
+            call array_eigenvalues4_2(c11, c13, c15, c33, c35, c55, &
+                                      eig_array, nx, nz)
+            cbackground = sqrt(maxval(eig_array) / minval(rho))
         else if ( source%source_type == 'ac') then 
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
             call loadsource('seismicsourcez.dat', source%time_steps, srcz)
@@ -328,13 +410,67 @@ module cpmlfdtd
             
             !$omp end parallel
             
-            ! Add the source term. If it is an accelerated weight drop the src_ij terms are zero
-            ! If it is any other source, the src_i terms are zero
-            sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
-            sigmaxz(isource+1,jsource+1) = sigmaxz(isource+1, jsource+1) + srcxz(it) / rho(isource+1,jsource+1)  
-            sigmazz(isource,jsource) = sigmazz(isource, jsource) + srczz(it) / rho(isource,jsource) 
-            vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
-            vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
+            if ( is_plane_wave_source(source%source_type) ) then
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then
+                    xi = nint(XLOC / domain%dx)
+                    do ip = j_min,j_max
+                        r = (/ XLOC, 0.0_real64, ip * domain%dz /)
+                        call boundary_seismic_field(r, r0, t, &
+                                        source%source_frequency, &
+                                        source%x_z_rotation, &
+                                        source%x_y_rotation, &
+                                        source%y_z_rotation, &
+                                        cbackground, source%amplitude, &
+                                        source%source_wavelet, &
+                                        Vvec, strain_vec, source%source_type)
+                        vx(xi,ip) = vx(xi,ip) + Vvec(1)
+                        vz(xi,ip) = vz(xi,ip) + Vvec(3)
+                        sigmaxx(xi,ip) = sigmaxx(xi,ip) + &
+                            c11(xi,ip) * strain_vec(1) + c13(xi,ip) * strain_vec(3) + &
+                            c15(xi,ip) * strain_vec(5)
+                        sigmazz(xi,ip) = sigmazz(xi,ip) + &
+                            c13(xi,ip) * strain_vec(1) + c33(xi,ip) * strain_vec(3) + &
+                            c35(xi,ip) * strain_vec(5)
+                        sigmaxz(xi,ip) = sigmaxz(xi,ip) + &
+                            c15(xi,ip) * strain_vec(1) + c35(xi,ip) * strain_vec(3) + &
+                            c55(xi,ip) * strain_vec(5)
+                    enddo
+                endif
+                if ( active(5) .or. active(6) ) then
+                    zi = nint(ZLOC / domain%dz)
+                    do ip = i_min,i_max
+                        r = (/ ip * domain%dx, 0.0_real64, ZLOC /)
+                        call boundary_seismic_field(r, r0, t, &
+                                        source%source_frequency, &
+                                        source%x_z_rotation, &
+                                        source%x_y_rotation, &
+                                        source%y_z_rotation, &
+                                        cbackground, source%amplitude, &
+                                        source%source_wavelet, &
+                                        Vvec, strain_vec, source%source_type)
+                        vx(ip,zi) = vx(ip,zi) + Vvec(1)
+                        vz(ip,zi) = vz(ip,zi) + Vvec(3)
+                        sigmaxx(ip,zi) = sigmaxx(ip,zi) + &
+                            c11(ip,zi) * strain_vec(1) + c13(ip,zi) * strain_vec(3) + &
+                            c15(ip,zi) * strain_vec(5)
+                        sigmazz(ip,zi) = sigmazz(ip,zi) + &
+                            c13(ip,zi) * strain_vec(1) + c33(ip,zi) * strain_vec(3) + &
+                            c35(ip,zi) * strain_vec(5)
+                        sigmaxz(ip,zi) = sigmaxz(ip,zi) + &
+                            c15(ip,zi) * strain_vec(1) + c35(ip,zi) * strain_vec(3) + &
+                            c55(ip,zi) * strain_vec(5)
+                    enddo
+                endif
+            else
+                ! Add the source term. If it is an accelerated weight drop the src_ij terms are zero
+                ! If it is any other source, the src_i terms are zero
+                sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
+                sigmaxz(isource+1,jsource+1) = sigmaxz(isource+1, jsource+1) + srcxz(it) / rho(isource+1,jsource+1)  
+                sigmazz(isource,jsource) = sigmazz(isource, jsource) + srczz(it) / rho(isource,jsource) 
+                vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
+                vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
+            endif
         
             ! Dirichlet conditions (rigid boundaries) on the edges or at the 
             ! bottom of the PML layers
@@ -371,6 +507,7 @@ module cpmlfdtd
         deallocate(memory_dsigmaxx_dx, memory_dsigmazz_dz)
         deallocate(memory_dsigmaxz_dx, memory_dsigmaxz_dz)
         deallocate(vx, vz, sigmaxx, sigmazz, sigmaxz)
+        deallocate(eig_array)
         
     end subroutine seismic2
     
@@ -427,7 +564,7 @@ module cpmlfdtd
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
         integer :: density_code
-        
+
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
         if (present(SINGLE_OUTPUT)) then 
@@ -779,7 +916,7 @@ module cpmlfdtd
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
         integer :: density_code
-        
+
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
         if (present(SINGLE_OUTPUT)) then 
@@ -1297,6 +1434,16 @@ module cpmlfdtd
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
         integer :: density_code
+
+        ! values for plane wave
+        real(real64) :: t, cbackground
+        real(real64) :: p(3), ehat(3), r(3), r0(3), Vvec(3), strain_vec(6)
+        real(real64), allocatable :: eig_array(:,:,:)
+        logical :: active(6)
+        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
+        real(real64) :: XMIN, XMAX, XMID, XLOC
+        real(real64) :: YMIN, YMAX, YMID, YLOC
+        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
         
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
@@ -1369,6 +1516,7 @@ module cpmlfdtd
         allocate(vx(nx, ny, nz), vy(nx, ny, nz), vz(nx, ny, nz))
         allocate(sigmaxx(nx, ny, nz), sigmaxy(nx, ny, nz), sigmaxz(nx, ny, nz))
         allocate(sigmayy(nx, ny, nz), sigmayz(nx, ny, nz), sigmazz(nx, ny, nz))        
+        allocate(eig_array(nx, nz, 6))
         
         ! ------------------------ Load Stiffness Coefficients ------------------------
         call material_rw2('c11.dat', c11, .TRUE.)
@@ -1418,7 +1566,65 @@ module cpmlfdtd
         srcy(:) = 0.0_real64
         srcz(:) = 0.0_real64
         
-        if ( source%source_type == 'ac') then 
+        if ( is_plane_wave_source(source%source_type) ) then
+            XMIN = domain%dx * (1 + domain%cpml)
+            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMID = 0.50_real64 * (XMIN + XMAX)
+            YMIN = domain%dy * (1 + domain%cpml)
+            YMAX = domain%dy * (domain%ny - domain%cpml)
+            YMID = 0.50_real64 * (YMIN + YMAX)
+            ZMIN = domain%dz * (1 + domain%cpml)
+            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMID = 0.50_real64 * (ZMIN + ZMAX)
+
+            call direction_polarization_vector( source%x_z_rotation, &
+                                                source%x_y_rotation, &
+                                                source%y_z_rotation, &
+                                                p, ehat)
+            call select_injection_faces(p, active)
+
+            r0 = (/ XMID, YMID, ZMID /)
+            XLOC = XMID
+            YLOC = YMID
+            ZLOC = ZMID
+            if ( active(1) ) then
+                r0(1) = XMIN
+                XLOC = XMIN
+            endif
+            if ( active(2) ) then
+                r0(1) = XMAX
+                XLOC = XMAX
+            endif
+            if ( active(3) ) then
+                r0(2) = YMIN
+                YLOC = YMIN
+            endif
+            if ( active(4) ) then
+                r0(2) = YMAX
+                YLOC = YMAX
+            endif
+            if ( active(5) ) then
+                r0(3) = ZMIN
+                ZLOC = ZMIN
+            endif
+            if ( active(6) ) then
+                r0(3) = ZMAX
+                ZLOC = ZMAX
+            endif
+
+            i_min = domain%cpml + 2
+            i_max = domain%nx - domain%cpml - 1
+            j_min = domain%cpml + 2
+            j_max = domain%ny - domain%cpml - 1
+            k_min = domain%cpml + 2
+            k_max = domain%nz - domain%cpml - 1
+
+            call array_eigenvalues4_25(c11, c12, c13, c14, c15, c16, &
+                                       c22, c23, c24, c25, c26, &
+                                       c33, c34, c35, c36, c44, c45, c46, &
+                                       c55, c56, c66, eig_array, nx, nz)
+            cbackground = sqrt(maxval(eig_array) / minval(rho))
+        else if ( source%source_type == 'ac') then 
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
             call loadsource('seismicsourcey.dat', source%time_steps, srcy)
             call loadsource('seismicsourcez.dat', source%time_steps, srcz)
@@ -1837,18 +2043,97 @@ module cpmlfdtd
                 enddo
             enddo
             
-            sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,ksource)  
-            sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,ksource+1)
-            sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,ksource)  
-            sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,ksource)
-            sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,ksource+1)  
-            sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,ksource)
-            vx(isource+1,jsource,ksource) = vx(isource+1,jsource,ksource) + &
-                    srcx(it) * dt / rho(isource+1,ksource)
-            vy(isource,jsource+1,ksource) = vy(isource,jsource+1,ksource) + &
-                    srcy(it) * dt / rho(isource,ksource)
-            vz(isource,jsource,ksource+1) = vz(isource,jsource,ksource+1) + &
-                    srcz(it) * dt / rho(isource,ksource+1)
+            if ( is_plane_wave_source(source%source_type) ) then
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then
+                    ii = nint(XLOC / domain%dx)
+                    do jj = j_min,j_max
+                        do kk = k_min,k_max
+                            r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+                            call boundary_seismic_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            cbackground, source%amplitude, &
+                                            source%source_wavelet, Vvec, strain_vec, source%source_type)
+                            vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
+                            vy(ii,jj,kk) = vy(ii,jj,kk) + Vvec(2)
+                            vz(ii,jj,kk) = vz(ii,jj,kk) + Vvec(3)
+                            call add_plane_wave_stress(c11(ii,kk), c12(ii,kk), c13(ii,kk), &
+                                c14(ii,kk), c15(ii,kk), c16(ii,kk), c22(ii,kk), c23(ii,kk), &
+                                c24(ii,kk), c25(ii,kk), c26(ii,kk), c33(ii,kk), c34(ii,kk), &
+                                c35(ii,kk), c36(ii,kk), c44(ii,kk), c45(ii,kk), c46(ii,kk), &
+                                c55(ii,kk), c56(ii,kk), c66(ii,kk), strain_vec, &
+                                sigmaxx(ii,jj,kk), sigmayy(ii,jj,kk), sigmazz(ii,jj,kk), &
+                                sigmayz(ii,jj,kk), sigmaxz(ii,jj,kk), sigmaxy(ii,jj,kk))
+                        enddo
+                    enddo
+                endif
+                if ( active(3) .or. active(4) ) then
+                    jj = nint(YLOC / domain%dy)
+                    do ii = i_min,i_max
+                        do kk = k_min,k_max
+                            r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
+                            call boundary_seismic_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            cbackground, source%amplitude, &
+                                            source%source_wavelet, Vvec, strain_vec, source%source_type)
+                            vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
+                            vy(ii,jj,kk) = vy(ii,jj,kk) + Vvec(2)
+                            vz(ii,jj,kk) = vz(ii,jj,kk) + Vvec(3)
+                            call add_plane_wave_stress(c11(ii,kk), c12(ii,kk), c13(ii,kk), &
+                                c14(ii,kk), c15(ii,kk), c16(ii,kk), c22(ii,kk), c23(ii,kk), &
+                                c24(ii,kk), c25(ii,kk), c26(ii,kk), c33(ii,kk), c34(ii,kk), &
+                                c35(ii,kk), c36(ii,kk), c44(ii,kk), c45(ii,kk), c46(ii,kk), &
+                                c55(ii,kk), c56(ii,kk), c66(ii,kk), strain_vec, &
+                                sigmaxx(ii,jj,kk), sigmayy(ii,jj,kk), sigmazz(ii,jj,kk), &
+                                sigmayz(ii,jj,kk), sigmaxz(ii,jj,kk), sigmaxy(ii,jj,kk))
+                        enddo
+                    enddo
+                endif
+                if ( active(5) .or. active(6) ) then
+                    kk = nint(ZLOC / domain%dz)
+                    do ii = i_min,i_max
+                        do jj = j_min,j_max
+                            r = (/ ii * domain%dx, jj * domain%dy, ZLOC /)
+                            call boundary_seismic_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            cbackground, source%amplitude, &
+                                            source%source_wavelet, Vvec, strain_vec, source%source_type)
+                            vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
+                            vy(ii,jj,kk) = vy(ii,jj,kk) + Vvec(2)
+                            vz(ii,jj,kk) = vz(ii,jj,kk) + Vvec(3)
+                            call add_plane_wave_stress(c11(ii,kk), c12(ii,kk), c13(ii,kk), &
+                                c14(ii,kk), c15(ii,kk), c16(ii,kk), c22(ii,kk), c23(ii,kk), &
+                                c24(ii,kk), c25(ii,kk), c26(ii,kk), c33(ii,kk), c34(ii,kk), &
+                                c35(ii,kk), c36(ii,kk), c44(ii,kk), c45(ii,kk), c46(ii,kk), &
+                                c55(ii,kk), c56(ii,kk), c66(ii,kk), strain_vec, &
+                                sigmaxx(ii,jj,kk), sigmayy(ii,jj,kk), sigmazz(ii,jj,kk), &
+                                sigmayz(ii,jj,kk), sigmaxz(ii,jj,kk), sigmaxy(ii,jj,kk))
+                        enddo
+                    enddo
+                endif
+            else
+                sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,ksource)  
+                sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,ksource+1)
+                sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,ksource)  
+                sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,ksource)
+                sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,ksource+1)  
+                sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,ksource)
+                vx(isource+1,jsource,ksource) = vx(isource+1,jsource,ksource) + &
+                        srcx(it) * dt / rho(isource+1,ksource)
+                vy(isource,jsource+1,ksource) = vy(isource,jsource+1,ksource) + &
+                        srcy(it) * dt / rho(isource,ksource)
+                vz(isource,jsource,ksource+1) = vz(isource,jsource,ksource+1) + &
+                        srcz(it) * dt / rho(isource,ksource+1)
+            endif
 
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             vx(1,:,:) = 0.0_real64
@@ -1929,6 +2214,7 @@ module cpmlfdtd
         deallocate(vx, vy, vz)
         deallocate(sigmaxx, sigmaxy, sigmaxz)
         deallocate(sigmayy, sigmayz, sigmazz)
+        deallocate(eig_array)
         
     end subroutine seismic25
 
@@ -2362,11 +2648,11 @@ module cpmlfdtd
             enddo
             !$omp end parallel do
             
-            sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)  
+            sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)
             sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource,ksource+1)
-            sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource,ksource)  
+            sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource,ksource)
             sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,jsource,ksource)
-            sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,jsource,ksource+1)  
+            sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,jsource,ksource+1)
             sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,jsource,ksource)
             vx(isource+1,jsource,ksource) = vx(isource+1,jsource,ksource) + &
                     srcx(it) * dt / rho(isource+1,jsource,ksource)
@@ -2524,6 +2810,16 @@ module cpmlfdtd
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
         integer :: density_code
+
+        ! values for plane wave
+        real(real64) :: t, cbackground
+        real(real64) :: p(3), ehat(3), r(3), r0(3), Vvec(3), strain_vec(6)
+        real(real64), allocatable :: eig_array(:,:,:,:)
+        logical :: active(6)
+        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
+        real(real64) :: XMIN, XMAX, XMID, XLOC
+        real(real64) :: YMIN, YMAX, YMID, YLOC
+        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
         
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
@@ -2593,6 +2889,7 @@ module cpmlfdtd
         allocate(vx(nx, ny, nz), vy(nx, ny, nz), vz(nx, ny, nz))
         allocate(sigmaxx(nx, ny, nz), sigmaxy(nx, ny, nz), sigmaxz(nx, ny, nz))
         allocate(sigmayy(nx, ny, nz), sigmayz(nx, ny, nz), sigmazz(nx, ny, nz))        
+        allocate(eig_array(nx, ny, nz, 6))
         
         ! ------------------------ Load Stiffness Coefficients ------------------------
         call material_rw3('c11.dat', c11, .TRUE.)
@@ -2642,7 +2939,65 @@ module cpmlfdtd
         srcy(:) = 0.0_real64
         srcz(:) = 0.0_real64
         
-        if ( source%source_type == 'ac') then 
+        if ( is_plane_wave_source(source%source_type) ) then
+            XMIN = domain%dx * (1 + domain%cpml)
+            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMID = 0.50_real64 * (XMIN + XMAX)
+            YMIN = domain%dy * (1 + domain%cpml)
+            YMAX = domain%dy * (domain%ny - domain%cpml)
+            YMID = 0.50_real64 * (YMIN + YMAX)
+            ZMIN = domain%dz * (1 + domain%cpml)
+            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMID = 0.50_real64 * (ZMIN + ZMAX)
+
+            call direction_polarization_vector( source%x_z_rotation, &
+                                                source%x_y_rotation, &
+                                                source%y_z_rotation, &
+                                                p, ehat)
+            call select_injection_faces(p, active)
+
+            r0 = (/ XMID, YMID, ZMID /)
+            XLOC = XMID
+            YLOC = YMID
+            ZLOC = ZMID
+            if ( active(1) ) then
+                r0(1) = XMIN
+                XLOC = XMIN
+            endif
+            if ( active(2) ) then
+                r0(1) = XMAX
+                XLOC = XMAX
+            endif
+            if ( active(3) ) then
+                r0(2) = YMIN
+                YLOC = YMIN
+            endif
+            if ( active(4) ) then
+                r0(2) = YMAX
+                YLOC = YMAX
+            endif
+            if ( active(5) ) then
+                r0(3) = ZMIN
+                ZLOC = ZMIN
+            endif
+            if ( active(6) ) then
+                r0(3) = ZMAX
+                ZLOC = ZMAX
+            endif
+
+            i_min = domain%cpml + 2
+            i_max = domain%nx - domain%cpml - 1
+            j_min = domain%cpml + 2
+            j_max = domain%ny - domain%cpml - 1
+            k_min = domain%cpml + 2
+            k_max = domain%nz - domain%cpml - 1
+
+            call array_eigenvalues4_3(c11, c12, c13, c14, c15, c16, &
+                                      c22, c23, c24, c25, c26, &
+                                      c33, c34, c35, c36, c44, c45, c46, &
+                                      c55, c56, c66, eig_array, nx, ny, nz)
+            cbackground = sqrt(maxval(eig_array) / minval(rho))
+        else if ( source%source_type == 'ac') then 
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
             call loadsource('seismicsourcey.dat', source%time_steps, srcy)
             call loadsource('seismicsourcez.dat', source%time_steps, srcz)
@@ -3050,18 +3405,91 @@ module cpmlfdtd
             enddo
             !$omp end parallel do
             
-            sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)  
-            sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource+1,ksource)
-            sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource,ksource)  
-            sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,jsource,ksource)
-            sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,jsource,ksource+1)  
-            sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,jsource,ksource)
-            vx(isource+1,jsource,ksource) = vx(isource+1,jsource,ksource) + &
-                    srcx(it) * dt / rho(isource+1,jsource,ksource)
-            vy(isource,jsource+1,ksource) = vy(isource,jsource+1,ksource) + &
-                    srcy(it) * dt / rho(isource,jsource,ksource)
-            vz(isource,jsource,ksource+1) = vz(isource,jsource,ksource+1) + &
-                    srcz(it) * dt / rho(isource,jsource,ksource+1)
+            if ( is_plane_wave_source(source%source_type) ) then
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then
+                    ii = nint(XLOC / domain%dx)
+                    do jj = j_min,j_max
+                        do kk = k_min,k_max
+                            r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+                            call boundary_seismic_field(r, r0, t, source%source_frequency, &
+                                source%x_z_rotation, source%x_y_rotation, source%y_z_rotation, &
+                                cbackground, source%amplitude, source%source_wavelet, &
+                                Vvec, strain_vec, source%source_type)
+                            vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
+                            vy(ii,jj,kk) = vy(ii,jj,kk) + Vvec(2)
+                            vz(ii,jj,kk) = vz(ii,jj,kk) + Vvec(3)
+                            call add_plane_wave_stress(c11(ii,jj,kk), c12(ii,jj,kk), c13(ii,jj,kk), &
+                                c14(ii,jj,kk), c15(ii,jj,kk), c16(ii,jj,kk), c22(ii,jj,kk), &
+                                c23(ii,jj,kk), c24(ii,jj,kk), c25(ii,jj,kk), c26(ii,jj,kk), &
+                                c33(ii,jj,kk), c34(ii,jj,kk), c35(ii,jj,kk), c36(ii,jj,kk), &
+                                c44(ii,jj,kk), c45(ii,jj,kk), c46(ii,jj,kk), c55(ii,jj,kk), &
+                                c56(ii,jj,kk), c66(ii,jj,kk), strain_vec, sigmaxx(ii,jj,kk), &
+                                sigmayy(ii,jj,kk), sigmazz(ii,jj,kk), sigmayz(ii,jj,kk), &
+                                sigmaxz(ii,jj,kk), sigmaxy(ii,jj,kk))
+                        enddo
+                    enddo
+                endif
+                if ( active(3) .or. active(4) ) then
+                    jj = nint(YLOC / domain%dy)
+                    do ii = i_min,i_max
+                        do kk = k_min,k_max
+                            r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
+                            call boundary_seismic_field(r, r0, t, source%source_frequency, &
+                                source%x_z_rotation, source%x_y_rotation, source%y_z_rotation, &
+                                cbackground, source%amplitude, source%source_wavelet, &
+                                Vvec, strain_vec, source%source_type)
+                            vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
+                            vy(ii,jj,kk) = vy(ii,jj,kk) + Vvec(2)
+                            vz(ii,jj,kk) = vz(ii,jj,kk) + Vvec(3)
+                            call add_plane_wave_stress(c11(ii,jj,kk), c12(ii,jj,kk), c13(ii,jj,kk), &
+                                c14(ii,jj,kk), c15(ii,jj,kk), c16(ii,jj,kk), c22(ii,jj,kk), &
+                                c23(ii,jj,kk), c24(ii,jj,kk), c25(ii,jj,kk), c26(ii,jj,kk), &
+                                c33(ii,jj,kk), c34(ii,jj,kk), c35(ii,jj,kk), c36(ii,jj,kk), &
+                                c44(ii,jj,kk), c45(ii,jj,kk), c46(ii,jj,kk), c55(ii,jj,kk), &
+                                c56(ii,jj,kk), c66(ii,jj,kk), strain_vec, sigmaxx(ii,jj,kk), &
+                                sigmayy(ii,jj,kk), sigmazz(ii,jj,kk), sigmayz(ii,jj,kk), &
+                                sigmaxz(ii,jj,kk), sigmaxy(ii,jj,kk))
+                        enddo
+                    enddo
+                endif
+                if ( active(5) .or. active(6) ) then
+                    kk = nint(ZLOC / domain%dz)
+                    do ii = i_min,i_max
+                        do jj = j_min,j_max
+                            r = (/ ii * domain%dx, jj * domain%dy, ZLOC /)
+                            call boundary_seismic_field(r, r0, t, source%source_frequency, &
+                                source%x_z_rotation, source%x_y_rotation, source%y_z_rotation, &
+                                cbackground, source%amplitude, source%source_wavelet, &
+                                Vvec, strain_vec, source%source_type)
+                            vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
+                            vy(ii,jj,kk) = vy(ii,jj,kk) + Vvec(2)
+                            vz(ii,jj,kk) = vz(ii,jj,kk) + Vvec(3)
+                            call add_plane_wave_stress(c11(ii,jj,kk), c12(ii,jj,kk), c13(ii,jj,kk), &
+                                c14(ii,jj,kk), c15(ii,jj,kk), c16(ii,jj,kk), c22(ii,jj,kk), &
+                                c23(ii,jj,kk), c24(ii,jj,kk), c25(ii,jj,kk), c26(ii,jj,kk), &
+                                c33(ii,jj,kk), c34(ii,jj,kk), c35(ii,jj,kk), c36(ii,jj,kk), &
+                                c44(ii,jj,kk), c45(ii,jj,kk), c46(ii,jj,kk), c55(ii,jj,kk), &
+                                c56(ii,jj,kk), c66(ii,jj,kk), strain_vec, sigmaxx(ii,jj,kk), &
+                                sigmayy(ii,jj,kk), sigmazz(ii,jj,kk), sigmayz(ii,jj,kk), &
+                                sigmaxz(ii,jj,kk), sigmaxy(ii,jj,kk))
+                        enddo
+                    enddo
+                endif
+            else
+                sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)
+                sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource+1,ksource)
+                sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource,ksource)
+                sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,jsource,ksource)
+                sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,jsource,ksource+1)
+                sigmazz(isource,jsource,ksource) = sigmazz(isource,jsource,ksource) + srczz(it) / rho(isource,jsource,ksource)
+                vx(isource+1,jsource,ksource) = vx(isource+1,jsource,ksource) + &
+                        srcx(it) * dt / rho(isource+1,jsource,ksource)
+                vy(isource,jsource+1,ksource) = vy(isource,jsource+1,ksource) + &
+                        srcy(it) * dt / rho(isource,jsource,ksource)
+                vz(isource,jsource,ksource+1) = vz(isource,jsource,ksource+1) + &
+                        srcz(it) * dt / rho(isource,jsource,ksource+1)
+            endif
 
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             vx(1,:,:) = 0.0_real64
@@ -3142,6 +3570,7 @@ module cpmlfdtd
         deallocate(vx, vy, vz)
         deallocate(sigmaxx, sigmaxy, sigmaxz)
         deallocate(sigmayy, sigmayz, sigmazz)
+        deallocate(eig_array)
         
     end subroutine seismic3
 

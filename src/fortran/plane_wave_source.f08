@@ -9,10 +9,30 @@ public :: select_injection_faces
 public :: rotmat 
 public :: direction_polarization_vector 
 public :: boundary_em_field 
+public :: boundary_seismic_field
+public :: is_plane_wave_source
+public :: is_p_wave_source
 
 real(real64), parameter :: PI = 3.1415926535897932384626433832795_real64
 
 contains 
+
+pure logical function is_plane_wave_source(source_type) result(is_pw)
+    character(len=*), intent(in) :: source_type
+    character(len=:), allocatable :: st
+
+    st = trim(adjustl(source_type))
+    is_pw = st == 'pw' .or. st == 'pws' .or. st == 'pw_s' .or. st == 'pw-s' .or. &
+            st == 'pwp' .or. st == 'pw_p' .or. st == 'pw-p'
+end function is_plane_wave_source
+
+pure logical function is_p_wave_source(source_type) result(is_p)
+    character(len=*), intent(in) :: source_type
+    character(len=:), allocatable :: st
+
+    st = trim(adjustl(source_type))
+    is_p = st == 'pwp' .or. st == 'pw_p' .or. st == 'pw-p'
+end function is_p_wave_source
 
 pure function cross_product(a, b) result(c)
     real(real64), intent(in) :: a(3), b(3)
@@ -172,5 +192,41 @@ subroutine boundary_em_field(r, r0, t, f0, &
     H = (s / eta) * hhat
 
 end subroutine boundary_em_field
+
+subroutine boundary_seismic_field(r, r0, t, f0, &
+                                    angle_xz, angle_xy, angle_yz, &
+                                    v, amp, type, Vvec, strain_vec, source_type)
+    real(real64), intent(in) :: t
+    real(real64), intent(in) :: r(3), r0(3)
+    real(real64), intent(in) :: angle_xz, angle_xy, angle_yz
+    real(real64), intent(in) :: v
+    real(real64), intent(in) :: amp, f0
+    character(len=*), intent(in) :: type
+    real(real64), intent(out) :: Vvec(3)
+    real(real64), intent(out) :: strain_vec(6)
+    character(len=*), intent(in), optional :: source_type
+
+    real(real64) :: p(3), ehat(3)
+    real(real64) :: tau, s, scale
+
+    call direction_polarization_vector(angle_xz, angle_xy, angle_yz, p, ehat)
+    if (present(source_type)) then
+        if (is_p_wave_source(source_type)) ehat = p
+    endif
+
+    tau = t - dot_product(p, r-r0) / v
+    s = amp * wavelet(tau, f0, type)
+
+    Vvec = s * ehat
+    scale = -s / v
+
+    strain_vec(1) = scale * ehat(1) * p(1)
+    strain_vec(2) = scale * ehat(2) * p(2)
+    strain_vec(3) = scale * ehat(3) * p(3)
+    strain_vec(4) = scale * (ehat(2) * p(3) + ehat(3) * p(2))
+    strain_vec(5) = scale * (ehat(1) * p(3) + ehat(3) * p(1))
+    strain_vec(6) = scale * (ehat(1) * p(2) + ehat(2) * p(1))
+
+end subroutine boundary_seismic_field
 
 end module plane_wave_source
