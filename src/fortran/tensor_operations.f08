@@ -131,7 +131,7 @@ contains
     end subroutine eigen4
     ! --------------------------------------------------------------------------
 
-    subroutine array_eigenvalues22(a11, a12, a22, eig_array, nx, ny)
+    subroutine array_eigenvalues2_2(a11, a12, a22, eig_array, nx, ny)
         !! Second order tensor, 2D case
         real(real64), intent(in) :: a11(:,:), a12(:,:), a22(:,:)
         
@@ -150,10 +150,10 @@ contains
             enddo 
         enddo 
 
-    end subroutine array_eigenvalues22
+    end subroutine array_eigenvalues2_2
 
     ! --------------------------------------------------------------------------
-    subroutine array_eigenvalues42(a11, a13, a15, a33, a35, a55, &
+    subroutine array_eigenvalues4_2(a11, a13, a15, a33, a35, a55, &
                                     eig_array, nx, ny)
         !! 4th order, 2D
         real(real64), intent(in) :: a11(:,:), a13(:,:), a15(:,:), a33(:,:), a35(:,:), a55(:,:)
@@ -177,11 +177,11 @@ contains
             enddo 
         enddo 
 
-    end subroutine array_eigenvalues42
+    end subroutine array_eigenvalues4_2
 
     ! --------------------------------------------------------------------------
 
-    subroutine array_eigenvalues23(a11, a12, a13, a22, a23, a33, eig_array, nx, ny)
+    subroutine array_eigenvalues2_25(a11, a12, a13, a22, a23, a33, eig_array, nx, ny)
         !! Second order, 3D
         real(real64), intent(in) :: a11(:,:), a12(:,:), a13(:,:)
         real(real64), intent(in) :: a22(:,:), a23(:,:), a33(:,:) 
@@ -200,10 +200,10 @@ contains
             enddo 
         enddo 
 
-    end subroutine array_eigenvalues23
+    end subroutine array_eigenvalues2_25
 
     ! --------------------------------------------------------------------------
-    subroutine array_eigenvalues43(a11, a12, a13, a14, a15, a16, &
+    subroutine array_eigenvalues4_25(a11, a12, a13, a14, a15, a16, &
                                     a22, a23, a24, a25, a26, &
                                     a33, a34, a35, a36, a44, a45, a46, &
                                     a55, a56, a66, eig_array, nx, ny)
@@ -232,6 +232,65 @@ contains
             enddo 
         enddo 
 
-    end subroutine array_eigenvalues43
+    end subroutine array_eigenvalues4_25
 
+    ! --------------------------------------------------------------------------
+
+    subroutine array_eigenvalues2_3(a11, a12, a13, a22, a23, a33, &
+                                    eig_array, nx, ny, nz)
+        !! Second order, 3D
+        real(real64), intent(in) :: a11(:,:,:), a12(:,:,:), a13(:,:,:)
+        real(real64), intent(in) :: a22(:,:,:), a23(:,:,:), a33(:,:,:) 
+        integer, intent(in) :: nx, ny, nz
+        real(real64), intent(out) :: eig_array(nx, ny, nz, 3)
+        integer :: i,j,k
+        real(real64) :: lambda(3) 
+
+        eig_array(:,:,:) = 0.0_real64 
+        
+        do k = 1,nz 
+            do j = 1,ny 
+                do i=1,nx 
+                    call eigen2(a11(i,j,k), a12(i,j,k), a13(i,j,k), &
+                                a22(i,j,k), a23(i,j,k), a33(i,j,k), lambda )
+                    eig_array(i,j,k,:) = lambda(:)
+                enddo 
+            enddo
+        enddo  
+
+    end subroutine array_eigenvalues2_3
+
+    ! --------------------------------------------------------------------------
+    subroutine array_eigenvalues4_3(a11, a12, a13, a14, a15, a16, &
+                                    a22, a23, a24, a25, a26, &
+                                    a33, a34, a35, a36, a44, a45, a46, &
+                                    a55, a56, a66, eig_array, nx, ny, nz)
+        !! 4th order 3D
+        real(real64), intent(in) :: a11(:,:,:), a12(:,:,:), a13(:,:,:), a14(:,:,:), a15(:,:,:), a16(:,:,:)
+        real(real64), intent(in) :: a22(:,:,:), a23(:,:,:), a24(:,:,:), a25(:,:,:), a26(:,:,:) 
+        real(real64), intent(in) :: a33(:,:,:), a34(:,:,:), a35(:,:,:), a36(:,:,:), a44(:,:,:) 
+        real(real64), intent(in) :: a45(:,:,:), a46(:,:,:), a55(:,:,:), a56(:,:,:), a66(:,:,:)
+        integer, intent(in) :: nx, ny, nz
+
+        real(real64), intent(out) :: eig_array(nx, ny, nz, 6)
+        
+        integer :: i,j
+        real(real64) :: lambda(6) 
+
+        eig_array(:,:,:,:) = 0.0_real64 
+        
+        do k = 1,nz
+            do j = 1,ny 
+                do i=1,nx 
+                    call eigen4(a11(i,j,k), a12(i,j,k), a13(i,j,k), a14(i,j,k), a15(i,j,k), a16(i,j,k), &
+                                a22(i,j,k), a23(i,j,k), a24(i,j,k), a25(i,j,k), a26(i,j,k), &
+                                a33(i,j,k), a34(i,j,k), a35(i,j,k), a36(i,j,k), &
+                                a44(i,j,k), a45(i,j,k), a46(i,j,k), &
+                                a55(i,j,k), a56(i,j,k), a66(i,j,k), lambda )
+                    eig_array(i,j,k,:) = lambda(:)
+                enddo 
+            enddo 
+        enddo
+
+    end subroutine array_eigenvalues4_25
 end module tensor_operations

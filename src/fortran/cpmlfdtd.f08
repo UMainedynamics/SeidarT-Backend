@@ -1936,6 +1936,7 @@ module cpmlfdtd
     subroutine seismic3iso(domain, source, density_method, SINGLE_OUTPUT)
         !--------------------------------------------------------------------------------------
         use constants
+        use omp_lib
         
         implicit none
 
@@ -2163,8 +2164,9 @@ module cpmlfdtd
             !------------------------------------------------------------
             ! compute stress sigma and update memory variables for C-PML
             !------------------------------------------------------------
-            ! Update in the x direction
-            ! Loop 1
+            ! Loop 1: update sigmaxx, sigmayy, sigmazz
+            !$omp parallel do collapse(2) private(i, j, k, dvx_dx, dvy_dy, dvz_dz) &
+            !$omp& schedule(static)
             do k = 3,nz-1
                 do j = 3,ny-1
                     do i = 2,nx-2
@@ -2265,11 +2267,14 @@ module cpmlfdtd
                     enddo
                 enddo
             enddo
+            !$omp end parallel do
 
             !--------------------------------------------------------
             ! compute velocity and update memory variables for C-PML
             !--------------------------------------------------------
-            ! Loop 5
+            ! Loop 5: update vx
+            !$omp parallel do collapse(2) private(i, j, k, rhoxx, rhoyx, rhozx, &
+            !$omp&    dsigmaxx_dx, dsigmaxy_dy, dsigmaxz_dz) schedule(static)
             do k = 3,nz-1
                 do j = 3,ny-1
                     do i = 3,nx-1
@@ -2294,7 +2299,12 @@ module cpmlfdtd
                             (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoyx + dsigmaxz_dz/rhozx) * dt 
                     enddo
                 enddo
-
+            enddo
+            !$omp end parallel do
+            ! Loop 6: update vy
+            !$omp parallel do collapse(2) private(i, j, k, rhoxy, rhoyy, rhozy, &
+            !$omp&    dsigmaxy_dx, dsigmayy_dy, dsigmayz_dz) schedule(static)
+            do k = 3,nz-1
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
@@ -2350,6 +2360,7 @@ module cpmlfdtd
                     enddo
                 enddo
             enddo
+            !$omp end parallel do
             
             sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)  
             sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource,ksource+1)
@@ -2440,6 +2451,7 @@ module cpmlfdtd
     subroutine seismic3(domain, source, density_method, SINGLE_OUTPUT)
         !--------------------------------------------------------------------------------------
         use constants
+        use omp_lib
         
         implicit none
 
@@ -2745,8 +2757,10 @@ module cpmlfdtd
             !------------------------------------------------------------
             ! compute stress sigma and update memory variables for C-PML
             !------------------------------------------------------------
-            ! Update in the x direction
-            ! Loop 1
+            ! Loop 1: update sigmaxx, sigmayy, sigmazz
+            !$omp parallel do collapse(2) private(i, j, k, &
+            !$omp&    dvx_dx, dvy_dx, dvz_dx, dvx_dy, dvy_dy, dvz_dy, dvx_dz, dvy_dz, dvz_dz) &
+            !$omp& schedule(static)
             do k = 3,nz-1
                 do j = 3,ny-1
                     do i = 2,nx-2
@@ -2805,8 +2819,11 @@ module cpmlfdtd
                     enddo
                 enddo
             enddo
-            ! Loop 2
-            ! Update sigmaxy, x-direction is full nodes
+            !$omp end parallel do
+            ! Loop 2: update sigmaxy
+            !$omp parallel do collapse(2) private(i, j, k, &
+            !$omp&    dvx_dx, dvy_dx, dvz_dx, dvx_dy, dvy_dy, dvz_dy, dvx_dz, dvy_dz, dvz_dz) &
+            !$omp& schedule(static)
             do k = 3,nz-1
                 do j = 2,ny-2
                     do i = 3,nx-1
@@ -2851,8 +2868,11 @@ module cpmlfdtd
                     enddo
                 enddo
             enddo
-            ! Loop 3
-            ! Update sigmaxz, z-direction is full nodes
+            !$omp end parallel do
+            ! Loop 3: update sigmaxz and sigmayz
+            !$omp parallel do collapse(2) private(i, j, k, &
+            !$omp&    dvx_dx, dvy_dx, dvz_dx, dvx_dy, dvy_dy, dvz_dy, dvx_dz, dvy_dz, dvz_dz) &
+            !$omp& schedule(static)
             do k = 2,nz-2
                 do j = 3,ny-1
                     do i = 3,nx-1
@@ -3028,9 +3048,10 @@ module cpmlfdtd
                     enddo
                 enddo
             enddo
+            !$omp end parallel do
             
             sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)  
-            sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource,ksource+1)
+            sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource+1,ksource)
             sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource,ksource)  
             sigmayy(isource,jsource,ksource) = sigmayy(isource,jsource,ksource) + srcyy(it) / rho(isource,jsource,ksource)
             sigmayz(isource,jsource+1,ksource+1) = sigmayz(isource,jsource+1,ksource+1) + srcyz(it) / rho(isource,jsource,ksource+1)  
@@ -3279,7 +3300,7 @@ module cpmlfdtd
             k_min = domain%cpml + 2 
             k_max = domain%nz - domain%cpml - 1
             
-            call array_eigenvalues22(eps11, eps13, eps33, eig_array, nx, nz)
+            call array_eigenvalues2_2(eps11, eps13, eps33, eig_array, nx, nz)
             eps_r_min = minval(eig_array)
             vbackground = clight / sqrt(eps_r_min)
             eta = sqrt(mu0 / (eps0*eps_r_min))
@@ -3715,13 +3736,13 @@ module cpmlfdtd
             endif
 
             i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml -1
+            i_max = domain%nx - domain%cpml - 1
             j_min = domain%cpml + 2 
-            j_max = domain%ny - domain%cpml -1
+            j_max = domain%ny - domain%cpml - 1
             k_min = domain%cpml + 2 
             k_max = domain%nz - domain%cpml - 1
             
-            call array_eigenvalues23(eps11, eps12, eps13, eps22, eps23, eps33, eig_array, nx, nz)
+            call array_eigenvalues2_25(eps11, eps12, eps13, eps22, eps23, eps33, eig_array, nx, nz)
             eps_r_min = minval(eig_array)
             vbackground = clight / sqrt(eps_r_min)
             eta = sqrt(mu0 / (eps0*eps_r_min))
@@ -4095,6 +4116,7 @@ module cpmlfdtd
         !--------------------------------------------------------------------------------------
         
         use constants
+        use omp_lib
         
         implicit none
 
@@ -4334,6 +4356,7 @@ module cpmlfdtd
             ! compute magnetic field and update memory variables for C-PML
             !--------------------------------------------------------
             ! Update Hx
+            !$omp parallel do collapse(2) private(i, j, k, dEz_dy, dEy_dz) schedule(static)
             do k = 1,nz-1
                 do i = 1,nx-1  
                     do j = 1,ny-1

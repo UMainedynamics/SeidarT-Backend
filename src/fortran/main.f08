@@ -85,13 +85,18 @@ program main
     
     !----------------------------------------------------------------------
     ! dispatch to the correct solver
-    if (domain%dim == 2.5) then
+    if (domain%dim == 3.0) then
 
-        ! if (seismoacoustic) then
-        ! print *, "Running 2.5D seismo‑acoustic model with", seismic_source%time_steps, "time steps"
-        ! call seismoacoustic25(domain, seismic_source, .TRUE.)
+        if (seismic) then
+            print *, "Running 3D seismic model with", seismic_source%time_steps, "time steps"
+            call seismic3(domain, seismic_source, density_method, .TRUE.)
+        else
+            print *, "Running 3D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
+            call electromag3(domain, electromagnetic_source, .TRUE.)
+        end if
 
-        ! else if (seismic) then
+    else if (domain%dim == 2.5) then
+
         if (seismic) then
             print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
             call seismic25(domain, seismic_source, density_method, .TRUE.)
