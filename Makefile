@@ -27,11 +27,13 @@ else ifeq ($(UNAME_S), Darwin)
 endif
 
 
-FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
+FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
 
 # Source files
 SRC_DIR := src/fortran
-SOURCES := $(SRC_DIR)/constants.f08 $(SRC_DIR)/seidart_types.f08 $(SRC_DIR)/seidartio.f08 $(SRC_DIR)/cpmlfdtd.f08 $(SRC_DIR)/main.f08
+SOURCES := $(SRC_DIR)/constants.f08 $(SRC_DIR)/seidart_types.f08 $(SRC_DIR)/seidartio.f08 \
+           $(SRC_DIR)/averaging.f08 $(SRC_DIR)/plane_wave_source.f08 \
+           $(SRC_DIR)/tensor_operations.f08 $(SRC_DIR)/cpmlfdtd.f08 $(SRC_DIR)/main.f08
 EXECUTABLE := seidartfdtd-$(OS)-$(ARCH) 
 
 # OpenMP support (conditionally add -fopenmp flag)

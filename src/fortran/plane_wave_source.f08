@@ -134,6 +134,8 @@ pure real(real64) function wavelet(t, f0, type) result(w)
             w = -2.0_real64 * a * g 
         case ('gaus2')
             w = (1.0_real64 - 2.0_real64 * a * a) * g 
+        case default
+            w = g
     end select
     
 end function wavelet

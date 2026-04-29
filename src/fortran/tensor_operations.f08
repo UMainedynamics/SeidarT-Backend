@@ -6,9 +6,10 @@ implicit none
 
 private 
 
-public :: eigen2, eigen4, & 
-            array_eigenvalues22, array_eigenvalues42, &
-            array_eigenvalues23, array_eigenvalues43
+public :: eigen2, eigen4, &
+            array_eigenvalues2_2,  array_eigenvalues4_2, &
+            array_eigenvalues2_25, array_eigenvalues4_25, &
+            array_eigenvalues2_3,  array_eigenvalues4_3
 
 contains 
 
@@ -274,7 +275,7 @@ contains
 
         real(real64), intent(out) :: eig_array(nx, ny, nz, 6)
         
-        integer :: i,j
+        integer :: i,j,k
         real(real64) :: lambda(6) 
 
         eig_array(:,:,:,:) = 0.0_real64 
@@ -292,5 +293,5 @@ contains
             enddo 
         enddo
 
-    end subroutine array_eigenvalues4_25
+    end subroutine array_eigenvalues4_3
 end module tensor_operations
