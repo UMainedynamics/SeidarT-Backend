@@ -261,8 +261,8 @@ module cpmlfdtd
         call material_rw2('initialconditionVx.dat', vx, .TRUE.)
         call material_rw2('initialconditionVz.dat', vz, .TRUE.)
         
-        vx(:,:) = 0.0_real64
-        vz(:,:) = 0.0_real64
+        ! vx(:,:) = 0.0_real64
+        ! vz(:,:) = 0.0_real64
         sigmaxx(:,:) = 0.0_real64
         sigmazz(:,:) = 0.0_real64
         sigmaxz(:,:) = 0.0_real64
@@ -295,7 +295,7 @@ module cpmlfdtd
         ! end if 
                     
         do it = 1,source%time_steps
-            !$omp parallel private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
+            !$omp parallel private(i, j, rhoxx, rhozx, rhoxz, rhozz, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
             ! ------------------------------------------------------------
             !  compute stress sigma and update memory variables for C-PML
             ! ------------------------------------------------------------
@@ -380,7 +380,7 @@ module cpmlfdtd
                     
                     value_dsigmaxx_dx = value_dsigmaxx_dx / kappa(i,j) + memory_dsigmaxx_dx(i,j)
                     value_dsigmaxz_dz = value_dsigmaxz_dz / kappa(i,j) + memory_dsigmaxz_dz(i,j)
-                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx/rhoxx + value_dsigmaxz_dz/rhozx ) !deltarho
+                    vx(i,j) = vx(i,j) + dt * (value_dsigmaxx_dx/rhoxx + value_dsigmaxz_dz/rhozx )
                     
                 enddo
             enddo
@@ -403,7 +403,7 @@ module cpmlfdtd
                     value_dsigmaxz_dx = value_dsigmaxz_dx / kappa_half(i,j) + memory_dsigmaxz_dx(i,j)
                     value_dsigmazz_dz = value_dsigmazz_dz / kappa_half(i,j) + memory_dsigmazz_dz(i,j)
 
-                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz + value_dsigmazz_dz/rhozz) !deltarho
+                    vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz + value_dsigmazz_dz/rhozz)
                 enddo
             enddo
             !$omp end do
@@ -787,7 +787,7 @@ module cpmlfdtd
 
                     vz(i,k) = vz(i,k) + &
                         (dsigmaxz_dx/rhoxz + dsigmazz_dz/rhozz) * &
-                        dt !/ deltarho !rho(i,k)
+                        dt 
 
                 enddo
             enddo
@@ -1267,7 +1267,7 @@ module cpmlfdtd
 
                         vz(i,j,k) = vz(i,j,k) + &
                             (dsigmaxz_dx/rhoxz + dsigmayz_dy/rhoyz + dsigmazz_dz/rhozz) * &
-                            dt !/ deltarho !rho(i,k)
+                            dt 
 
                     enddo
                 enddo
@@ -2037,7 +2037,7 @@ module cpmlfdtd
 
                         vz(i,j,k) = vz(i,j,k) + &
                             (dsigmaxz_dx/rhoxz(i,j) + dsigmayz_dy/rhoyz(i,j) + dsigmazz_dz/rhozz(i,j)) * &
-                            dt !/ deltarho !rho(i,k)
+                            dt 
 
                     enddo
                 enddo
@@ -3398,7 +3398,7 @@ module cpmlfdtd
 
                         vz(i,j,k) = vz(i,j,k) + &
                             (dsigmaxz_dx/rhoxz + dsigmayz_dy/rhoyz + dsigmazz_dz/rhozz) * &
-                            dt !/ deltarho !rho(i,k)
+                            dt 
 
                     enddo
                 enddo
@@ -3725,8 +3725,8 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
             i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml -1
-            k_min = domain%cpml + 2 
+            i_max = domain%nx - domain%cpml - 1
+            k_min = domain%cpml + 2
             k_max = domain%nz - domain%cpml - 1
             
             call array_eigenvalues2_2(eps11, eps13, eps33, eig_array, nx, nz)
@@ -4164,12 +4164,12 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
 
-            i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml - 1
-            j_min = domain%cpml + 2 
-            j_max = domain%ny - domain%cpml - 1
-            k_min = domain%cpml + 2 
-            k_max = domain%nz - domain%cpml - 1
+            i_min = domain%cpml + 3
+            i_max = domain%nx - domain%cpml - 2
+            j_min = domain%cpml + 3 
+            j_max = domain%ny - domain%cpml - 2
+            k_min = domain%cpml + 3 
+            k_max = domain%nz - domain%cpml - 2
             
             call array_eigenvalues2_25(eps11, eps12, eps13, eps22, eps23, eps33, eig_array, nx, nz)
             eps_r_min = minval(eig_array)
@@ -4750,12 +4750,12 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
 
-            i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml - 1
-            j_min = domain%cpml + 2
-            j_max = domain%ny - domain%cpml - 1
-            k_min = domain%cpml + 2
-            k_max = domain%nz - domain%cpml - 1
+            i_min = domain%cpml + 3
+            i_max = domain%nx - domain%cpml - 2
+            j_min = domain%cpml + 3
+            j_max = domain%ny - domain%cpml - 2
+            k_min = domain%cpml + 3
+            k_max = domain%nz - domain%cpml - 2
 
             call array_eigenvalues2_3(eps11, eps12, eps13, eps22, eps23, eps33, &
                                       eig_array, nx, ny, nz)
@@ -4864,7 +4864,7 @@ module cpmlfdtd
                         dEz_dy = ( Ez(i,j+1,k) - Ez(i,j,k) )/dy
                         dEy_dz = ( Ey(i,j,k+1) - Ey(i,j,k) )/dz
             
-                        ! The rest of the equation needed for agnetic field updates
+                        ! The rest of the equation needed for magnetic field updates
                         memory_dEy_dz(i,j,k) = bcoef_half(i,j,k) * memory_dEy_dz(i,j,k) + acoef_half(i,j,k) * dEy_dz
                         memory_dEz_dy(i,j,k) = bcoef_half(i,j,k) * memory_dEz_dy(i,j,k) + acoef_half(i,j,k) * dEz_dy
                         
@@ -4876,8 +4876,10 @@ module cpmlfdtd
                     enddo
                 enddo  
             enddo
+            !$omp end parallel do
 
-                ! Update Hy
+            ! Update Hy
+            !$omp parallel do collapse(2) private(i, j, k, dEx_dz, dEz_dx) schedule(static)
             do k = 1,nz-1
                 do i = 1,nx-1      
                     do j = 1,ny-1
@@ -4898,8 +4900,10 @@ module cpmlfdtd
                     enddo
                 enddo  
             enddo
+            !$omp end parallel do
 
-                ! Update Hz
+            ! Update Hz
+            !$omp parallel do collapse(2) private(i, j, k, dEx_dy, dEy_dx) schedule(static)
             do k = 2,nz-1
                 do i = 1,nx-1      
                     do j = 1,ny-1
@@ -4918,11 +4922,15 @@ module cpmlfdtd
                     enddo
                 enddo  
             enddo
+            !$omp end parallel do
 
             !--------------------------------------------------------
             ! compute electric field and update memory variables for C-PML
             !--------------------------------------------------------
-            do k =2,nz-1 
+            !$omp parallel do collapse(2) private(i, j, k, &
+            !$omp&    dHz_dy, dHy_dz, dHz_dx, dHx_dz, dHy_dx, dHx_dy, &
+            !$omp&    rhs_x, rhs_y, rhs_z) schedule(static)
+            do k = 2,nz-1 
                 do i = 2,nx-1
                     do j = 2,ny-1 
                         dHz_dy = ( Hz(i,j,k) - Hz(i,j-1,k) )/dy
@@ -4956,6 +4964,7 @@ module cpmlfdtd
                     end do 
                 end do 
             end do 
+            !$omp end parallel do
 
             if ( source%source_type == 'pw' ) then
                 t = it * source%dt
@@ -5135,7 +5144,7 @@ module cpmlfdtd
     !     real(real64) :: velocnorm, value_dvx_dx, value_dvx_dz, &
     !         value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, &
     !         value_dsigmaxz_dx, value_dsigmaxz_dz, &
-    !         rhoxx, rhozx, rhoxz, rhozz !deltarho,  
+    !         rhoxx, rhozx, rhoxz, rhozz  
 
     !     ! 1D arrays for damping profiles
     !     real(real64), allocatable :: c11(:,:), c13(:,:), c15(:,:), c33(:,:), c35(:,:), c55(:,:), rho(:,:)
@@ -5273,7 +5282,7 @@ module cpmlfdtd
     !     dl = sqrt(dx**2 + dz**2)
         
     !     do it = 1,source%time_steps
-    !         !$omp parallel private(i, j, deltarho, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
+    !         !$omp parallel private(i, j, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, value_dsigmaxz_dx, value_dsigmaxz_dz)
     !         ! ------------------------------------------------------------
     !         !  compute stress sigma and update memory variables for C-PML
     !         ! ------------------------------------------------------------

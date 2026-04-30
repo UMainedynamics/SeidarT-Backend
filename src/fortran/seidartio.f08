@@ -83,7 +83,7 @@ module seidartio
         call json%get('Electromagnetic.Source.source_type', temp_string)
         electromagnetic_source%source_type = trim(adjustl(temp_string))
         call json%get('Electromagnetic.Source.source_wavelet', temp_string)
-        seismic_source%source_wavelet = trim(adjustl(temp_string))
+        electromagnetic_source%source_wavelet = trim(adjustl(temp_string))
 
         call json%destroy()
     
