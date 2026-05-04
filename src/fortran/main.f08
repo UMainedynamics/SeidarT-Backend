@@ -11,6 +11,7 @@ program main
     ! Types are defined in seidartio
     use seidartio 
     use cpmlfdtd 
+    use biotfdtd
     use seidart_types 
     
     implicit none 
@@ -23,6 +24,7 @@ program main
     character(len=256) :: arg
     character(len=256) :: input_json_file 
     logical :: seismic
+    logical :: poroelastic
     integer :: argc, i
     character(len=256) :: key, value, density_method
     
@@ -42,6 +44,7 @@ program main
     ! Set defaults
     ! seismic flag 
     seismic = .true.
+    poroelastic = .false.
     density_method = 'arithmetic'
         
     ! loop over any further key=value flags
@@ -56,6 +59,12 @@ program main
             seismic = .true.
             else if (value == 'false') then
             seismic = .false.
+            end if
+        case ('poroelastic')
+            if (value == 'true') then
+            poroelastic = .true.
+            else if (value == 'false') then
+            poroelastic = .false.
             end if
         case ('density_method')
             density_method = adjustl(value)
@@ -87,7 +96,10 @@ program main
     ! dispatch to the correct solver
     if (domain%dim == 3.0) then
 
-        if (seismic) then
+        if (seismic .and. poroelastic) then
+            print *, "3D Biot poroelastic modeling is not implemented yet."
+            stop
+        else if (seismic) then
             print *, "Running 3D seismic model with", seismic_source%time_steps, "time steps"
             call seismic3(domain, seismic_source, density_method, .TRUE.)
         else
@@ -97,7 +109,10 @@ program main
 
     else if (domain%dim == 2.5) then
 
-        if (seismic) then
+        if (seismic .and. poroelastic) then
+            print *, "Running 2.5D Biot poroelastic model with", seismic_source%time_steps, "time steps"
+            call biot25(domain, seismic_source, .TRUE.)
+        else if (seismic) then
             print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
             call seismic25(domain, seismic_source, density_method, .TRUE.)
         else
@@ -106,7 +121,10 @@ program main
         end if
     else    ! dim == 2.0
 
-        if (seismic) then
+        if (seismic .and. poroelastic) then
+            print *, "Running 2D Biot poroelastic model with", seismic_source%time_steps, "time steps"
+            call biot2(domain, seismic_source, .TRUE.)
+        else if (seismic) then
             print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
             call seismic2(domain, seismic_source, density_method, .TRUE.)
         else
