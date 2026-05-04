@@ -60,6 +60,7 @@ contains
 
         integer :: a, b, i, k
 
+        !$omp parallel do collapse(2) private(a,b) schedule(static)
         do k = 1, size(cell, 2)
             do i = 1, size(cell, 1)
                 do b = 0, DG_P
@@ -69,6 +70,7 @@ contains
                 enddo
             enddo
         enddo
+        !$omp end parallel do
     end subroutine fill_modal_from_cell
 
     subroutine cell_average(nodal, weights, cell)
@@ -81,6 +83,7 @@ contains
 
         wsum = 4.0_real64
         cell(:,:) = 0.0_real64
+        !$omp parallel do collapse(2) private(a,b) schedule(static)
         do k = 1, size(cell, 2)
             do i = 1, size(cell, 1)
                 do b = 0, DG_P
@@ -91,6 +94,7 @@ contains
                 cell(i,k) = cell(i,k) / wsum
             enddo
         enddo
+        !$omp end parallel do
     end subroutine cell_average
 
     subroutine dg_derivatives(field, deriv, dx, dz, dfdx, dfdz)
@@ -104,6 +108,7 @@ contains
 
         dfdx(:,:,:,:) = 0.0_real64
         dfdz(:,:,:,:) = 0.0_real64
+        !$omp parallel do collapse(2) private(a,b,m) schedule(static)
         do k = 1, size(field, 4)
             do i = 1, size(field, 3)
                 do b = 0, DG_P
@@ -118,6 +123,7 @@ contains
                 enddo
             enddo
         enddo
+        !$omp end parallel do
     end subroutine dg_derivatives
 
     subroutine apply_rusanov_penalty(u, rhs, weights, dx, dz, speed)
@@ -133,6 +139,7 @@ contains
         nx = size(u, 3)
         nz = size(u, 4)
 
+        !$omp parallel do collapse(2) private(b,left_state,right_state,jump) schedule(static)
         do k = 1, nz
             do i = 1, nx
                 do b = 0, DG_P
@@ -154,7 +161,9 @@ contains
                 enddo
             enddo
         enddo
+        !$omp end parallel do
 
+        !$omp parallel do collapse(2) private(b,left_state,right_state,jump) schedule(static)
         do k = 1, nz
             do i = 1, nx
                 do b = 0, DG_P
@@ -176,11 +185,13 @@ contains
                 enddo
             enddo
         enddo
+        !$omp end parallel do
     end subroutine apply_rusanov_penalty
 
     subroutine rhs_biot2(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz, &
                          c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                          alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                         gamma_x, gamma_z, gamma_xz, &
                          deriv, weights, dx, dz, max_speed, &
                          rvx, rvz, rqx, rqz, rp, rsxx, rszz, rsxz)
         real(real64), intent(in) :: vx(0:,0:,:,:), vz(0:,0:,:,:)
@@ -192,6 +203,7 @@ contains
         real(real64), intent(in) :: rho(:,:), rho_fluid(:,:), viscosity(:,:)
         real(real64), intent(in) :: alpha_x(:,:), alpha_z(:,:), biot_m(:,:)
         real(real64), intent(in) :: permeability_x(:,:), permeability_z(:,:)
+        real(real64), intent(in) :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:)
         real(real64), intent(in) :: deriv(0:DG_P,0:DG_P), weights(0:DG_P)
         real(real64), intent(in) :: dx, dz, max_speed
         real(real64), intent(out) :: rvx(0:,0:,:,:), rvz(0:,0:,:,:)
@@ -225,6 +237,7 @@ contains
         call dg_derivatives(sigmazz, deriv, dx, dz, dszz_dx, dszz_dz)
         call dg_derivatives(sigmaxz, deriv, dx, dz, dsxz_dx, dsxz_dz)
 
+        !$omp parallel do collapse(2) private(a,b,div_vs,div_q,p_rate,drag_x,drag_z) schedule(static)
         do k = 1, size(vx, 4)
             do i = 1, size(vx, 3)
                 do b = 0, DG_P
@@ -240,11 +253,13 @@ contains
 
                         rp(a,b,i,k) = p_rate
                         rsxx(a,b,i,k) = c11(i,k)*dvx_dx(a,b,i,k) + c13(i,k)*dvz_dz(a,b,i,k) + &
-                            c15(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - alpha_x(i,k) * p_rate
+                            c15(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - alpha_x(i,k) * p_rate - &
+                            gamma_x(i,k) * sigmaxx(a,b,i,k)
                         rszz(a,b,i,k) = c13(i,k)*dvx_dx(a,b,i,k) + c33(i,k)*dvz_dz(a,b,i,k) + &
-                            c35(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - alpha_z(i,k) * p_rate
+                            c35(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - alpha_z(i,k) * p_rate - &
+                            gamma_z(i,k) * sigmazz(a,b,i,k)
                         rsxz(a,b,i,k) = c15(i,k)*dvx_dx(a,b,i,k) + c35(i,k)*dvz_dz(a,b,i,k) + &
-                            c55(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k))
+                            c55(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - gamma_xz(i,k) * sigmaxz(a,b,i,k)
                         rvx(a,b,i,k) = (dsxx_dx(a,b,i,k) + dsxz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
                         rvz(a,b,i,k) = (dsxz_dx(a,b,i,k) + dszz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
                         rqx(a,b,i,k) = -drag_x * dp_dx(a,b,i,k)
@@ -253,6 +268,7 @@ contains
                 enddo
             enddo
         enddo
+        !$omp end parallel do
 
         call apply_rusanov_penalty(vx, rvx, weights, dx, dz, max_speed)
         call apply_rusanov_penalty(vz, rvz, weights, dx, dz, max_speed)
@@ -284,6 +300,7 @@ contains
         real(real64), allocatable :: rho(:,:), rho_fluid(:,:), viscosity(:,:)
         real(real64), allocatable :: alpha_x(:,:), alpha_z(:,:), biot_m(:,:)
         real(real64), allocatable :: permeability_x(:,:), permeability_z(:,:)
+        real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:)
         real(real64), allocatable :: cell_vx(:,:), cell_vz(:,:), cell_out(:,:)
         real(real64), allocatable :: vx(:,:,:,:), vz(:,:,:,:), qx(:,:,:,:), qz(:,:,:,:), pressure(:,:,:,:)
         real(real64), allocatable :: sigmaxx(:,:,:,:), sigmazz(:,:,:,:), sigmaxz(:,:,:,:)
@@ -320,6 +337,7 @@ contains
         allocate(rho(nx,nz), rho_fluid(nx,nz), viscosity(nx,nz))
         allocate(alpha_x(nx,nz), alpha_z(nx,nz), biot_m(nx,nz))
         allocate(permeability_x(nx,nz), permeability_z(nx,nz))
+        allocate(gamma_x(nx,nz), gamma_z(nx,nz), gamma_xz(nx,nz))
         allocate(cell_vx(nx,nz), cell_vz(nx,nz), cell_out(nx,nz))
 
         allocate(vx(0:DG_P,0:DG_P,nx,nz), vz(0:DG_P,0:DG_P,nx,nz))
@@ -363,6 +381,9 @@ contains
         call material_rw2('biot_m.dat', biot_m, .TRUE.)
         call material_rw2('permeability_x.dat', permeability_x, .TRUE.)
         call material_rw2('permeability_z.dat', permeability_z, .TRUE.)
+        call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
+        call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
+        call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
         call material_rw2('initialconditionVx.dat', cell_vx, .TRUE.)
         call material_rw2('initialconditionVz.dat', cell_vz, .TRUE.)
 
@@ -399,6 +420,7 @@ contains
             call rhs_biot2(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
                            k1vx, k1vz, k1qx, k1qz, k1p, k1sxx, k1szz, k1sxz)
             tvx = vx + 0.5_real64 * dt * k1vx
@@ -413,6 +435,7 @@ contains
             call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
                            k2vx, k2vz, k2qx, k2qz, k2p, k2sxx, k2szz, k2sxz)
             tvx = vx + 0.5_real64 * dt * k2vx
@@ -427,6 +450,7 @@ contains
             call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
                            k3vx, k3vz, k3qx, k3qz, k3p, k3sxx, k3szz, k3sxz)
             tvx = vx + dt * k3vx
@@ -441,6 +465,7 @@ contains
             call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
                            k4vx, k4vz, k4qx, k4qz, k4p, k4sxx, k4szz, k4sxz)
 
@@ -494,6 +519,7 @@ contains
         real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c22(:,:), c23(:,:), c33(:,:), rho(:,:)
         real(real64), allocatable :: alpha_x(:,:), alpha_y(:,:), alpha_z(:,:), biot_m(:,:)
         real(real64), allocatable :: rho_fluid(:,:), viscosity(:,:), permeability_x(:,:), permeability_y(:,:), permeability_z(:,:)
+        real(real64), allocatable :: gamma_x(:,:), gamma_y(:,:), gamma_z(:,:)
         real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), pressure(:,:,:)
         real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:)
         real(real64), allocatable :: k1vx(:,:,:), k1vy(:,:,:), k1vz(:,:,:), k1qx(:,:,:), k1qy(:,:,:), k1qz(:,:,:), k1p(:,:,:)
@@ -521,6 +547,7 @@ contains
         allocate(c11(nx,nz), c12(nx,nz), c13(nx,nz), c22(nx,nz), c23(nx,nz), c33(nx,nz), rho(nx,nz))
         allocate(alpha_x(nx,nz), alpha_y(nx,nz), alpha_z(nx,nz), biot_m(nx,nz))
         allocate(rho_fluid(nx,nz), viscosity(nx,nz), permeability_x(nx,nz), permeability_y(nx,nz), permeability_z(nx,nz))
+        allocate(gamma_x(nx,nz), gamma_y(nx,nz), gamma_z(nx,nz))
         allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), pressure(nx,ny,nz))
         allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz))
         allocate(k1vx(nx,ny,nz), k1vy(nx,ny,nz), k1vz(nx,ny,nz), k1qx(nx,ny,nz), k1qy(nx,ny,nz), k1qz(nx,ny,nz), k1p(nx,ny,nz))
@@ -549,6 +576,8 @@ contains
         call material_rw2('biot_m.dat', biot_m, .TRUE.); call material_rw2('rho_fluid.dat', rho_fluid, .TRUE.)
         call material_rw2('viscosity.dat', viscosity, .TRUE.); call material_rw2('permeability_x.dat', permeability_x, .TRUE.)
         call material_rw2('permeability_y.dat', permeability_y, .TRUE.); call material_rw2('permeability_z.dat', permeability_z, .TRUE.)
+        call material_rw2('gamma_x.dat', gamma_x, .TRUE.); call material_rw2('gamma_y.dat', gamma_y, .TRUE.)
+        call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
         call material_rw3('initialconditionVx.dat', vx, .TRUE.)
         call material_rw3('initialconditionVy.dat', vy, .TRUE.)
         call material_rw3('initialconditionVz.dat', vz, .TRUE.)
@@ -577,23 +606,27 @@ contains
         do it = 1, source%time_steps
             call rhs_biot25_cell(vx,vy,vz,qx,qy,qz,pressure,sxx,syy,szz,c11,c12,c13,c22,c23,c33,rho, &
                 rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
                 dx,dy,dz,max_speed,k1vx,k1vy,k1vz,k1qx,k1qy,k1qz,k1p,k1sxx,k1syy,k1szz)
             tvx=vx+0.5_real64*dt*k1vx; tvy=vy+0.5_real64*dt*k1vy; tvz=vz+0.5_real64*dt*k1vz
             tqx=qx+0.5_real64*dt*k1qx; tqy=qy+0.5_real64*dt*k1qy; tqz=qz+0.5_real64*dt*k1qz
             tp=pressure+0.5_real64*dt*k1p; tsxx=sxx+0.5_real64*dt*k1sxx; tsyy=syy+0.5_real64*dt*k1syy; tszz=szz+0.5_real64*dt*k1szz
             call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
                 rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
                 dx,dy,dz,max_speed,k2vx,k2vy,k2vz,k2qx,k2qy,k2qz,k2p,k2sxx,k2syy,k2szz)
             tvx=vx+0.5_real64*dt*k2vx; tvy=vy+0.5_real64*dt*k2vy; tvz=vz+0.5_real64*dt*k2vz
             tqx=qx+0.5_real64*dt*k2qx; tqy=qy+0.5_real64*dt*k2qy; tqz=qz+0.5_real64*dt*k2qz
             tp=pressure+0.5_real64*dt*k2p; tsxx=sxx+0.5_real64*dt*k2sxx; tsyy=syy+0.5_real64*dt*k2syy; tszz=szz+0.5_real64*dt*k2szz
             call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
                 rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
                 dx,dy,dz,max_speed,k3vx,k3vy,k3vz,k3qx,k3qy,k3qz,k3p,k3sxx,k3syy,k3szz)
             tvx=vx+dt*k3vx; tvy=vy+dt*k3vy; tvz=vz+dt*k3vz; tqx=qx+dt*k3qx; tqy=qy+dt*k3qy; tqz=qz+dt*k3qz
             tp=pressure+dt*k3p; tsxx=sxx+dt*k3sxx; tsyy=syy+dt*k3syy; tszz=szz+dt*k3szz
             call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
                 rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
                 dx,dy,dz,max_speed,k4vx,k4vy,k4vz,k4qx,k4qy,k4qz,k4p,k4sxx,k4syy,k4szz)
 
             vx=vx+dt*(k1vx+2.0_real64*k2vx+2.0_real64*k3vx+k4vx)/6.0_real64
@@ -643,6 +676,7 @@ contains
 
         real(real64), allocatable :: c11(:,:,:), c12(:,:,:), c13(:,:,:), c22(:,:,:), c23(:,:,:), c33(:,:,:), rho(:,:,:)
         real(real64), allocatable :: ax(:,:,:), ay(:,:,:), az(:,:,:), m(:,:,:), rho_f(:,:,:), eta(:,:,:), kx(:,:,:), ky(:,:,:), kz(:,:,:)
+        real(real64), allocatable :: gx(:,:,:), gy(:,:,:), gz(:,:,:)
         real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), p(:,:,:)
         real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:)
         real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:)
@@ -660,6 +694,7 @@ contains
         allocate(c11(nx,ny,nz), c12(nx,ny,nz), c13(nx,ny,nz), c22(nx,ny,nz), c23(nx,ny,nz), c33(nx,ny,nz), rho(nx,ny,nz))
         allocate(ax(nx,ny,nz), ay(nx,ny,nz), az(nx,ny,nz), m(nx,ny,nz), rho_f(nx,ny,nz), eta(nx,ny,nz))
         allocate(kx(nx,ny,nz), ky(nx,ny,nz), kz(nx,ny,nz))
+        allocate(gx(nx,ny,nz), gy(nx,ny,nz), gz(nx,ny,nz))
         allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), p(nx,ny,nz))
         allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz))
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
@@ -674,6 +709,8 @@ contains
         call material_rw3('biot_m.dat', m, .TRUE.); call material_rw3('rho_fluid.dat', rho_f, .TRUE.)
         call material_rw3('viscosity.dat', eta, .TRUE.); call material_rw3('permeability_x.dat', kx, .TRUE.)
         call material_rw3('permeability_y.dat', ky, .TRUE.); call material_rw3('permeability_z.dat', kz, .TRUE.)
+        call material_rw3('gamma_x.dat', gx, .TRUE.); call material_rw3('gamma_y.dat', gy, .TRUE.)
+        call material_rw3('gamma_z.dat', gz, .TRUE.)
         call material_rw3('initialconditionVx.dat', vx, .TRUE.)
         call material_rw3('initialconditionVy.dat', vy, .TRUE.)
         call material_rw3('initialconditionVz.dat', vz, .TRUE.)
@@ -697,6 +734,7 @@ contains
         endif
 
         do it=1,source%time_steps
+            !$omp parallel do collapse(3) private(div_v,div_q) schedule(static)
             do k=2,nz-1
                 do j=2,ny-1
                     do i=2,nx-1
@@ -710,17 +748,22 @@ contains
 
                         sxx(i,j,k)=sxx(i,j,k)+dt*(c11(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
                             c12(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
-                            c13(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ax(i,j,k)*p(i,j,k))
+                            c13(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ax(i,j,k)*p(i,j,k)- &
+                            gx(i,j,k)*sxx(i,j,k))
                         syy(i,j,k)=syy(i,j,k)+dt*(c12(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
                             c22(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
-                            c23(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ay(i,j,k)*p(i,j,k))
+                            c23(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ay(i,j,k)*p(i,j,k)- &
+                            gy(i,j,k)*syy(i,j,k))
                         szz(i,j,k)=szz(i,j,k)+dt*(c13(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
                             c23(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
-                            c33(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-az(i,j,k)*p(i,j,k))
+                            c33(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-az(i,j,k)*p(i,j,k)- &
+                            gz(i,j,k)*szz(i,j,k))
                     enddo
                 enddo
             enddo
+            !$omp end parallel do
 
+            !$omp parallel do collapse(3) private(px,py,pz) schedule(static)
             do k=2,nz-1
                 do j=2,ny-1
                     do i=2,nx-1
@@ -736,6 +779,7 @@ contains
                     enddo
                 enddo
             enddo
+            !$omp end parallel do
 
             rho0=positive(rho(isource,jsource,ksource),1.0_real64)
             vx(isource,jsource,ksource)=vx(isource,jsource,ksource)+srcx(it)*dt/rho0
@@ -761,7 +805,7 @@ contains
     end subroutine biotdg3
 
     subroutine rhs_biot25_cell(vx,vy,vz,qx,qy,qz,p,sxx,syy,szz,c11,c12,c13,c22,c23,c33,rho, &
-                               rho_f,eta,ax,ay,az,m,kx,ky,kz,dx,dy,dz,speed, &
+                               rho_f,eta,ax,ay,az,m,kx,ky,kz,gx,gy,gz,dx,dy,dz,speed, &
                                rvx,rvy,rvz,rqx,rqy,rqz,rp,rsxx,rsyy,rszz)
         implicit none
 
@@ -769,6 +813,7 @@ contains
         real(real64), intent(in) :: p(:,:,:), sxx(:,:,:), syy(:,:,:), szz(:,:,:)
         real(real64), intent(in) :: c11(:,:), c12(:,:), c13(:,:), c22(:,:), c23(:,:), c33(:,:), rho(:,:)
         real(real64), intent(in) :: rho_f(:,:), eta(:,:), ax(:,:), ay(:,:), az(:,:), m(:,:), kx(:,:), ky(:,:), kz(:,:)
+        real(real64), intent(in) :: gx(:,:), gy(:,:), gz(:,:)
         real(real64), intent(in) :: dx, dy, dz, speed
         real(real64), intent(out) :: rvx(:,:,:), rvy(:,:,:), rvz(:,:,:), rqx(:,:,:), rqy(:,:,:), rqz(:,:,:)
         real(real64), intent(out) :: rp(:,:,:), rsxx(:,:,:), rsyy(:,:,:), rszz(:,:,:)
@@ -780,6 +825,7 @@ contains
         rvx=0.0_real64; rvy=0.0_real64; rvz=0.0_real64; rqx=0.0_real64; rqy=0.0_real64; rqz=0.0_real64
         rp=0.0_real64; rsxx=0.0_real64; rsyy=0.0_real64; rszz=0.0_real64
 
+        !$omp parallel do collapse(3) private(div_v,div_q,px,py,pz,dampx,dampy,dampz) schedule(static)
         do k=2,nz-1
             do j=2,ny-1
                 do i=2,nx-1
@@ -793,13 +839,16 @@ contains
 
                     rsxx(i,j,k) = c11(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
                                   c12(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
-                                  c13(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ax(i,k)*rp(i,j,k)
+                                  c13(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ax(i,k)*rp(i,j,k) - &
+                                  gx(i,k)*sxx(i,j,k)
                     rsyy(i,j,k) = c12(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
                                   c22(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
-                                  c23(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ay(i,k)*rp(i,j,k)
+                                  c23(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ay(i,k)*rp(i,j,k) - &
+                                  gy(i,k)*syy(i,j,k)
                     rszz(i,j,k) = c13(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
                                   c23(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
-                                  c33(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - az(i,k)*rp(i,j,k)
+                                  c33(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - az(i,k)*rp(i,j,k) - &
+                                  gz(i,k)*szz(i,j,k)
 
                     px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx); py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
                     pz=(p(i,j,k+1)-p(i,j,k-1))/(2.0_real64*dz)
@@ -817,6 +866,7 @@ contains
                 enddo
             enddo
         enddo
+        !$omp end parallel do
     end subroutine rhs_biot25_cell
 
 end module biotdg
