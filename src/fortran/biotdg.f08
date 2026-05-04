@@ -275,7 +275,7 @@ contains
         logical, intent(in), optional :: SINGLE_OUTPUT
 
         integer :: nx, nz
-        integer :: i, k, it, isource, ksource
+        integer :: it, isource, ksource
         real(real64) :: dx, dz, dt, max_speed
         logical :: SINGLE
         real(real64) :: nodes(0:DG_P), weights(0:DG_P), deriv(0:DG_P,0:DG_P)
@@ -479,5 +479,344 @@ contains
         call write_array('velocity_norm.dat', source%time_steps, velocnorm)
         call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
     end subroutine biotdg2
+
+    subroutine biotdg25(domain, source, SINGLE_OUTPUT)
+        implicit none
+
+        type(Domain_Type), intent(in) :: domain
+        type(Source_Type), intent(in) :: source
+        logical, intent(in), optional :: SINGLE_OUTPUT
+
+        integer :: nx, ny, nz, it, isource, jsource, ksource
+        real(real64) :: dx, dy, dz, dt, max_speed, rho0
+        logical :: SINGLE
+
+        real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c22(:,:), c23(:,:), c33(:,:), rho(:,:)
+        real(real64), allocatable :: alpha_x(:,:), alpha_y(:,:), alpha_z(:,:), biot_m(:,:)
+        real(real64), allocatable :: rho_fluid(:,:), viscosity(:,:), permeability_x(:,:), permeability_y(:,:), permeability_z(:,:)
+        real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), pressure(:,:,:)
+        real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:)
+        real(real64), allocatable :: k1vx(:,:,:), k1vy(:,:,:), k1vz(:,:,:), k1qx(:,:,:), k1qy(:,:,:), k1qz(:,:,:), k1p(:,:,:)
+        real(real64), allocatable :: k1sxx(:,:,:), k1syy(:,:,:), k1szz(:,:,:)
+        real(real64), allocatable :: k2vx(:,:,:), k2vy(:,:,:), k2vz(:,:,:), k2qx(:,:,:), k2qy(:,:,:), k2qz(:,:,:), k2p(:,:,:)
+        real(real64), allocatable :: k2sxx(:,:,:), k2syy(:,:,:), k2szz(:,:,:)
+        real(real64), allocatable :: k3vx(:,:,:), k3vy(:,:,:), k3vz(:,:,:), k3qx(:,:,:), k3qy(:,:,:), k3qz(:,:,:), k3p(:,:,:)
+        real(real64), allocatable :: k3sxx(:,:,:), k3syy(:,:,:), k3szz(:,:,:)
+        real(real64), allocatable :: k4vx(:,:,:), k4vy(:,:,:), k4vz(:,:,:), k4qx(:,:,:), k4qy(:,:,:), k4qz(:,:,:), k4p(:,:,:)
+        real(real64), allocatable :: k4sxx(:,:,:), k4syy(:,:,:), k4szz(:,:,:)
+        real(real64), allocatable :: tvx(:,:,:), tvy(:,:,:), tvz(:,:,:), tqx(:,:,:), tqy(:,:,:), tqz(:,:,:), tp(:,:,:)
+        real(real64), allocatable :: tsxx(:,:,:), tsyy(:,:,:), tszz(:,:,:)
+        real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:)
+        real(real64), allocatable :: velocnorm(:), pressurenorm(:)
+
+        if (present(SINGLE_OUTPUT)) then
+            SINGLE = SINGLE_OUTPUT
+        else
+            SINGLE = .TRUE.
+        endif
+
+        nx = domain%nx; ny = domain%ny; nz = domain%nz
+        dx = domain%dx; dy = domain%dy; dz = domain%dz; dt = source%dt
+
+        allocate(c11(nx,nz), c12(nx,nz), c13(nx,nz), c22(nx,nz), c23(nx,nz), c33(nx,nz), rho(nx,nz))
+        allocate(alpha_x(nx,nz), alpha_y(nx,nz), alpha_z(nx,nz), biot_m(nx,nz))
+        allocate(rho_fluid(nx,nz), viscosity(nx,nz), permeability_x(nx,nz), permeability_y(nx,nz), permeability_z(nx,nz))
+        allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), pressure(nx,ny,nz))
+        allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz))
+        allocate(k1vx(nx,ny,nz), k1vy(nx,ny,nz), k1vz(nx,ny,nz), k1qx(nx,ny,nz), k1qy(nx,ny,nz), k1qz(nx,ny,nz), k1p(nx,ny,nz))
+        allocate(k1sxx(nx,ny,nz), k1syy(nx,ny,nz), k1szz(nx,ny,nz))
+        allocate(k2vx, source=k1vx); allocate(k2vy, source=k1vy); allocate(k2vz, source=k1vz)
+        allocate(k2qx, source=k1qx); allocate(k2qy, source=k1qy); allocate(k2qz, source=k1qz); allocate(k2p, source=k1p)
+        allocate(k2sxx, source=k1sxx); allocate(k2syy, source=k1syy); allocate(k2szz, source=k1szz)
+        allocate(k3vx, source=k1vx); allocate(k3vy, source=k1vy); allocate(k3vz, source=k1vz)
+        allocate(k3qx, source=k1qx); allocate(k3qy, source=k1qy); allocate(k3qz, source=k1qz); allocate(k3p, source=k1p)
+        allocate(k3sxx, source=k1sxx); allocate(k3syy, source=k1syy); allocate(k3szz, source=k1szz)
+        allocate(k4vx, source=k1vx); allocate(k4vy, source=k1vy); allocate(k4vz, source=k1vz)
+        allocate(k4qx, source=k1qx); allocate(k4qy, source=k1qy); allocate(k4qz, source=k1qz); allocate(k4p, source=k1p)
+        allocate(k4sxx, source=k1sxx); allocate(k4syy, source=k1syy); allocate(k4szz, source=k1szz)
+        allocate(tvx, source=k1vx); allocate(tvy, source=k1vy); allocate(tvz, source=k1vz)
+        allocate(tqx, source=k1qx); allocate(tqy, source=k1qy); allocate(tqz, source=k1qz); allocate(tp, source=k1p)
+        allocate(tsxx, source=k1sxx); allocate(tsyy, source=k1syy); allocate(tszz, source=k1szz)
+        allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
+        allocate(srcxx(source%time_steps), srcyy(source%time_steps), srczz(source%time_steps))
+        allocate(velocnorm(source%time_steps), pressurenorm(source%time_steps))
+
+        call material_rw2('c11.dat', c11, .TRUE.); call material_rw2('c12.dat', c12, .TRUE.)
+        call material_rw2('c13.dat', c13, .TRUE.); call material_rw2('c22.dat', c22, .TRUE.)
+        call material_rw2('c23.dat', c23, .TRUE.); call material_rw2('c33.dat', c33, .TRUE.)
+        call material_rw2('rho.dat', rho, .TRUE.); call material_rw2('alpha_x.dat', alpha_x, .TRUE.)
+        call material_rw2('alpha_y.dat', alpha_y, .TRUE.); call material_rw2('alpha_z.dat', alpha_z, .TRUE.)
+        call material_rw2('biot_m.dat', biot_m, .TRUE.); call material_rw2('rho_fluid.dat', rho_fluid, .TRUE.)
+        call material_rw2('viscosity.dat', viscosity, .TRUE.); call material_rw2('permeability_x.dat', permeability_x, .TRUE.)
+        call material_rw2('permeability_y.dat', permeability_y, .TRUE.); call material_rw2('permeability_z.dat', permeability_z, .TRUE.)
+        call material_rw3('initialconditionVx.dat', vx, .TRUE.)
+        call material_rw3('initialconditionVy.dat', vy, .TRUE.)
+        call material_rw3('initialconditionVz.dat', vz, .TRUE.)
+
+        qx = 0.0_real64; qy = 0.0_real64; qz = 0.0_real64; pressure = 0.0_real64
+        sxx = 0.0_real64; syy = 0.0_real64; szz = 0.0_real64
+        srcx = 0.0_real64; srcy = 0.0_real64; srcz = 0.0_real64
+        srcxx = 0.0_real64; srcyy = 0.0_real64; srczz = 0.0_real64
+        velocnorm = 0.0_real64; pressurenorm = 0.0_real64
+
+        isource = source%xind + domain%cpml
+        jsource = source%yind + domain%cpml
+        ksource = source%zind + domain%cpml
+        max_speed = sqrt(maxval(max(c11, c33)) / positive(minval(rho), 1.0_real64))
+
+        if (source%source_type == 'ac') then
+            call loadsource('seismicsourcex.dat', source%time_steps, srcx)
+            call loadsource('seismicsourcey.dat', source%time_steps, srcy)
+            call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        else
+            call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
+            call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
+            call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
+        endif
+
+        do it = 1, source%time_steps
+            call rhs_biot25_cell(vx,vy,vz,qx,qy,qz,pressure,sxx,syy,szz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                dx,dy,dz,max_speed,k1vx,k1vy,k1vz,k1qx,k1qy,k1qz,k1p,k1sxx,k1syy,k1szz)
+            tvx=vx+0.5_real64*dt*k1vx; tvy=vy+0.5_real64*dt*k1vy; tvz=vz+0.5_real64*dt*k1vz
+            tqx=qx+0.5_real64*dt*k1qx; tqy=qy+0.5_real64*dt*k1qy; tqz=qz+0.5_real64*dt*k1qz
+            tp=pressure+0.5_real64*dt*k1p; tsxx=sxx+0.5_real64*dt*k1sxx; tsyy=syy+0.5_real64*dt*k1syy; tszz=szz+0.5_real64*dt*k1szz
+            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                dx,dy,dz,max_speed,k2vx,k2vy,k2vz,k2qx,k2qy,k2qz,k2p,k2sxx,k2syy,k2szz)
+            tvx=vx+0.5_real64*dt*k2vx; tvy=vy+0.5_real64*dt*k2vy; tvz=vz+0.5_real64*dt*k2vz
+            tqx=qx+0.5_real64*dt*k2qx; tqy=qy+0.5_real64*dt*k2qy; tqz=qz+0.5_real64*dt*k2qz
+            tp=pressure+0.5_real64*dt*k2p; tsxx=sxx+0.5_real64*dt*k2sxx; tsyy=syy+0.5_real64*dt*k2syy; tszz=szz+0.5_real64*dt*k2szz
+            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                dx,dy,dz,max_speed,k3vx,k3vy,k3vz,k3qx,k3qy,k3qz,k3p,k3sxx,k3syy,k3szz)
+            tvx=vx+dt*k3vx; tvy=vy+dt*k3vy; tvz=vz+dt*k3vz; tqx=qx+dt*k3qx; tqy=qy+dt*k3qy; tqz=qz+dt*k3qz
+            tp=pressure+dt*k3p; tsxx=sxx+dt*k3sxx; tsyy=syy+dt*k3syy; tszz=szz+dt*k3szz
+            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                dx,dy,dz,max_speed,k4vx,k4vy,k4vz,k4qx,k4qy,k4qz,k4p,k4sxx,k4syy,k4szz)
+
+            vx=vx+dt*(k1vx+2.0_real64*k2vx+2.0_real64*k3vx+k4vx)/6.0_real64
+            vy=vy+dt*(k1vy+2.0_real64*k2vy+2.0_real64*k3vy+k4vy)/6.0_real64
+            vz=vz+dt*(k1vz+2.0_real64*k2vz+2.0_real64*k3vz+k4vz)/6.0_real64
+            qx=qx+dt*(k1qx+2.0_real64*k2qx+2.0_real64*k3qx+k4qx)/6.0_real64
+            qy=qy+dt*(k1qy+2.0_real64*k2qy+2.0_real64*k3qy+k4qy)/6.0_real64
+            qz=qz+dt*(k1qz+2.0_real64*k2qz+2.0_real64*k3qz+k4qz)/6.0_real64
+            pressure=pressure+dt*(k1p+2.0_real64*k2p+2.0_real64*k3p+k4p)/6.0_real64
+            sxx=sxx+dt*(k1sxx+2.0_real64*k2sxx+2.0_real64*k3sxx+k4sxx)/6.0_real64
+            syy=syy+dt*(k1syy+2.0_real64*k2syy+2.0_real64*k3syy+k4syy)/6.0_real64
+            szz=szz+dt*(k1szz+2.0_real64*k2szz+2.0_real64*k3szz+k4szz)/6.0_real64
+
+            rho0 = positive(rho(isource,ksource), 1.0_real64)
+            vx(isource,jsource,ksource)=vx(isource,jsource,ksource)+srcx(it)*dt/rho0
+            vy(isource,jsource,ksource)=vy(isource,jsource,ksource)+srcy(it)*dt/rho0
+            vz(isource,jsource,ksource)=vz(isource,jsource,ksource)+srcz(it)*dt/rho0
+            sxx(isource,jsource,ksource)=sxx(isource,jsource,ksource)+srcxx(it)/rho0
+            syy(isource,jsource,ksource)=syy(isource,jsource,ksource)+srcyy(it)/rho0
+            szz(isource,jsource,ksource)=szz(isource,jsource,ksource)+srczz(it)/rho0
+
+            vx(1,:,:)=0.0_real64; vy(:,1,:)=0.0_real64; vz(:,:,1)=0.0_real64
+            vx(nx,:,:)=0.0_real64; vy(:,ny,:)=0.0_real64; vz(:,:,nz)=0.0_real64
+
+            velocnorm(it)=maxval(sqrt(vx**2+vy**2+vz**2)); pressurenorm(it)=maxval(abs(pressure))
+            if (velocnorm(it) > stability_threshold) stop 'Biot DG 2.5D solution became unstable'
+            call write_image3(vx,nx,ny,nz,source,it,'Vx',SINGLE); call write_image3(vy,nx,ny,nz,source,it,'Vy',SINGLE)
+            call write_image3(vz,nx,ny,nz,source,it,'Vz',SINGLE); call write_image3(qx,nx,ny,nz,source,it,'Qx',SINGLE)
+            call write_image3(qy,nx,ny,nz,source,it,'Qy',SINGLE); call write_image3(qz,nx,ny,nz,source,it,'Qz',SINGLE)
+            call write_image3(pressure,nx,ny,nz,source,it,'Pp',SINGLE)
+        enddo
+
+        call write_array('velocity_norm.dat', source%time_steps, velocnorm)
+        call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
+    end subroutine biotdg25
+
+    subroutine biotdg3(domain, source, SINGLE_OUTPUT)
+        implicit none
+
+        type(Domain_Type), intent(in) :: domain
+        type(Source_Type), intent(in) :: source
+        logical, intent(in), optional :: SINGLE_OUTPUT
+
+        integer :: nx, ny, nz, i, j, k, it, isource, jsource, ksource
+        real(real64) :: dx, dy, dz, dt, rho0, div_v, div_q, px, py, pz
+        logical :: SINGLE
+
+        real(real64), allocatable :: c11(:,:,:), c12(:,:,:), c13(:,:,:), c22(:,:,:), c23(:,:,:), c33(:,:,:), rho(:,:,:)
+        real(real64), allocatable :: ax(:,:,:), ay(:,:,:), az(:,:,:), m(:,:,:), rho_f(:,:,:), eta(:,:,:), kx(:,:,:), ky(:,:,:), kz(:,:,:)
+        real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), p(:,:,:)
+        real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:)
+        real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:)
+        real(real64), allocatable :: velocnorm(:), pressurenorm(:)
+
+        if (present(SINGLE_OUTPUT)) then
+            SINGLE = SINGLE_OUTPUT
+        else
+            SINGLE = .TRUE.
+        endif
+
+        nx=domain%nx; ny=domain%ny; nz=domain%nz
+        dx=domain%dx; dy=domain%dy; dz=domain%dz; dt=source%dt
+
+        allocate(c11(nx,ny,nz), c12(nx,ny,nz), c13(nx,ny,nz), c22(nx,ny,nz), c23(nx,ny,nz), c33(nx,ny,nz), rho(nx,ny,nz))
+        allocate(ax(nx,ny,nz), ay(nx,ny,nz), az(nx,ny,nz), m(nx,ny,nz), rho_f(nx,ny,nz), eta(nx,ny,nz))
+        allocate(kx(nx,ny,nz), ky(nx,ny,nz), kz(nx,ny,nz))
+        allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), p(nx,ny,nz))
+        allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz))
+        allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
+        allocate(srcxx(source%time_steps), srcyy(source%time_steps), srczz(source%time_steps))
+        allocate(velocnorm(source%time_steps), pressurenorm(source%time_steps))
+
+        call material_rw3('c11.dat', c11, .TRUE.); call material_rw3('c12.dat', c12, .TRUE.)
+        call material_rw3('c13.dat', c13, .TRUE.); call material_rw3('c22.dat', c22, .TRUE.)
+        call material_rw3('c23.dat', c23, .TRUE.); call material_rw3('c33.dat', c33, .TRUE.)
+        call material_rw3('rho.dat', rho, .TRUE.); call material_rw3('alpha_x.dat', ax, .TRUE.)
+        call material_rw3('alpha_y.dat', ay, .TRUE.); call material_rw3('alpha_z.dat', az, .TRUE.)
+        call material_rw3('biot_m.dat', m, .TRUE.); call material_rw3('rho_fluid.dat', rho_f, .TRUE.)
+        call material_rw3('viscosity.dat', eta, .TRUE.); call material_rw3('permeability_x.dat', kx, .TRUE.)
+        call material_rw3('permeability_y.dat', ky, .TRUE.); call material_rw3('permeability_z.dat', kz, .TRUE.)
+        call material_rw3('initialconditionVx.dat', vx, .TRUE.)
+        call material_rw3('initialconditionVy.dat', vy, .TRUE.)
+        call material_rw3('initialconditionVz.dat', vz, .TRUE.)
+
+        qx=0.0_real64; qy=0.0_real64; qz=0.0_real64; p=0.0_real64
+        sxx=0.0_real64; syy=0.0_real64; szz=0.0_real64
+        srcx=0.0_real64; srcy=0.0_real64; srcz=0.0_real64
+        srcxx=0.0_real64; srcyy=0.0_real64; srczz=0.0_real64
+        velocnorm=0.0_real64; pressurenorm=0.0_real64
+
+        isource=source%xind+domain%cpml; jsource=source%yind+domain%cpml; ksource=source%zind+domain%cpml
+
+        if (source%source_type == 'ac') then
+            call loadsource('seismicsourcex.dat', source%time_steps, srcx)
+            call loadsource('seismicsourcey.dat', source%time_steps, srcy)
+            call loadsource('seismicsourcez.dat', source%time_steps, srcz)
+        else
+            call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
+            call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
+            call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
+        endif
+
+        do it=1,source%time_steps
+            do k=2,nz-1
+                do j=2,ny-1
+                    do i=2,nx-1
+                        div_v=(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                              (vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                              (vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)
+                        div_q=(qx(i+1,j,k)-qx(i-1,j,k))/(2.0_real64*dx)+ &
+                              (qy(i,j+1,k)-qy(i,j-1,k))/(2.0_real64*dy)+ &
+                              (qz(i,j,k+1)-qz(i,j,k-1))/(2.0_real64*dz)
+                        p(i,j,k)=p(i,j,k)-dt*m(i,j,k)*(((ax(i,j,k)+ay(i,j,k)+az(i,j,k))/3.0_real64)*div_v+div_q)
+
+                        sxx(i,j,k)=sxx(i,j,k)+dt*(c11(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                            c12(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                            c13(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ax(i,j,k)*p(i,j,k))
+                        syy(i,j,k)=syy(i,j,k)+dt*(c12(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                            c22(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                            c23(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ay(i,j,k)*p(i,j,k))
+                        szz(i,j,k)=szz(i,j,k)+dt*(c13(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                            c23(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                            c33(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-az(i,j,k)*p(i,j,k))
+                    enddo
+                enddo
+            enddo
+
+            do k=2,nz-1
+                do j=2,ny-1
+                    do i=2,nx-1
+                        px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx)
+                        py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
+                        pz=(p(i,j,k+1)-p(i,j,k-1))/(2.0_real64*dz)
+                        vx(i,j,k)=vx(i,j,k)+dt*(sxx(i+1,j,k)-sxx(i-1,j,k))/(2.0_real64*dx)/positive(rho(i,j,k),1.0_real64)
+                        vy(i,j,k)=vy(i,j,k)+dt*(syy(i,j+1,k)-syy(i,j-1,k))/(2.0_real64*dy)/positive(rho(i,j,k),1.0_real64)
+                        vz(i,j,k)=vz(i,j,k)+dt*(szz(i,j,k+1)-szz(i,j,k-1))/(2.0_real64*dz)/positive(rho(i,j,k),1.0_real64)
+                        qx(i,j,k)=qx(i,j,k)-dt*kx(i,j,k)*px/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
+                        qy(i,j,k)=qy(i,j,k)-dt*ky(i,j,k)*py/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
+                        qz(i,j,k)=qz(i,j,k)-dt*kz(i,j,k)*pz/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
+                    enddo
+                enddo
+            enddo
+
+            rho0=positive(rho(isource,jsource,ksource),1.0_real64)
+            vx(isource,jsource,ksource)=vx(isource,jsource,ksource)+srcx(it)*dt/rho0
+            vy(isource,jsource,ksource)=vy(isource,jsource,ksource)+srcy(it)*dt/rho0
+            vz(isource,jsource,ksource)=vz(isource,jsource,ksource)+srcz(it)*dt/rho0
+            sxx(isource,jsource,ksource)=sxx(isource,jsource,ksource)+srcxx(it)/rho0
+            syy(isource,jsource,ksource)=syy(isource,jsource,ksource)+srcyy(it)/rho0
+            szz(isource,jsource,ksource)=szz(isource,jsource,ksource)+srczz(it)/rho0
+
+            vx(1,:,:)=0.0_real64; vy(:,1,:)=0.0_real64; vz(:,:,1)=0.0_real64
+            vx(nx,:,:)=0.0_real64; vy(:,ny,:)=0.0_real64; vz(:,:,nz)=0.0_real64
+            velocnorm(it)=maxval(sqrt(vx**2+vy**2+vz**2)); pressurenorm(it)=maxval(abs(p))
+            if (velocnorm(it) > stability_threshold) stop 'Biot DG 3D solution became unstable'
+
+            call write_image3(vx,nx,ny,nz,source,it,'Vx',SINGLE); call write_image3(vy,nx,ny,nz,source,it,'Vy',SINGLE)
+            call write_image3(vz,nx,ny,nz,source,it,'Vz',SINGLE); call write_image3(qx,nx,ny,nz,source,it,'Qx',SINGLE)
+            call write_image3(qy,nx,ny,nz,source,it,'Qy',SINGLE); call write_image3(qz,nx,ny,nz,source,it,'Qz',SINGLE)
+            call write_image3(p,nx,ny,nz,source,it,'Pp',SINGLE)
+        enddo
+
+        call write_array('velocity_norm.dat', source%time_steps, velocnorm)
+        call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
+    end subroutine biotdg3
+
+    subroutine rhs_biot25_cell(vx,vy,vz,qx,qy,qz,p,sxx,syy,szz,c11,c12,c13,c22,c23,c33,rho, &
+                               rho_f,eta,ax,ay,az,m,kx,ky,kz,dx,dy,dz,speed, &
+                               rvx,rvy,rvz,rqx,rqy,rqz,rp,rsxx,rsyy,rszz)
+        implicit none
+
+        real(real64), intent(in) :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:)
+        real(real64), intent(in) :: p(:,:,:), sxx(:,:,:), syy(:,:,:), szz(:,:,:)
+        real(real64), intent(in) :: c11(:,:), c12(:,:), c13(:,:), c22(:,:), c23(:,:), c33(:,:), rho(:,:)
+        real(real64), intent(in) :: rho_f(:,:), eta(:,:), ax(:,:), ay(:,:), az(:,:), m(:,:), kx(:,:), ky(:,:), kz(:,:)
+        real(real64), intent(in) :: dx, dy, dz, speed
+        real(real64), intent(out) :: rvx(:,:,:), rvy(:,:,:), rvz(:,:,:), rqx(:,:,:), rqy(:,:,:), rqz(:,:,:)
+        real(real64), intent(out) :: rp(:,:,:), rsxx(:,:,:), rsyy(:,:,:), rszz(:,:,:)
+
+        integer :: i, j, k, nx, ny, nz
+        real(real64) :: div_v, div_q, px, py, pz, dampx, dampy, dampz
+
+        nx=size(vx,1); ny=size(vx,2); nz=size(vx,3)
+        rvx=0.0_real64; rvy=0.0_real64; rvz=0.0_real64; rqx=0.0_real64; rqy=0.0_real64; rqz=0.0_real64
+        rp=0.0_real64; rsxx=0.0_real64; rsyy=0.0_real64; rszz=0.0_real64
+
+        do k=2,nz-1
+            do j=2,ny-1
+                do i=2,nx-1
+                    div_v = (vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                            (vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                            (vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)
+                    div_q = (qx(i+1,j,k)-qx(i-1,j,k))/(2.0_real64*dx) + &
+                            (qy(i,j+1,k)-qy(i,j-1,k))/(2.0_real64*dy) + &
+                            (qz(i,j,k+1)-qz(i,j,k-1))/(2.0_real64*dz)
+                    rp(i,j,k) = -m(i,k) * (((ax(i,k)+ay(i,k)+az(i,k))/3.0_real64)*div_v + div_q)
+
+                    rsxx(i,j,k) = c11(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                                  c12(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                                  c13(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ax(i,k)*rp(i,j,k)
+                    rsyy(i,j,k) = c12(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                                  c22(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                                  c23(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ay(i,k)*rp(i,j,k)
+                    rszz(i,j,k) = c13(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                                  c23(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                                  c33(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - az(i,k)*rp(i,j,k)
+
+                    px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx); py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
+                    pz=(p(i,j,k+1)-p(i,j,k-1))/(2.0_real64*dz)
+                    rvx(i,j,k)=(sxx(i+1,j,k)-sxx(i-1,j,k))/(2.0_real64*dx)/positive(rho(i,k),1.0_real64)
+                    rvy(i,j,k)=(syy(i,j+1,k)-syy(i,j-1,k))/(2.0_real64*dy)/positive(rho(i,k),1.0_real64)
+                    rvz(i,j,k)=(szz(i,j,k+1)-szz(i,j,k-1))/(2.0_real64*dz)/positive(rho(i,k),1.0_real64)
+                    rqx(i,j,k)=-kx(i,k)*px/(positive(eta(i,k),1.0e-6_real64)*positive(rho_f(i,k),1.0_real64))
+                    rqy(i,j,k)=-ky(i,k)*py/(positive(eta(i,k),1.0e-6_real64)*positive(rho_f(i,k),1.0_real64))
+                    rqz(i,j,k)=-kz(i,k)*pz/(positive(eta(i,k),1.0e-6_real64)*positive(rho_f(i,k),1.0_real64))
+
+                    dampx = speed*((vx(i+1,j,k)-2.0_real64*vx(i,j,k)+vx(i-1,j,k))/(dx*dx))
+                    dampy = speed*((vy(i,j+1,k)-2.0_real64*vy(i,j,k)+vy(i,j-1,k))/(dy*dy))
+                    dampz = speed*((vz(i,j,k+1)-2.0_real64*vz(i,j,k)+vz(i,j,k-1))/(dz*dz))
+                    rvx(i,j,k)=rvx(i,j,k)+dampx; rvy(i,j,k)=rvy(i,j,k)+dampy; rvz(i,j,k)=rvz(i,j,k)+dampz
+                enddo
+            enddo
+        enddo
+    end subroutine rhs_biot25_cell
 
 end module biotdg

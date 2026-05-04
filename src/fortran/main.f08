@@ -11,7 +11,7 @@ program main
     ! Types are defined in seidartio
     use seidartio 
     use cpmlfdtd 
-    use biotfdtd
+    use biotdg
     use seidart_types 
     
     implicit none 
@@ -97,8 +97,8 @@ program main
     if (domain%dim == 3.0) then
 
         if (seismic .and. poroelastic) then
-            print *, "3D Biot poroelastic modeling is not implemented yet."
-            stop
+            print *, "Running 3D Biot DG poroelastic model with", seismic_source%time_steps, "time steps"
+            call biotdg3(domain, seismic_source, .TRUE.)
         else if (seismic) then
             print *, "Running 3D seismic model with", seismic_source%time_steps, "time steps"
             call seismic3(domain, seismic_source, density_method, .TRUE.)
@@ -110,8 +110,8 @@ program main
     else if (domain%dim == 2.5) then
 
         if (seismic .and. poroelastic) then
-            print *, "Running 2.5D Biot poroelastic model with", seismic_source%time_steps, "time steps"
-            call biot25(domain, seismic_source, .TRUE.)
+            print *, "Running 2.5D Biot DG poroelastic model with", seismic_source%time_steps, "time steps"
+            call biotdg25(domain, seismic_source, .TRUE.)
         else if (seismic) then
             print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
             call seismic25(domain, seismic_source, density_method, .TRUE.)
@@ -122,8 +122,8 @@ program main
     else    ! dim == 2.0
 
         if (seismic .and. poroelastic) then
-            print *, "Running 2D Biot poroelastic model with", seismic_source%time_steps, "time steps"
-            call biot2(domain, seismic_source, .TRUE.)
+            print *, "Running 2D Biot DG poroelastic model with", seismic_source%time_steps, "time steps"
+            call biotdg2(domain, seismic_source, .TRUE.)
         else if (seismic) then
             print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
             call seismic2(domain, seismic_source, density_method, .TRUE.)

@@ -113,7 +113,7 @@ SOURCES="$SRC_DIR/constants.f08 \
          $SRC_DIR/plane_wave_source.f08 \
          $SRC_DIR/tensor_operations.f08 \
          $SRC_DIR/cpmlfdtd.f08 \
-         $SRC_DIR/biotfdtd.f08 \
+         $SRC_DIR/biotdg.f08 \
          $SRC_DIR/main.f08"
 EXECUTABLE="seidartfdtd-$os-$arch"
 
