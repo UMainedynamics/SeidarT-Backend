@@ -34,7 +34,8 @@ SRC_DIR := src/fortran
 SOURCES := $(SRC_DIR)/constants.f08 $(SRC_DIR)/seidart_types.f08 $(SRC_DIR)/seidartio.f08 \
            $(SRC_DIR)/averaging.f08 $(SRC_DIR)/plane_wave_source.f08 \
            $(SRC_DIR)/tensor_operations.f08 $(SRC_DIR)/cpmlfdtd.f08 \
-           $(SRC_DIR)/biotdg.f08 $(SRC_DIR)/main.f08
+           $(SRC_DIR)/discontinuous_galerkin_methods.f08 \
+           $(SRC_DIR)/biotdg.f08 $(SRC_DIR)/jcadg.f08 $(SRC_DIR)/main.f08
 EXECUTABLE := seidartfdtd-$(OS)-$(ARCH) 
 
 # OpenMP support (conditionally add -fopenmp flag)

@@ -12,6 +12,7 @@ program main
     use seidartio 
     use cpmlfdtd 
     use biotdg
+    use jcadg
     use seidart_types 
     
     implicit none 
@@ -25,6 +26,7 @@ program main
     character(len=256) :: input_json_file 
     logical :: seismic
     logical :: poroelastic
+    logical :: jca
     integer :: argc, i
     character(len=256) :: key, value, density_method
     
@@ -45,6 +47,7 @@ program main
     ! seismic flag 
     seismic = .true.
     poroelastic = .false.
+    jca = .false.
     density_method = 'arithmetic'
         
     ! loop over any further key=value flags
@@ -65,6 +68,12 @@ program main
             poroelastic = .true.
             else if (value == 'false') then
             poroelastic = .false.
+            end if
+        case ('jca')
+            if (value == 'true') then
+            jca = .true.
+            else if (value == 'false') then
+            jca = .false.
             end if
         case ('density_method')
             density_method = adjustl(value)
@@ -96,7 +105,10 @@ program main
     ! dispatch to the correct solver
     if (domain%dim == 3.0) then
 
-        if (seismic .and. poroelastic) then
+        if (seismic .and. jca) then
+            print *, "Running 3D Johnson-Champoux-Allard acoustic model with", seismic_source%time_steps, "time steps"
+            call jcadg3(domain, seismic_source, .TRUE.)
+        else if (seismic .and. poroelastic) then
             print *, "Running 3D Biot DG poroelastic model with", seismic_source%time_steps, "time steps"
             call biotdg3(domain, seismic_source, .TRUE.)
         else if (seismic) then
@@ -109,7 +121,10 @@ program main
 
     else if (domain%dim == 2.5) then
 
-        if (seismic .and. poroelastic) then
+        if (seismic .and. jca) then
+            print *, "Running 2.5D Johnson-Champoux-Allard acoustic model with", seismic_source%time_steps, "time steps"
+            call jcadg25(domain, seismic_source, .TRUE.)
+        else if (seismic .and. poroelastic) then
             print *, "Running 2.5D Biot DG poroelastic model with", seismic_source%time_steps, "time steps"
             call biotdg25(domain, seismic_source, .TRUE.)
         else if (seismic) then
@@ -121,7 +136,10 @@ program main
         end if
     else    ! dim == 2.0
 
-        if (seismic .and. poroelastic) then
+        if (seismic .and. jca) then
+            print *, "Running 2D Johnson-Champoux-Allard DG acoustic model with", seismic_source%time_steps, "time steps"
+            call jcadg2(domain, seismic_source, .TRUE.)
+        else if (seismic .and. poroelastic) then
             print *, "Running 2D Biot DG poroelastic model with", seismic_source%time_steps, "time steps"
             call biotdg2(domain, seismic_source, .TRUE.)
         else if (seismic) then
