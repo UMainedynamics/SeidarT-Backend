@@ -18,9 +18,7 @@ contains
                          alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                          gamma_x, gamma_z, gamma_xz, &
                          deriv, weights, dx, dz, max_speed, &
-                         rvx, rvz, rqx, rqz, rp, rsxx, rszz, rsxz, &
-                         dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz, &
-                         dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
+                         rvx, rvz, rqx, rqz, rp, rsxx, rszz, rsxz)
         real(real64), intent(in) :: vx(0:,0:,:,:), vz(0:,0:,:,:)
         real(real64), intent(in) :: qx(0:,0:,:,:), qz(0:,0:,:,:)
         real(real64), intent(in) :: pressure(0:,0:,:,:)
@@ -38,13 +36,22 @@ contains
         real(real64), intent(out) :: rp(0:,0:,:,:), rsxx(0:,0:,:,:)
         real(real64), intent(out) :: rszz(0:,0:,:,:), rsxz(0:,0:,:,:)
 
-        real(real64), intent(inout) :: dvx_dx(0:,0:,:,:), dvx_dz(0:,0:,:,:), dvz_dx(0:,0:,:,:), dvz_dz(0:,0:,:,:)
-        real(real64), intent(inout) :: dqx_dx(0:,0:,:,:), dqx_dz(0:,0:,:,:), dqz_dx(0:,0:,:,:), dqz_dz(0:,0:,:,:)
-        real(real64), intent(inout) :: dp_dx(0:,0:,:,:), dp_dz(0:,0:,:,:)
-        real(real64), intent(inout) :: dsxx_dx(0:,0:,:,:), dsxx_dz(0:,0:,:,:), dszz_dx(0:,0:,:,:), dszz_dz(0:,0:,:,:)
-        real(real64), intent(inout) :: dsxz_dx(0:,0:,:,:), dsxz_dz(0:,0:,:,:)
+        real(real64), allocatable :: dvx_dx(:,:,:,:), dvx_dz(:,:,:,:), dvz_dx(:,:,:,:), dvz_dz(:,:,:,:)
+        real(real64), allocatable :: dqx_dx(:,:,:,:), dqx_dz(:,:,:,:), dqz_dx(:,:,:,:), dqz_dz(:,:,:,:)
+        real(real64), allocatable :: dp_dx(:,:,:,:), dp_dz(:,:,:,:)
+        real(real64), allocatable :: dsxx_dx(:,:,:,:), dsxx_dz(:,:,:,:), dszz_dx(:,:,:,:), dszz_dz(:,:,:,:)
+        real(real64), allocatable :: dsxz_dx(:,:,:,:), dsxz_dz(:,:,:,:)
         integer :: a, b, i, k
         real(real64) :: div_vs, div_q, p_rate, drag_x, drag_z
+
+        allocate(dvx_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dvx_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dvz_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dvz_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dqx_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dqx_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dqz_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dqz_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dp_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dp_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dsxx_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dsxx_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dszz_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dszz_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
+        allocate(dsxz_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dsxz_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
 
         call dg_derivatives(vx, deriv, dx, dz, dvx_dx, dvx_dz)
         call dg_derivatives(vz, deriv, dx, dz, dvz_dx, dvz_dz)
@@ -97,7 +104,8 @@ contains
         call apply_rusanov_penalty(sigmazz, rszz, weights, dx, dz, max_speed)
         call apply_rusanov_penalty(sigmaxz, rsxz, weights, dx, dz, max_speed)
 
-
+        deallocate(dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz)
+        deallocate(dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
     end subroutine rhs_biot2
 
     subroutine biotdg2(domain, source, SINGLE_OUTPUT)
@@ -133,13 +141,6 @@ contains
         real(real64), allocatable :: k3sxx(:,:,:,:), k3szz(:,:,:,:), k3sxz(:,:,:,:)
         real(real64), allocatable :: k4vx(:,:,:,:), k4vz(:,:,:,:), k4qx(:,:,:,:), k4qz(:,:,:,:), k4p(:,:,:,:)
         real(real64), allocatable :: k4sxx(:,:,:,:), k4szz(:,:,:,:), k4sxz(:,:,:,:)
-        
-        real(real64), allocatable :: dvx_dx(:,:,:,:), dvx_dz(:,:,:,:), dvz_dx(:,:,:,:), dvz_dz(:,:,:,:)
-        real(real64), allocatable :: dqx_dx(:,:,:,:), dqx_dz(:,:,:,:), dqz_dx(:,:,:,:), dqz_dz(:,:,:,:)
-        real(real64), allocatable :: dp_dx(:,:,:,:), dp_dz(:,:,:,:)
-        real(real64), allocatable :: dsxx_dx(:,:,:,:), dsxx_dz(:,:,:,:), dszz_dx(:,:,:,:), dszz_dz(:,:,:,:)
-        real(real64), allocatable :: dsxz_dx(:,:,:,:), dsxz_dz(:,:,:,:)
-
         real(real64), allocatable :: srcx(:), srcz(:), srcxx(:), srcxz(:), srczz(:)
         real(real64), allocatable :: srcqx(:), srcqz(:), srcp(:)
         real(real64), allocatable :: velocnorm(:), pressurenorm(:)
@@ -256,9 +257,7 @@ contains
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
-                           k1vx, k1vz, k1qx, k1qz, k1p, k1sxx, k1szz, k1sxz, &
-                           dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz, &
-                           dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
+                           k1vx, k1vz, k1qx, k1qz, k1p, k1sxx, k1szz, k1sxz)
             tvx = vx + 0.5_real64 * dt * k1vx
             tvz = vz + 0.5_real64 * dt * k1vz
             tqx = qx + 0.5_real64 * dt * k1qx
@@ -273,9 +272,7 @@ contains
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
-                           k2vx, k2vz, k2qx, k2qz, k2p, k2sxx, k2szz, k2sxz, &
-                           dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz, &
-                           dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
+                           k2vx, k2vz, k2qx, k2qz, k2p, k2sxx, k2szz, k2sxz)
             tvx = vx + 0.5_real64 * dt * k2vx
             tvz = vz + 0.5_real64 * dt * k2vz
             tqx = qx + 0.5_real64 * dt * k2qx
@@ -290,9 +287,7 @@ contains
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
-                           k3vx, k3vz, k3qx, k3qz, k3p, k3sxx, k3szz, k3sxz, &
-                           dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz, &
-                           dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
+                           k3vx, k3vz, k3qx, k3qz, k3p, k3sxx, k3szz, k3sxz)
             tvx = vx + dt * k3vx
             tvz = vz + dt * k3vz
             tqx = qx + dt * k3qx
@@ -307,9 +302,7 @@ contains
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
-                           k4vx, k4vz, k4qx, k4qz, k4p, k4sxx, k4szz, k4sxz, &
-                           dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz, &
-                           dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
+                           k4vx, k4vz, k4qx, k4qz, k4p, k4sxx, k4szz, k4sxz)
 
             vx = vx + dt * (k1vx + 2.0_real64*k2vx + 2.0_real64*k3vx + k4vx) / 6.0_real64
             vz = vz + dt * (k1vz + 2.0_real64*k2vz + 2.0_real64*k3vz + k4vz) / 6.0_real64
@@ -350,39 +343,34 @@ contains
         call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
     end subroutine biotdg2
 
-
     subroutine biotdg25(domain, source, SINGLE_OUTPUT)
         implicit none
+
         type(Domain_Type), intent(in) :: domain
         type(Source_Type), intent(in) :: source
         logical, intent(in), optional :: SINGLE_OUTPUT
 
-        integer :: nx, ny, nz, i, j, k, it, isource, jsource, ksource
-        real(real64) :: dx, dy, dz, dt, rho0, max_speed
+        integer :: nx, ny, nz, it, isource, jsource, ksource
+        real(real64) :: dx, dy, dz, dt, max_speed, rho0
         logical :: SINGLE
 
-        real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c14(:,:), c15(:,:), c16(:,:)
-        real(real64), allocatable :: c22(:,:), c23(:,:), c24(:,:), c25(:,:), c26(:,:)
-        real(real64), allocatable :: c33(:,:), c34(:,:), c35(:,:), c36(:,:)
-        real(real64), allocatable :: c44(:,:), c45(:,:), c46(:,:), c55(:,:), c56(:,:), c66(:,:), rho(:,:)
+        real(real64), allocatable :: c11(:,:), c12(:,:), c13(:,:), c22(:,:), c23(:,:), c33(:,:), rho(:,:)
         real(real64), allocatable :: alpha_x(:,:), alpha_y(:,:), alpha_z(:,:), biot_m(:,:)
         real(real64), allocatable :: rho_fluid(:,:), viscosity(:,:), permeability_x(:,:), permeability_y(:,:), permeability_z(:,:)
         real(real64), allocatable :: gamma_x(:,:), gamma_y(:,:), gamma_z(:,:)
-
         real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), pressure(:,:,:)
-        real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:), sxy(:,:,:), sxz(:,:,:), syz(:,:,:)
+        real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:)
         real(real64), allocatable :: k1vx(:,:,:), k1vy(:,:,:), k1vz(:,:,:), k1qx(:,:,:), k1qy(:,:,:), k1qz(:,:,:), k1p(:,:,:)
-        real(real64), allocatable :: k1sxx(:,:,:), k1syy(:,:,:), k1szz(:,:,:), k1sxy(:,:,:), k1sxz(:,:,:), k1syz(:,:,:)
+        real(real64), allocatable :: k1sxx(:,:,:), k1syy(:,:,:), k1szz(:,:,:)
         real(real64), allocatable :: k2vx(:,:,:), k2vy(:,:,:), k2vz(:,:,:), k2qx(:,:,:), k2qy(:,:,:), k2qz(:,:,:), k2p(:,:,:)
-        real(real64), allocatable :: k2sxx(:,:,:), k2syy(:,:,:), k2szz(:,:,:), k2sxy(:,:,:), k2sxz(:,:,:), k2syz(:,:,:)
+        real(real64), allocatable :: k2sxx(:,:,:), k2syy(:,:,:), k2szz(:,:,:)
         real(real64), allocatable :: k3vx(:,:,:), k3vy(:,:,:), k3vz(:,:,:), k3qx(:,:,:), k3qy(:,:,:), k3qz(:,:,:), k3p(:,:,:)
-        real(real64), allocatable :: k3sxx(:,:,:), k3syy(:,:,:), k3szz(:,:,:), k3sxy(:,:,:), k3sxz(:,:,:), k3syz(:,:,:)
+        real(real64), allocatable :: k3sxx(:,:,:), k3syy(:,:,:), k3szz(:,:,:)
         real(real64), allocatable :: k4vx(:,:,:), k4vy(:,:,:), k4vz(:,:,:), k4qx(:,:,:), k4qy(:,:,:), k4qz(:,:,:), k4p(:,:,:)
-        real(real64), allocatable :: k4sxx(:,:,:), k4syy(:,:,:), k4szz(:,:,:), k4sxy(:,:,:), k4sxz(:,:,:), k4syz(:,:,:)
+        real(real64), allocatable :: k4sxx(:,:,:), k4syy(:,:,:), k4szz(:,:,:)
         real(real64), allocatable :: tvx(:,:,:), tvy(:,:,:), tvz(:,:,:), tqx(:,:,:), tqy(:,:,:), tqz(:,:,:), tp(:,:,:)
-        real(real64), allocatable :: tsxx(:,:,:), tsyy(:,:,:), tszz(:,:,:), tsxy(:,:,:), tsxz(:,:,:), tsyz(:,:,:)
-
-        real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:), srcxy(:), srcxz(:), srcyz(:)
+        real(real64), allocatable :: tsxx(:,:,:), tsyy(:,:,:), tszz(:,:,:)
+        real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:)
         real(real64), allocatable :: srcqx(:), srcqy(:), srcqz(:), srcp(:)
         real(real64), allocatable :: velocnorm(:), pressurenorm(:)
 
@@ -392,62 +380,42 @@ contains
             SINGLE = .TRUE.
         endif
 
-        nx=domain%nx; ny=domain%ny; nz=domain%nz
-        dx=domain%dx; dy=domain%dy; dz=domain%dz; dt=source%dt
+        nx = domain%nx; ny = domain%ny; nz = domain%nz
+        dx = domain%dx; dy = domain%dy; dz = domain%dz; dt = source%dt
 
-        allocate(c11(nx,nz), c12(nx,nz), c13(nx,nz), c14(nx,nz), c15(nx,nz), c16(nx,nz))
-        allocate(c22(nx,nz), c23(nx,nz), c24(nx,nz), c25(nx,nz), c26(nx,nz))
-        allocate(c33(nx,nz), c34(nx,nz), c35(nx,nz), c36(nx,nz))
-        allocate(c44(nx,nz), c45(nx,nz), c46(nx,nz), c55(nx,nz), c56(nx,nz), c66(nx,nz), rho(nx,nz))
+        allocate(c11(nx,nz), c12(nx,nz), c13(nx,nz), c22(nx,nz), c23(nx,nz), c33(nx,nz), rho(nx,nz))
         allocate(alpha_x(nx,nz), alpha_y(nx,nz), alpha_z(nx,nz), biot_m(nx,nz))
         allocate(rho_fluid(nx,nz), viscosity(nx,nz), permeability_x(nx,nz), permeability_y(nx,nz), permeability_z(nx,nz))
         allocate(gamma_x(nx,nz), gamma_y(nx,nz), gamma_z(nx,nz))
-
         allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), pressure(nx,ny,nz))
-        allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz), sxy(nx,ny,nz), sxz(nx,ny,nz), syz(nx,ny,nz))
-        
+        allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz))
         allocate(k1vx(nx,ny,nz), k1vy(nx,ny,nz), k1vz(nx,ny,nz), k1qx(nx,ny,nz), k1qy(nx,ny,nz), k1qz(nx,ny,nz), k1p(nx,ny,nz))
-        allocate(k1sxx(nx,ny,nz), k1syy(nx,ny,nz), k1szz(nx,ny,nz), k1sxy(nx,ny,nz), k1sxz(nx,ny,nz), k1syz(nx,ny,nz))
+        allocate(k1sxx(nx,ny,nz), k1syy(nx,ny,nz), k1szz(nx,ny,nz))
         allocate(k2vx, source=k1vx); allocate(k2vy, source=k1vy); allocate(k2vz, source=k1vz)
         allocate(k2qx, source=k1qx); allocate(k2qy, source=k1qy); allocate(k2qz, source=k1qz); allocate(k2p, source=k1p)
         allocate(k2sxx, source=k1sxx); allocate(k2syy, source=k1syy); allocate(k2szz, source=k1szz)
-        allocate(k2sxy, source=k1sxy); allocate(k2sxz, source=k1sxz); allocate(k2syz, source=k1syz)
         allocate(k3vx, source=k1vx); allocate(k3vy, source=k1vy); allocate(k3vz, source=k1vz)
         allocate(k3qx, source=k1qx); allocate(k3qy, source=k1qy); allocate(k3qz, source=k1qz); allocate(k3p, source=k1p)
         allocate(k3sxx, source=k1sxx); allocate(k3syy, source=k1syy); allocate(k3szz, source=k1szz)
-        allocate(k3sxy, source=k1sxy); allocate(k3sxz, source=k1sxz); allocate(k3syz, source=k1syz)
         allocate(k4vx, source=k1vx); allocate(k4vy, source=k1vy); allocate(k4vz, source=k1vz)
         allocate(k4qx, source=k1qx); allocate(k4qy, source=k1qy); allocate(k4qz, source=k1qz); allocate(k4p, source=k1p)
         allocate(k4sxx, source=k1sxx); allocate(k4syy, source=k1syy); allocate(k4szz, source=k1szz)
-        allocate(k4sxy, source=k1sxy); allocate(k4sxz, source=k1sxz); allocate(k4syz, source=k1syz)
         allocate(tvx, source=k1vx); allocate(tvy, source=k1vy); allocate(tvz, source=k1vz)
         allocate(tqx, source=k1qx); allocate(tqy, source=k1qy); allocate(tqz, source=k1qz); allocate(tp, source=k1p)
         allocate(tsxx, source=k1sxx); allocate(tsyy, source=k1syy); allocate(tszz, source=k1szz)
-        allocate(tsxy, source=k1sxy); allocate(tsxz, source=k1sxz); allocate(tsyz, source=k1syz)
-
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         allocate(srcxx(source%time_steps), srcyy(source%time_steps), srczz(source%time_steps))
-        allocate(srcxy(source%time_steps), srcxz(source%time_steps), srcyz(source%time_steps))
         allocate(srcqx(source%time_steps), srcqy(source%time_steps), srcqz(source%time_steps), srcp(source%time_steps))
         allocate(velocnorm(source%time_steps), pressurenorm(source%time_steps))
 
         call material_rw2('c11.dat', c11, .TRUE.); call material_rw2('c12.dat', c12, .TRUE.)
-        call material_rw2('c13.dat', c13, .TRUE.); call material_rw2('c14.dat', c14, .TRUE.)
-        call material_rw2('c15.dat', c15, .TRUE.); call material_rw2('c16.dat', c16, .TRUE.)
-        call material_rw2('c22.dat', c22, .TRUE.); call material_rw2('c23.dat', c23, .TRUE.)
-        call material_rw2('c24.dat', c24, .TRUE.); call material_rw2('c25.dat', c25, .TRUE.)
-        call material_rw2('c26.dat', c26, .TRUE.); call material_rw2('c33.dat', c33, .TRUE.)
-        call material_rw2('c34.dat', c34, .TRUE.); call material_rw2('c35.dat', c35, .TRUE.)
-        call material_rw2('c36.dat', c36, .TRUE.); call material_rw2('c44.dat', c44, .TRUE.)
-        call material_rw2('c45.dat', c45, .TRUE.); call material_rw2('c46.dat', c46, .TRUE.)
-        call material_rw2('c55.dat', c55, .TRUE.); call material_rw2('c56.dat', c56, .TRUE.)
-        call material_rw2('c66.dat', c66, .TRUE.); call material_rw2('rho.dat', rho, .TRUE.)
-        call material_rw2('alpha_x.dat', alpha_x, .TRUE.); call material_rw2('alpha_y.dat', alpha_y, .TRUE.)
-        call material_rw2('alpha_z.dat', alpha_z, .TRUE.); call material_rw2('biot_m.dat', biot_m, .TRUE.)
-        call material_rw2('rho_fluid.dat', rho_fluid, .TRUE.); call material_rw2('viscosity.dat', viscosity, .TRUE.)
-        call material_rw2('permeability_x.dat', permeability_x, .TRUE.)
-        call material_rw2('permeability_y.dat', permeability_y, .TRUE.)
-        call material_rw2('permeability_z.dat', permeability_z, .TRUE.)
+        call material_rw2('c13.dat', c13, .TRUE.); call material_rw2('c22.dat', c22, .TRUE.)
+        call material_rw2('c23.dat', c23, .TRUE.); call material_rw2('c33.dat', c33, .TRUE.)
+        call material_rw2('rho.dat', rho, .TRUE.); call material_rw2('alpha_x.dat', alpha_x, .TRUE.)
+        call material_rw2('alpha_y.dat', alpha_y, .TRUE.); call material_rw2('alpha_z.dat', alpha_z, .TRUE.)
+        call material_rw2('biot_m.dat', biot_m, .TRUE.); call material_rw2('rho_fluid.dat', rho_fluid, .TRUE.)
+        call material_rw2('viscosity.dat', viscosity, .TRUE.); call material_rw2('permeability_x.dat', permeability_x, .TRUE.)
+        call material_rw2('permeability_y.dat', permeability_y, .TRUE.); call material_rw2('permeability_z.dat', permeability_z, .TRUE.)
         call material_rw2('gamma_x.dat', gamma_x, .TRUE.); call material_rw2('gamma_y.dat', gamma_y, .TRUE.)
         call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
         call material_rw3('initialconditionVx.dat', vx, .TRUE.)
@@ -455,9 +423,9 @@ contains
         call material_rw3('initialconditionVz.dat', vz, .TRUE.)
 
         qx = 0.0_real64; qy = 0.0_real64; qz = 0.0_real64; pressure = 0.0_real64
-        sxx = 0.0_real64; syy = 0.0_real64; szz = 0.0_real64; sxy = 0.0_real64; sxz = 0.0_real64; syz = 0.0_real64
+        sxx = 0.0_real64; syy = 0.0_real64; szz = 0.0_real64
         srcx = 0.0_real64; srcy = 0.0_real64; srcz = 0.0_real64
-        srcxx = 0.0_real64; srcyy = 0.0_real64; srczz = 0.0_real64; srcxy = 0.0_real64; srcxz = 0.0_real64; srcyz = 0.0_real64
+        srcxx = 0.0_real64; srcyy = 0.0_real64; srczz = 0.0_real64
         srcqx = 0.0_real64; srcqy = 0.0_real64; srcqz = 0.0_real64; srcp = 0.0_real64
         velocnorm = 0.0_real64; pressurenorm = 0.0_real64
 
@@ -480,46 +448,33 @@ contains
             call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
             call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
             call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
-            call loadsource('seismicsourcexy.dat', source%time_steps, srcxy)
-            call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
-            call loadsource('seismicsourceyz.dat', source%time_steps, srcyz)
         endif
 
         do it = 1, source%time_steps
-            call rhs_biot25_cell(vx,vy,vz,qx,qy,qz,pressure,sxx,syy,szz,sxy,sxz,syz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k1vx,k1vy,k1vz,k1qx,k1qy,k1qz,k1p,k1sxx,k1syy,k1szz,k1sxy,k1sxz,k1syz)
+            call rhs_biot25_cell(vx,vy,vz,qx,qy,qz,pressure,sxx,syy,szz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
+                dx,dy,dz,max_speed,k1vx,k1vy,k1vz,k1qx,k1qy,k1qz,k1p,k1sxx,k1syy,k1szz)
             tvx=vx+0.5_real64*dt*k1vx; tvy=vy+0.5_real64*dt*k1vy; tvz=vz+0.5_real64*dt*k1vz
             tqx=qx+0.5_real64*dt*k1qx; tqy=qy+0.5_real64*dt*k1qy; tqz=qz+0.5_real64*dt*k1qz
             tp=pressure+0.5_real64*dt*k1p; tsxx=sxx+0.5_real64*dt*k1sxx; tsyy=syy+0.5_real64*dt*k1syy; tszz=szz+0.5_real64*dt*k1szz
-            tsxy=sxy+0.5_real64*dt*k1sxy; tsxz=sxz+0.5_real64*dt*k1sxz; tsyz=syz+0.5_real64*dt*k1syz
-            
-            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,tsxy,tsxz,tsyz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k2vx,k2vy,k2vz,k2qx,k2qy,k2qz,k2p,k2sxx,k2syy,k2szz,k2sxy,k2sxz,k2syz)
+            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
+                dx,dy,dz,max_speed,k2vx,k2vy,k2vz,k2qx,k2qy,k2qz,k2p,k2sxx,k2syy,k2szz)
             tvx=vx+0.5_real64*dt*k2vx; tvy=vy+0.5_real64*dt*k2vy; tvz=vz+0.5_real64*dt*k2vz
             tqx=qx+0.5_real64*dt*k2qx; tqy=qy+0.5_real64*dt*k2qy; tqz=qz+0.5_real64*dt*k2qz
             tp=pressure+0.5_real64*dt*k2p; tsxx=sxx+0.5_real64*dt*k2sxx; tsyy=syy+0.5_real64*dt*k2syy; tszz=szz+0.5_real64*dt*k2szz
-            tsxy=sxy+0.5_real64*dt*k2sxy; tsxz=sxz+0.5_real64*dt*k2sxz; tsyz=syz+0.5_real64*dt*k2syz
-            
-            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,tsxy,tsxz,tsyz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k3vx,k3vy,k3vz,k3qx,k3qy,k3qz,k3p,k3sxx,k3syy,k3szz,k3sxy,k3sxz,k3syz)
+            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
+                dx,dy,dz,max_speed,k3vx,k3vy,k3vz,k3qx,k3qy,k3qz,k3p,k3sxx,k3syy,k3szz)
             tvx=vx+dt*k3vx; tvy=vy+dt*k3vy; tvz=vz+dt*k3vz; tqx=qx+dt*k3qx; tqy=qy+dt*k3qy; tqz=qz+dt*k3qz
             tp=pressure+dt*k3p; tsxx=sxx+dt*k3sxx; tsyy=syy+dt*k3syy; tszz=szz+dt*k3szz
-            tsxy=sxy+dt*k3sxy; tsxz=sxz+dt*k3sxz; tsyz=syz+dt*k3syz
-            
-            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,tsxy,tsxz,tsyz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k4vx,k4vy,k4vz,k4qx,k4qy,k4qz,k4p,k4sxx,k4syy,k4szz,k4sxy,k4sxz,k4syz)
+            call rhs_biot25_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,c11,c12,c13,c22,c23,c33,rho, &
+                rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
+                gamma_x,gamma_y,gamma_z, &
+                dx,dy,dz,max_speed,k4vx,k4vy,k4vz,k4qx,k4qy,k4qz,k4p,k4sxx,k4syy,k4szz)
 
             vx=vx+dt*(k1vx+2.0_real64*k2vx+2.0_real64*k3vx+k4vx)/6.0_real64
             vy=vy+dt*(k1vy+2.0_real64*k2vy+2.0_real64*k3vy+k4vy)/6.0_real64
@@ -531,9 +486,6 @@ contains
             sxx=sxx+dt*(k1sxx+2.0_real64*k2sxx+2.0_real64*k3sxx+k4sxx)/6.0_real64
             syy=syy+dt*(k1syy+2.0_real64*k2syy+2.0_real64*k3syy+k4syy)/6.0_real64
             szz=szz+dt*(k1szz+2.0_real64*k2szz+2.0_real64*k3szz+k4szz)/6.0_real64
-            sxy=sxy+dt*(k1sxy+2.0_real64*k2sxy+2.0_real64*k3sxy+k4sxy)/6.0_real64
-            sxz=sxz+dt*(k1sxz+2.0_real64*k2sxz+2.0_real64*k3sxz+k4sxz)/6.0_real64
-            syz=syz+dt*(k1syz+2.0_real64*k2syz+2.0_real64*k3syz+k4syz)/6.0_real64
 
             rho0 = positive(rho(isource,ksource), 1.0_real64)
             vx(isource,jsource,ksource)=vx(isource,jsource,ksource)+srcx(it)*dt/rho0
@@ -546,15 +498,12 @@ contains
             sxx(isource,jsource,ksource)=sxx(isource,jsource,ksource)+srcxx(it)/rho0
             syy(isource,jsource,ksource)=syy(isource,jsource,ksource)+srcyy(it)/rho0
             szz(isource,jsource,ksource)=szz(isource,jsource,ksource)+srczz(it)/rho0
-            sxy(isource,jsource,ksource)=sxy(isource,jsource,ksource)+srcxy(it)/rho0
-            sxz(isource,jsource,ksource)=sxz(isource,jsource,ksource)+srcxz(it)/rho0
-            syz(isource,jsource,ksource)=syz(isource,jsource,ksource)+srcyz(it)/rho0
 
             vx(1,:,:)=0.0_real64; vy(:,1,:)=0.0_real64; vz(:,:,1)=0.0_real64
             vx(nx,:,:)=0.0_real64; vy(:,ny,:)=0.0_real64; vz(:,:,nz)=0.0_real64
 
             velocnorm(it)=maxval(sqrt(vx**2+vy**2+vz**2)); pressurenorm(it)=maxval(abs(pressure))
-            if (velocnorm(it) > stability_threshold) stop 'Biot DG solution became unstable'
+            if (velocnorm(it) > stability_threshold) stop 'Biot DG 2.5D solution became unstable'
             call write_image3(vx,nx,ny,nz,source,it,'Vx',SINGLE); call write_image3(vy,nx,ny,nz,source,it,'Vy',SINGLE)
             call write_image3(vz,nx,ny,nz,source,it,'Vz',SINGLE); call write_image3(qx,nx,ny,nz,source,it,'Qx',SINGLE)
             call write_image3(qy,nx,ny,nz,source,it,'Qy',SINGLE); call write_image3(qz,nx,ny,nz,source,it,'Qz',SINGLE)
@@ -565,39 +514,23 @@ contains
         call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
     end subroutine biotdg25
 
-
     subroutine biotdg3(domain, source, SINGLE_OUTPUT)
         implicit none
+
         type(Domain_Type), intent(in) :: domain
         type(Source_Type), intent(in) :: source
         logical, intent(in), optional :: SINGLE_OUTPUT
 
         integer :: nx, ny, nz, i, j, k, it, isource, jsource, ksource
-        real(real64) :: dx, dy, dz, dt, rho0, max_speed
+        real(real64) :: dx, dy, dz, dt, rho0, div_v, div_q, px, py, pz
         logical :: SINGLE
 
-        real(real64), allocatable :: c11(:,:,:), c12(:,:,:), c13(:,:,:), c14(:,:,:), c15(:,:,:), c16(:,:,:)
-        real(real64), allocatable :: c22(:,:,:), c23(:,:,:), c24(:,:,:), c25(:,:,:), c26(:,:,:)
-        real(real64), allocatable :: c33(:,:,:), c34(:,:,:), c35(:,:,:), c36(:,:,:)
-        real(real64), allocatable :: c44(:,:,:), c45(:,:,:), c46(:,:,:), c55(:,:,:), c56(:,:,:), c66(:,:,:), rho(:,:,:)
-        real(real64), allocatable :: alpha_x(:,:,:), alpha_y(:,:,:), alpha_z(:,:,:), biot_m(:,:,:)
-        real(real64), allocatable :: rho_fluid(:,:,:), viscosity(:,:,:), permeability_x(:,:,:), permeability_y(:,:,:), permeability_z(:,:,:)
-        real(real64), allocatable :: gamma_x(:,:,:), gamma_y(:,:,:), gamma_z(:,:,:)
-
-        real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), pressure(:,:,:)
-        real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:), sxy(:,:,:), sxz(:,:,:), syz(:,:,:)
-        real(real64), allocatable :: k1vx(:,:,:), k1vy(:,:,:), k1vz(:,:,:), k1qx(:,:,:), k1qy(:,:,:), k1qz(:,:,:), k1p(:,:,:)
-        real(real64), allocatable :: k1sxx(:,:,:), k1syy(:,:,:), k1szz(:,:,:), k1sxy(:,:,:), k1sxz(:,:,:), k1syz(:,:,:)
-        real(real64), allocatable :: k2vx(:,:,:), k2vy(:,:,:), k2vz(:,:,:), k2qx(:,:,:), k2qy(:,:,:), k2qz(:,:,:), k2p(:,:,:)
-        real(real64), allocatable :: k2sxx(:,:,:), k2syy(:,:,:), k2szz(:,:,:), k2sxy(:,:,:), k2sxz(:,:,:), k2syz(:,:,:)
-        real(real64), allocatable :: k3vx(:,:,:), k3vy(:,:,:), k3vz(:,:,:), k3qx(:,:,:), k3qy(:,:,:), k3qz(:,:,:), k3p(:,:,:)
-        real(real64), allocatable :: k3sxx(:,:,:), k3syy(:,:,:), k3szz(:,:,:), k3sxy(:,:,:), k3sxz(:,:,:), k3syz(:,:,:)
-        real(real64), allocatable :: k4vx(:,:,:), k4vy(:,:,:), k4vz(:,:,:), k4qx(:,:,:), k4qy(:,:,:), k4qz(:,:,:), k4p(:,:,:)
-        real(real64), allocatable :: k4sxx(:,:,:), k4syy(:,:,:), k4szz(:,:,:), k4sxy(:,:,:), k4sxz(:,:,:), k4syz(:,:,:)
-        real(real64), allocatable :: tvx(:,:,:), tvy(:,:,:), tvz(:,:,:), tqx(:,:,:), tqy(:,:,:), tqz(:,:,:), tp(:,:,:)
-        real(real64), allocatable :: tsxx(:,:,:), tsyy(:,:,:), tszz(:,:,:), tsxy(:,:,:), tsxz(:,:,:), tsyz(:,:,:)
-
-        real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:), srcxy(:), srcxz(:), srcyz(:)
+        real(real64), allocatable :: c11(:,:,:), c12(:,:,:), c13(:,:,:), c22(:,:,:), c23(:,:,:), c33(:,:,:), rho(:,:,:)
+        real(real64), allocatable :: ax(:,:,:), ay(:,:,:), az(:,:,:), m(:,:,:), rho_f(:,:,:), eta(:,:,:), kx(:,:,:), ky(:,:,:), kz(:,:,:)
+        real(real64), allocatable :: gx(:,:,:), gy(:,:,:), gz(:,:,:)
+        real(real64), allocatable :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:), p(:,:,:)
+        real(real64), allocatable :: sxx(:,:,:), syy(:,:,:), szz(:,:,:)
+        real(real64), allocatable :: srcx(:), srcy(:), srcz(:), srcxx(:), srcyy(:), srczz(:)
         real(real64), allocatable :: srcqx(:), srcqy(:), srcqz(:), srcp(:)
         real(real64), allocatable :: velocnorm(:), pressurenorm(:)
 
@@ -610,76 +543,39 @@ contains
         nx=domain%nx; ny=domain%ny; nz=domain%nz
         dx=domain%dx; dy=domain%dy; dz=domain%dz; dt=source%dt
 
-        allocate(c11(nx,ny,nz), c12(nx,ny,nz), c13(nx,ny,nz), c14(nx,ny,nz), c15(nx,ny,nz), c16(nx,ny,nz))
-        allocate(c22(nx,ny,nz), c23(nx,ny,nz), c24(nx,ny,nz), c25(nx,ny,nz), c26(nx,ny,nz))
-        allocate(c33(nx,ny,nz), c34(nx,ny,nz), c35(nx,ny,nz), c36(nx,ny,nz))
-        allocate(c44(nx,ny,nz), c45(nx,ny,nz), c46(nx,ny,nz), c55(nx,ny,nz), c56(nx,ny,nz), c66(nx,ny,nz), rho(nx,ny,nz))
-        allocate(alpha_x(nx,ny,nz), alpha_y(nx,ny,nz), alpha_z(nx,ny,nz), biot_m(nx,ny,nz))
-        allocate(rho_fluid(nx,ny,nz), viscosity(nx,ny,nz), permeability_x(nx,ny,nz), permeability_y(nx,ny,nz), permeability_z(nx,ny,nz))
-        allocate(gamma_x(nx,ny,nz), gamma_y(nx,ny,nz), gamma_z(nx,ny,nz))
-
-        allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), pressure(nx,ny,nz))
-        allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz), sxy(nx,ny,nz), sxz(nx,ny,nz), syz(nx,ny,nz))
-        
-        allocate(k1vx(nx,ny,nz), k1vy(nx,ny,nz), k1vz(nx,ny,nz), k1qx(nx,ny,nz), k1qy(nx,ny,nz), k1qz(nx,ny,nz), k1p(nx,ny,nz))
-        allocate(k1sxx(nx,ny,nz), k1syy(nx,ny,nz), k1szz(nx,ny,nz), k1sxy(nx,ny,nz), k1sxz(nx,ny,nz), k1syz(nx,ny,nz))
-        allocate(k2vx, source=k1vx); allocate(k2vy, source=k1vy); allocate(k2vz, source=k1vz)
-        allocate(k2qx, source=k1qx); allocate(k2qy, source=k1qy); allocate(k2qz, source=k1qz); allocate(k2p, source=k1p)
-        allocate(k2sxx, source=k1sxx); allocate(k2syy, source=k1syy); allocate(k2szz, source=k1szz)
-        allocate(k2sxy, source=k1sxy); allocate(k2sxz, source=k1sxz); allocate(k2syz, source=k1syz)
-        allocate(k3vx, source=k1vx); allocate(k3vy, source=k1vy); allocate(k3vz, source=k1vz)
-        allocate(k3qx, source=k1qx); allocate(k3qy, source=k1qy); allocate(k3qz, source=k1qz); allocate(k3p, source=k1p)
-        allocate(k3sxx, source=k1sxx); allocate(k3syy, source=k1syy); allocate(k3szz, source=k1szz)
-        allocate(k3sxy, source=k1sxy); allocate(k3sxz, source=k1sxz); allocate(k3syz, source=k1syz)
-        allocate(k4vx, source=k1vx); allocate(k4vy, source=k1vy); allocate(k4vz, source=k1vz)
-        allocate(k4qx, source=k1qx); allocate(k4qy, source=k1qy); allocate(k4qz, source=k1qz); allocate(k4p, source=k1p)
-        allocate(k4sxx, source=k1sxx); allocate(k4syy, source=k1syy); allocate(k4szz, source=k1szz)
-        allocate(k4sxy, source=k1sxy); allocate(k4sxz, source=k1sxz); allocate(k4syz, source=k1syz)
-        allocate(tvx, source=k1vx); allocate(tvy, source=k1vy); allocate(tvz, source=k1vz)
-        allocate(tqx, source=k1qx); allocate(tqy, source=k1qy); allocate(tqz, source=k1qz); allocate(tp, source=k1p)
-        allocate(tsxx, source=k1sxx); allocate(tsyy, source=k1syy); allocate(tszz, source=k1szz)
-        allocate(tsxy, source=k1sxy); allocate(tsxz, source=k1sxz); allocate(tsyz, source=k1syz)
-
+        allocate(c11(nx,ny,nz), c12(nx,ny,nz), c13(nx,ny,nz), c22(nx,ny,nz), c23(nx,ny,nz), c33(nx,ny,nz), rho(nx,ny,nz))
+        allocate(ax(nx,ny,nz), ay(nx,ny,nz), az(nx,ny,nz), m(nx,ny,nz), rho_f(nx,ny,nz), eta(nx,ny,nz))
+        allocate(kx(nx,ny,nz), ky(nx,ny,nz), kz(nx,ny,nz))
+        allocate(gx(nx,ny,nz), gy(nx,ny,nz), gz(nx,ny,nz))
+        allocate(vx(nx,ny,nz), vy(nx,ny,nz), vz(nx,ny,nz), qx(nx,ny,nz), qy(nx,ny,nz), qz(nx,ny,nz), p(nx,ny,nz))
+        allocate(sxx(nx,ny,nz), syy(nx,ny,nz), szz(nx,ny,nz))
         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
         allocate(srcxx(source%time_steps), srcyy(source%time_steps), srczz(source%time_steps))
-        allocate(srcxy(source%time_steps), srcxz(source%time_steps), srcyz(source%time_steps))
         allocate(srcqx(source%time_steps), srcqy(source%time_steps), srcqz(source%time_steps), srcp(source%time_steps))
         allocate(velocnorm(source%time_steps), pressurenorm(source%time_steps))
 
         call material_rw3('c11.dat', c11, .TRUE.); call material_rw3('c12.dat', c12, .TRUE.)
-        call material_rw3('c13.dat', c13, .TRUE.); call material_rw3('c14.dat', c14, .TRUE.)
-        call material_rw3('c15.dat', c15, .TRUE.); call material_rw3('c16.dat', c16, .TRUE.)
-        call material_rw3('c22.dat', c22, .TRUE.); call material_rw3('c23.dat', c23, .TRUE.)
-        call material_rw3('c24.dat', c24, .TRUE.); call material_rw3('c25.dat', c25, .TRUE.)
-        call material_rw3('c26.dat', c26, .TRUE.); call material_rw3('c33.dat', c33, .TRUE.)
-        call material_rw3('c34.dat', c34, .TRUE.); call material_rw3('c35.dat', c35, .TRUE.)
-        call material_rw3('c36.dat', c36, .TRUE.); call material_rw3('c44.dat', c44, .TRUE.)
-        call material_rw3('c45.dat', c45, .TRUE.); call material_rw3('c46.dat', c46, .TRUE.)
-        call material_rw3('c55.dat', c55, .TRUE.); call material_rw3('c56.dat', c56, .TRUE.)
-        call material_rw3('c66.dat', c66, .TRUE.); call material_rw3('rho.dat', rho, .TRUE.)
-        call material_rw3('alpha_x.dat', alpha_x, .TRUE.); call material_rw3('alpha_y.dat', alpha_y, .TRUE.)
-        call material_rw3('alpha_z.dat', alpha_z, .TRUE.); call material_rw3('biot_m.dat', biot_m, .TRUE.)
-        call material_rw3('rho_fluid.dat', rho_fluid, .TRUE.); call material_rw3('viscosity.dat', viscosity, .TRUE.)
-        call material_rw3('permeability_x.dat', permeability_x, .TRUE.)
-        call material_rw3('permeability_y.dat', permeability_y, .TRUE.)
-        call material_rw3('permeability_z.dat', permeability_z, .TRUE.)
-        call material_rw3('gamma_x.dat', gamma_x, .TRUE.); call material_rw3('gamma_y.dat', gamma_y, .TRUE.)
-        call material_rw3('gamma_z.dat', gamma_z, .TRUE.)
+        call material_rw3('c13.dat', c13, .TRUE.); call material_rw3('c22.dat', c22, .TRUE.)
+        call material_rw3('c23.dat', c23, .TRUE.); call material_rw3('c33.dat', c33, .TRUE.)
+        call material_rw3('rho.dat', rho, .TRUE.); call material_rw3('alpha_x.dat', ax, .TRUE.)
+        call material_rw3('alpha_y.dat', ay, .TRUE.); call material_rw3('alpha_z.dat', az, .TRUE.)
+        call material_rw3('biot_m.dat', m, .TRUE.); call material_rw3('rho_fluid.dat', rho_f, .TRUE.)
+        call material_rw3('viscosity.dat', eta, .TRUE.); call material_rw3('permeability_x.dat', kx, .TRUE.)
+        call material_rw3('permeability_y.dat', ky, .TRUE.); call material_rw3('permeability_z.dat', kz, .TRUE.)
+        call material_rw3('gamma_x.dat', gx, .TRUE.); call material_rw3('gamma_y.dat', gy, .TRUE.)
+        call material_rw3('gamma_z.dat', gz, .TRUE.)
         call material_rw3('initialconditionVx.dat', vx, .TRUE.)
         call material_rw3('initialconditionVy.dat', vy, .TRUE.)
         call material_rw3('initialconditionVz.dat', vz, .TRUE.)
 
-        qx = 0.0_real64; qy = 0.0_real64; qz = 0.0_real64; pressure = 0.0_real64
-        sxx = 0.0_real64; syy = 0.0_real64; szz = 0.0_real64; sxy = 0.0_real64; sxz = 0.0_real64; syz = 0.0_real64
-        srcx = 0.0_real64; srcy = 0.0_real64; srcz = 0.0_real64
-        srcxx = 0.0_real64; srcyy = 0.0_real64; srczz = 0.0_real64; srcxy = 0.0_real64; srcxz = 0.0_real64; srcyz = 0.0_real64
-        srcqx = 0.0_real64; srcqy = 0.0_real64; srcqz = 0.0_real64; srcp = 0.0_real64
-        velocnorm = 0.0_real64; pressurenorm = 0.0_real64
+        qx=0.0_real64; qy=0.0_real64; qz=0.0_real64; p=0.0_real64
+        sxx=0.0_real64; syy=0.0_real64; szz=0.0_real64
+        srcx=0.0_real64; srcy=0.0_real64; srcz=0.0_real64
+        srcxx=0.0_real64; srcyy=0.0_real64; srczz=0.0_real64
+        srcqx=0.0_real64; srcqy=0.0_real64; srcqz=0.0_real64; srcp=0.0_real64
+        velocnorm=0.0_real64; pressurenorm=0.0_real64
 
-        isource = source%xind + domain%cpml
-        jsource = source%yind + domain%cpml
-        ksource = source%zind + domain%cpml
-        max_speed = sqrt(maxval(max(c11, c33)) / positive(minval(rho), 1.0_real64))
+        isource=source%xind+domain%cpml; jsource=source%yind+domain%cpml; ksource=source%zind+domain%cpml
 
         if (source%source_type == 'ac') then
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
@@ -695,247 +591,146 @@ contains
             call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
             call loadsource('seismicsourceyy.dat', source%time_steps, srcyy)
             call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
-            call loadsource('seismicsourcexy.dat', source%time_steps, srcxy)
-            call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
-            call loadsource('seismicsourceyz.dat', source%time_steps, srcyz)
         endif
 
-        do it = 1, source%time_steps
-            call rhs_biot3_cell(vx,vy,vz,qx,qy,qz,pressure,sxx,syy,szz,sxy,sxz,syz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k1vx,k1vy,k1vz,k1qx,k1qy,k1qz,k1p,k1sxx,k1syy,k1szz,k1sxy,k1sxz,k1syz)
-            tvx=vx+0.5_real64*dt*k1vx; tvy=vy+0.5_real64*dt*k1vy; tvz=vz+0.5_real64*dt*k1vz
-            tqx=qx+0.5_real64*dt*k1qx; tqy=qy+0.5_real64*dt*k1qy; tqz=qz+0.5_real64*dt*k1qz
-            tp=pressure+0.5_real64*dt*k1p; tsxx=sxx+0.5_real64*dt*k1sxx; tsyy=syy+0.5_real64*dt*k1syy; tszz=szz+0.5_real64*dt*k1szz
-            tsxy=sxy+0.5_real64*dt*k1sxy; tsxz=sxz+0.5_real64*dt*k1sxz; tsyz=syz+0.5_real64*dt*k1syz
-            
-            call rhs_biot3_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,tsxy,tsxz,tsyz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k2vx,k2vy,k2vz,k2qx,k2qy,k2qz,k2p,k2sxx,k2syy,k2szz,k2sxy,k2sxz,k2syz)
-            tvx=vx+0.5_real64*dt*k2vx; tvy=vy+0.5_real64*dt*k2vy; tvz=vz+0.5_real64*dt*k2vz
-            tqx=qx+0.5_real64*dt*k2qx; tqy=qy+0.5_real64*dt*k2qy; tqz=qz+0.5_real64*dt*k2qz
-            tp=pressure+0.5_real64*dt*k2p; tsxx=sxx+0.5_real64*dt*k2sxx; tsyy=syy+0.5_real64*dt*k2syy; tszz=szz+0.5_real64*dt*k2szz
-            tsxy=sxy+0.5_real64*dt*k2sxy; tsxz=sxz+0.5_real64*dt*k2sxz; tsyz=syz+0.5_real64*dt*k2syz
-            
-            call rhs_biot3_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,tsxy,tsxz,tsyz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k3vx,k3vy,k3vz,k3qx,k3qy,k3qz,k3p,k3sxx,k3syy,k3szz,k3sxy,k3sxz,k3syz)
-            tvx=vx+dt*k3vx; tvy=vy+dt*k3vy; tvz=vz+dt*k3vz; tqx=qx+dt*k3qx; tqy=qy+dt*k3qy; tqz=qz+dt*k3qz
-            tp=pressure+dt*k3p; tsxx=sxx+dt*k3sxx; tsyy=syy+dt*k3syy; tszz=szz+dt*k3szz
-            tsxy=sxy+dt*k3sxy; tsxz=sxz+dt*k3sxz; tsyz=syz+dt*k3syz
-            
-            call rhs_biot3_cell(tvx,tvy,tvz,tqx,tqy,tqz,tp,tsxx,tsyy,tszz,tsxy,tsxz,tsyz, &
-                c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-                rho,rho_fluid,viscosity,alpha_x,alpha_y,alpha_z,biot_m,permeability_x,permeability_y,permeability_z, &
-                gamma_x,gamma_y,gamma_z,dx,dy,dz,max_speed, &
-                k4vx,k4vy,k4vz,k4qx,k4qy,k4qz,k4p,k4sxx,k4syy,k4szz,k4sxy,k4sxz,k4syz)
+        do it=1,source%time_steps
+            !$omp parallel do collapse(3) private(div_v,div_q) schedule(static)
+            do k=2,nz-1
+                do j=2,ny-1
+                    do i=2,nx-1
+                        div_v=(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                              (vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                              (vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)
+                        div_q=(qx(i+1,j,k)-qx(i-1,j,k))/(2.0_real64*dx)+ &
+                              (qy(i,j+1,k)-qy(i,j-1,k))/(2.0_real64*dy)+ &
+                              (qz(i,j,k+1)-qz(i,j,k-1))/(2.0_real64*dz)
+                        p(i,j,k)=p(i,j,k)-dt*m(i,j,k)*(((ax(i,j,k)+ay(i,j,k)+az(i,j,k))/3.0_real64)*div_v+div_q)
 
-            vx=vx+dt*(k1vx+2.0_real64*k2vx+2.0_real64*k3vx+k4vx)/6.0_real64
-            vy=vy+dt*(k1vy+2.0_real64*k2vy+2.0_real64*k3vy+k4vy)/6.0_real64
-            vz=vz+dt*(k1vz+2.0_real64*k2vz+2.0_real64*k3vz+k4vz)/6.0_real64
-            qx=qx+dt*(k1qx+2.0_real64*k2qx+2.0_real64*k3qx+k4qx)/6.0_real64
-            qy=qy+dt*(k1qy+2.0_real64*k2qy+2.0_real64*k3qy+k4qy)/6.0_real64
-            qz=qz+dt*(k1qz+2.0_real64*k2qz+2.0_real64*k3qz+k4qz)/6.0_real64
-            pressure=pressure+dt*(k1p+2.0_real64*k2p+2.0_real64*k3p+k4p)/6.0_real64
-            sxx=sxx+dt*(k1sxx+2.0_real64*k2sxx+2.0_real64*k3sxx+k4sxx)/6.0_real64
-            syy=syy+dt*(k1syy+2.0_real64*k2syy+2.0_real64*k3syy+k4syy)/6.0_real64
-            szz=szz+dt*(k1szz+2.0_real64*k2szz+2.0_real64*k3szz+k4szz)/6.0_real64
-            sxy=sxy+dt*(k1sxy+2.0_real64*k2sxy+2.0_real64*k3sxy+k4sxy)/6.0_real64
-            sxz=sxz+dt*(k1sxz+2.0_real64*k2sxz+2.0_real64*k3sxz+k4sxz)/6.0_real64
-            syz=syz+dt*(k1syz+2.0_real64*k2syz+2.0_real64*k3syz+k4syz)/6.0_real64
+                        sxx(i,j,k)=sxx(i,j,k)+dt*(c11(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                            c12(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                            c13(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ax(i,j,k)*p(i,j,k)- &
+                            gx(i,j,k)*sxx(i,j,k))
+                        syy(i,j,k)=syy(i,j,k)+dt*(c12(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                            c22(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                            c23(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ay(i,j,k)*p(i,j,k)- &
+                            gy(i,j,k)*syy(i,j,k))
+                        szz(i,j,k)=szz(i,j,k)+dt*(c13(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
+                            c23(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
+                            c33(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-az(i,j,k)*p(i,j,k)- &
+                            gz(i,j,k)*szz(i,j,k))
+                    enddo
+                enddo
+            enddo
+            !$omp end parallel do
 
-            rho0 = positive(rho(isource,jsource,ksource), 1.0_real64)
+            !$omp parallel do collapse(3) private(px,py,pz) schedule(static)
+            do k=2,nz-1
+                do j=2,ny-1
+                    do i=2,nx-1
+                        px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx)
+                        py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
+                        pz=(p(i,j,k+1)-p(i,j,k-1))/(2.0_real64*dz)
+                        vx(i,j,k)=vx(i,j,k)+dt*(sxx(i+1,j,k)-sxx(i-1,j,k))/(2.0_real64*dx)/positive(rho(i,j,k),1.0_real64)
+                        vy(i,j,k)=vy(i,j,k)+dt*(syy(i,j+1,k)-syy(i,j-1,k))/(2.0_real64*dy)/positive(rho(i,j,k),1.0_real64)
+                        vz(i,j,k)=vz(i,j,k)+dt*(szz(i,j,k+1)-szz(i,j,k-1))/(2.0_real64*dz)/positive(rho(i,j,k),1.0_real64)
+                        qx(i,j,k)=qx(i,j,k)-dt*kx(i,j,k)*px/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
+                        qy(i,j,k)=qy(i,j,k)-dt*ky(i,j,k)*py/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
+                        qz(i,j,k)=qz(i,j,k)-dt*kz(i,j,k)*pz/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
+                    enddo
+                enddo
+            enddo
+            !$omp end parallel do
+
+            rho0=positive(rho(isource,jsource,ksource),1.0_real64)
             vx(isource,jsource,ksource)=vx(isource,jsource,ksource)+srcx(it)*dt/rho0
             vy(isource,jsource,ksource)=vy(isource,jsource,ksource)+srcy(it)*dt/rho0
             vz(isource,jsource,ksource)=vz(isource,jsource,ksource)+srcz(it)*dt/rho0
             qx(isource,jsource,ksource)=qx(isource,jsource,ksource)+srcqx(it)*dt
             qy(isource,jsource,ksource)=qy(isource,jsource,ksource)+srcqy(it)*dt
             qz(isource,jsource,ksource)=qz(isource,jsource,ksource)+srcqz(it)*dt
-            pressure(isource,jsource,ksource)=pressure(isource,jsource,ksource)+srcp(it)*dt
+            p(isource,jsource,ksource)=p(isource,jsource,ksource)+srcp(it)*dt
             sxx(isource,jsource,ksource)=sxx(isource,jsource,ksource)+srcxx(it)/rho0
             syy(isource,jsource,ksource)=syy(isource,jsource,ksource)+srcyy(it)/rho0
             szz(isource,jsource,ksource)=szz(isource,jsource,ksource)+srczz(it)/rho0
-            sxy(isource,jsource,ksource)=sxy(isource,jsource,ksource)+srcxy(it)/rho0
-            sxz(isource,jsource,ksource)=sxz(isource,jsource,ksource)+srcxz(it)/rho0
-            syz(isource,jsource,ksource)=syz(isource,jsource,ksource)+srcyz(it)/rho0
 
             vx(1,:,:)=0.0_real64; vy(:,1,:)=0.0_real64; vz(:,:,1)=0.0_real64
             vx(nx,:,:)=0.0_real64; vy(:,ny,:)=0.0_real64; vz(:,:,nz)=0.0_real64
+            velocnorm(it)=maxval(sqrt(vx**2+vy**2+vz**2)); pressurenorm(it)=maxval(abs(p))
+            if (velocnorm(it) > stability_threshold) stop 'Biot DG 3D solution became unstable'
 
-            velocnorm(it)=maxval(sqrt(vx**2+vy**2+vz**2)); pressurenorm(it)=maxval(abs(pressure))
-            if (velocnorm(it) > stability_threshold) stop 'Biot DG solution became unstable'
             call write_image3(vx,nx,ny,nz,source,it,'Vx',SINGLE); call write_image3(vy,nx,ny,nz,source,it,'Vy',SINGLE)
             call write_image3(vz,nx,ny,nz,source,it,'Vz',SINGLE); call write_image3(qx,nx,ny,nz,source,it,'Qx',SINGLE)
             call write_image3(qy,nx,ny,nz,source,it,'Qy',SINGLE); call write_image3(qz,nx,ny,nz,source,it,'Qz',SINGLE)
-            call write_image3(pressure,nx,ny,nz,source,it,'Pp',SINGLE)
+            call write_image3(p,nx,ny,nz,source,it,'Pp',SINGLE)
         enddo
 
         call write_array('velocity_norm.dat', source%time_steps, velocnorm)
         call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
     end subroutine biotdg3
 
-
-    subroutine rhs_biot25_cell(vx,vy,vz,qx,qy,qz,p,sxx,syy,szz,sxy,sxz,syz, &
-        c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-        rho,rho_f,eta,ax,ay,az,m,kx,ky,kz,gx,gy,gz,dx,dy,dz,speed, &
-        rvx,rvy,rvz,rqx,rqy,rqz,rp,rsxx,rsyy,rszz,rsxy,rsxz,rsyz)
+    subroutine rhs_biot25_cell(vx,vy,vz,qx,qy,qz,p,sxx,syy,szz,c11,c12,c13,c22,c23,c33,rho, &
+                               rho_f,eta,ax,ay,az,m,kx,ky,kz,gx,gy,gz,dx,dy,dz,speed, &
+                               rvx,rvy,rvz,rqx,rqy,rqz,rp,rsxx,rsyy,rszz)
         implicit none
 
         real(real64), intent(in) :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:)
-        real(real64), intent(in) :: p(:,:,:), sxx(:,:,:), syy(:,:,:), szz(:,:,:), sxy(:,:,:), sxz(:,:,:), syz(:,:,:)
-        real(real64), intent(in) :: c11(:,:), c12(:,:), c13(:,:), c14(:,:), c15(:,:), c16(:,:)
-        real(real64), intent(in) :: c22(:,:), c23(:,:), c24(:,:), c25(:,:), c26(:,:)
-        real(real64), intent(in) :: c33(:,:), c34(:,:), c35(:,:), c36(:,:)
-        real(real64), intent(in) :: c44(:,:), c45(:,:), c46(:,:), c55(:,:), c56(:,:), c66(:,:)
-        real(real64), intent(in) :: rho(:,:), rho_f(:,:), eta(:,:), ax(:,:), ay(:,:), az(:,:)
-        real(real64), intent(in) :: m(:,:), kx(:,:), ky(:,:), kz(:,:), gx(:,:), gy(:,:), gz(:,:)
-        real(real64), intent(out) :: rvx(:,:,:), rvy(:,:,:), rvz(:,:,:), rqx(:,:,:), rqy(:,:,:), rqz(:,:,:)
-        real(real64), intent(out) :: rp(:,:,:), rsxx(:,:,:), rsyy(:,:,:), rszz(:,:,:), rsxy(:,:,:), rsxz(:,:,:), rsyz(:,:,:)
+        real(real64), intent(in) :: p(:,:,:), sxx(:,:,:), syy(:,:,:), szz(:,:,:)
+        real(real64), intent(in) :: c11(:,:), c12(:,:), c13(:,:), c22(:,:), c23(:,:), c33(:,:), rho(:,:)
+        real(real64), intent(in) :: rho_f(:,:), eta(:,:), ax(:,:), ay(:,:), az(:,:), m(:,:), kx(:,:), ky(:,:), kz(:,:)
+        real(real64), intent(in) :: gx(:,:), gy(:,:), gz(:,:)
         real(real64), intent(in) :: dx, dy, dz, speed
+        real(real64), intent(out) :: rvx(:,:,:), rvy(:,:,:), rvz(:,:,:), rqx(:,:,:), rqy(:,:,:), rqz(:,:,:)
+        real(real64), intent(out) :: rp(:,:,:), rsxx(:,:,:), rsyy(:,:,:), rszz(:,:,:)
 
         integer :: i, j, k, nx, ny, nz
-        real(real64) :: exx, eyy, ezz, eyz, exz, exy
-        real(real64) :: div_q, px, py, pz, dampx, dampy, dampz
+        real(real64) :: div_v, div_q, px, py, pz, dampx, dampy, dampz
 
         nx=size(vx,1); ny=size(vx,2); nz=size(vx,3)
         rvx=0.0_real64; rvy=0.0_real64; rvz=0.0_real64; rqx=0.0_real64; rqy=0.0_real64; rqz=0.0_real64
-        rp=0.0_real64; rsxx=0.0_real64; rsyy=0.0_real64; rszz=0.0_real64; rsxy=0.0_real64; rsxz=0.0_real64; rsyz=0.0_real64
+        rp=0.0_real64; rsxx=0.0_real64; rsyy=0.0_real64; rszz=0.0_real64
 
-        !$omp parallel do collapse(3) private(exx,eyy,ezz,eyz,exz,exy,div_q,px,py,pz,dampx,dampy,dampz) schedule(static)
+        !$omp parallel do collapse(3) private(div_v,div_q,px,py,pz,dampx,dampy,dampz) schedule(static)
         do k=2,nz-1
             do j=2,ny-1
                 do i=2,nx-1
-                    exx = (vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)
-                    eyy = (vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)
-                    ezz = (vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)
-                    eyz = (vy(i,j,k+1)-vy(i,j,k-1))/(2.0_real64*dz) + (vz(i,j+1,k)-vz(i,j-1,k))/(2.0_real64*dy)
-                    exz = (vx(i,j,k+1)-vx(i,j,k-1))/(2.0_real64*dz) + (vz(i+1,j,k)-vz(i-1,j,k))/(2.0_real64*dx)
-                    exy = (vx(i,j+1,k)-vx(i,j-1,k))/(2.0_real64*dy) + (vy(i+1,j,k)-vy(i-1,j,k))/(2.0_real64*dx)
-                    
+                    div_v = (vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                            (vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                            (vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)
                     div_q = (qx(i+1,j,k)-qx(i-1,j,k))/(2.0_real64*dx) + &
                             (qy(i,j+1,k)-qy(i,j-1,k))/(2.0_real64*dy) + &
                             (qz(i,j,k+1)-qz(i,j,k-1))/(2.0_real64*dz)
-                            
-                    rp(i,j,k) = -m(i,k) * (((ax(i,k)+ay(i,k)+az(i,k))/3.0_real64)*(exx+eyy+ezz) + div_q)
+                    rp(i,j,k) = -m(i,k) * (((ax(i,k)+ay(i,k)+az(i,k))/3.0_real64)*div_v + div_q)
 
-                    rsxx(i,j,k) = c11(i,k)*exx + c12(i,k)*eyy + c13(i,k)*ezz + c14(i,k)*eyz + c15(i,k)*exz + c16(i,k)*exy - ax(i,k)*rp(i,j,k) - gx(i,k)*sxx(i,j,k)
-                    rsyy(i,j,k) = c12(i,k)*exx + c22(i,k)*eyy + c23(i,k)*ezz + c24(i,k)*eyz + c25(i,k)*exz + c26(i,k)*exy - ay(i,k)*rp(i,j,k) - gy(i,k)*syy(i,j,k)
-                    rszz(i,j,k) = c13(i,k)*exx + c23(i,k)*eyy + c33(i,k)*ezz + c34(i,k)*eyz + c35(i,k)*exz + c36(i,k)*exy - az(i,k)*rp(i,j,k) - gz(i,k)*szz(i,j,k)
-                    rsyz(i,j,k) = c14(i,k)*exx + c24(i,k)*eyy + c34(i,k)*ezz + c44(i,k)*eyz + c45(i,k)*exz + c46(i,k)*exy - gy(i,k)*syz(i,j,k)
-                    rsxz(i,j,k) = c15(i,k)*exx + c25(i,k)*eyy + c35(i,k)*ezz + c45(i,k)*eyz + c55(i,k)*exz + c56(i,k)*exy - gx(i,k)*sxz(i,j,k)
-                    rsxy(i,j,k) = c16(i,k)*exx + c26(i,k)*eyy + c36(i,k)*ezz + c46(i,k)*eyz + c56(i,k)*exz + c66(i,k)*exy - gx(i,k)*sxy(i,j,k)
+                    rsxx(i,j,k) = c11(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                                  c12(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                                  c13(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ax(i,k)*rp(i,j,k) - &
+                                  gx(i,k)*sxx(i,j,k)
+                    rsyy(i,j,k) = c12(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                                  c22(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                                  c23(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - ay(i,k)*rp(i,j,k) - &
+                                  gy(i,k)*syy(i,j,k)
+                    rszz(i,j,k) = c13(i,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx) + &
+                                  c23(i,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy) + &
+                                  c33(i,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz) - az(i,k)*rp(i,j,k) - &
+                                  gz(i,k)*szz(i,j,k)
 
-                    px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx)
-                    py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
+                    px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx); py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
                     pz=(p(i,j,k+1)-p(i,j,k-1))/(2.0_real64*dz)
-                    
-                    rvx(i,j,k)=((sxx(i+1,j,k)-sxx(i-1,j,k))/(2.0_real64*dx) + &
-                                (sxy(i,j+1,k)-sxy(i,j-1,k))/(2.0_real64*dy) + &
-                                (sxz(i,j,k+1)-sxz(i,j,k-1))/(2.0_real64*dz))/positive(rho(i,k),1.0_real64)
-                    rvy(i,j,k)=((sxy(i+1,j,k)-sxy(i-1,j,k))/(2.0_real64*dx) + &
-                                (syy(i,j+1,k)-syy(i,j-1,k))/(2.0_real64*dy) + &
-                                (syz(i,j,k+1)-syz(i,j,k-1))/(2.0_real64*dz))/positive(rho(i,k),1.0_real64)
-                    rvz(i,j,k)=((sxz(i+1,j,k)-sxz(i-1,j,k))/(2.0_real64*dx) + &
-                                (syz(i,j+1,k)-syz(i,j-1,k))/(2.0_real64*dy) + &
-                                (szz(i,j,k+1)-szz(i,j,k-1))/(2.0_real64*dz))/positive(rho(i,k),1.0_real64)
-                                
+                    rvx(i,j,k)=(sxx(i+1,j,k)-sxx(i-1,j,k))/(2.0_real64*dx)/positive(rho(i,k),1.0_real64)
+                    rvy(i,j,k)=(syy(i,j+1,k)-syy(i,j-1,k))/(2.0_real64*dy)/positive(rho(i,k),1.0_real64)
+                    rvz(i,j,k)=(szz(i,j,k+1)-szz(i,j,k-1))/(2.0_real64*dz)/positive(rho(i,k),1.0_real64)
                     rqx(i,j,k)=-kx(i,k)*px/(positive(eta(i,k),1.0e-6_real64)*positive(rho_f(i,k),1.0_real64))
                     rqy(i,j,k)=-ky(i,k)*py/(positive(eta(i,k),1.0e-6_real64)*positive(rho_f(i,k),1.0_real64))
                     rqz(i,j,k)=-kz(i,k)*pz/(positive(eta(i,k),1.0e-6_real64)*positive(rho_f(i,k),1.0_real64))
 
-                    dampx = speed*((vx(i+1,j,k)-2.0_real64*vx(i,j,k)+vx(i-1,j,k))/(dx*dx)) * dx * 0.1_real64
-                    dampy = speed*((vy(i,j+1,k)-2.0_real64*vy(i,j,k)+vy(i,j-1,k))/(dy*dy)) * dy * 0.1_real64
-                    dampz = speed*((vz(i,j,k+1)-2.0_real64*vz(i,j,k)+vz(i,j,k-1))/(dz*dz)) * dz * 0.1_real64
+                    dampx = speed*((vx(i+1,j,k)-2.0_real64*vx(i,j,k)+vx(i-1,j,k))/(dx*dx))
+                    dampy = speed*((vy(i,j+1,k)-2.0_real64*vy(i,j,k)+vy(i,j-1,k))/(dy*dy))
+                    dampz = speed*((vz(i,j,k+1)-2.0_real64*vz(i,j,k)+vz(i,j,k-1))/(dz*dz))
                     rvx(i,j,k)=rvx(i,j,k)+dampx; rvy(i,j,k)=rvy(i,j,k)+dampy; rvz(i,j,k)=rvz(i,j,k)+dampz
                 enddo
             enddo
         enddo
         !$omp end parallel do
     end subroutine rhs_biot25_cell
-
-
-    subroutine rhs_biot3_cell(vx,vy,vz,qx,qy,qz,p,sxx,syy,szz,sxy,sxz,syz, &
-        c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26,c33,c34,c35,c36,c44,c45,c46,c55,c56,c66, &
-        rho,rho_f,eta,ax,ay,az,m,kx,ky,kz,gx,gy,gz,dx,dy,dz,speed, &
-        rvx,rvy,rvz,rqx,rqy,rqz,rp,rsxx,rsyy,rszz,rsxy,rsxz,rsyz)
-        implicit none
-
-        real(real64), intent(in) :: vx(:,:,:), vy(:,:,:), vz(:,:,:), qx(:,:,:), qy(:,:,:), qz(:,:,:)
-        real(real64), intent(in) :: p(:,:,:), sxx(:,:,:), syy(:,:,:), szz(:,:,:), sxy(:,:,:), sxz(:,:,:), syz(:,:,:)
-        real(real64), intent(in) :: c11(:,:,:), c12(:,:,:), c13(:,:,:), c14(:,:,:), c15(:,:,:), c16(:,:,:)
-        real(real64), intent(in) :: c22(:,:,:), c23(:,:,:), c24(:,:,:), c25(:,:,:), c26(:,:,:)
-        real(real64), intent(in) :: c33(:,:,:), c34(:,:,:), c35(:,:,:), c36(:,:,:)
-        real(real64), intent(in) :: c44(:,:,:), c45(:,:,:), c46(:,:,:), c55(:,:,:), c56(:,:,:), c66(:,:,:)
-        real(real64), intent(in) :: rho(:,:,:), rho_f(:,:,:), eta(:,:,:), ax(:,:,:), ay(:,:,:), az(:,:,:)
-        real(real64), intent(in) :: m(:,:,:), kx(:,:,:), ky(:,:,:), kz(:,:,:), gx(:,:,:), gy(:,:,:), gz(:,:,:)
-        real(real64), intent(out) :: rvx(:,:,:), rvy(:,:,:), rvz(:,:,:), rqx(:,:,:), rqy(:,:,:), rqz(:,:,:)
-        real(real64), intent(out) :: rp(:,:,:), rsxx(:,:,:), rsyy(:,:,:), rszz(:,:,:), rsxy(:,:,:), rsxz(:,:,:), rsyz(:,:,:)
-        real(real64), intent(in) :: dx, dy, dz, speed
-
-        integer :: i, j, k, nx, ny, nz
-        real(real64) :: exx, eyy, ezz, eyz, exz, exy
-        real(real64) :: div_q, px, py, pz, dampx, dampy, dampz
-
-        nx=size(vx,1); ny=size(vx,2); nz=size(vx,3)
-        rvx=0.0_real64; rvy=0.0_real64; rvz=0.0_real64; rqx=0.0_real64; rqy=0.0_real64; rqz=0.0_real64
-        rp=0.0_real64; rsxx=0.0_real64; rsyy=0.0_real64; rszz=0.0_real64; rsxy=0.0_real64; rsxz=0.0_real64; rsyz=0.0_real64
-
-        !$omp parallel do collapse(3) private(exx,eyy,ezz,eyz,exz,exy,div_q,px,py,pz,dampx,dampy,dampz) schedule(static)
-        do k=2,nz-1
-            do j=2,ny-1
-                do i=2,nx-1
-                    exx = (vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)
-                    eyy = (vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)
-                    ezz = (vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)
-                    eyz = (vy(i,j,k+1)-vy(i,j,k-1))/(2.0_real64*dz) + (vz(i,j+1,k)-vz(i,j-1,k))/(2.0_real64*dy)
-                    exz = (vx(i,j,k+1)-vx(i,j,k-1))/(2.0_real64*dz) + (vz(i+1,j,k)-vz(i-1,j,k))/(2.0_real64*dx)
-                    exy = (vx(i,j+1,k)-vx(i,j-1,k))/(2.0_real64*dy) + (vy(i+1,j,k)-vy(i-1,j,k))/(2.0_real64*dx)
-                    
-                    div_q = (qx(i+1,j,k)-qx(i-1,j,k))/(2.0_real64*dx) + &
-                            (qy(i,j+1,k)-qy(i,j-1,k))/(2.0_real64*dy) + &
-                            (qz(i,j,k+1)-qz(i,j,k-1))/(2.0_real64*dz)
-                            
-                    rp(i,j,k) = -m(i,j,k) * (((ax(i,j,k)+ay(i,j,k)+az(i,j,k))/3.0_real64)*(exx+eyy+ezz) + div_q)
-
-                    rsxx(i,j,k) = c11(i,j,k)*exx + c12(i,j,k)*eyy + c13(i,j,k)*ezz + c14(i,j,k)*eyz + c15(i,j,k)*exz + c16(i,j,k)*exy - ax(i,j,k)*rp(i,j,k) - gx(i,j,k)*sxx(i,j,k)
-                    rsyy(i,j,k) = c12(i,j,k)*exx + c22(i,j,k)*eyy + c23(i,j,k)*ezz + c24(i,j,k)*eyz + c25(i,j,k)*exz + c26(i,j,k)*exy - ay(i,j,k)*rp(i,j,k) - gy(i,j,k)*syy(i,j,k)
-                    rszz(i,j,k) = c13(i,j,k)*exx + c23(i,j,k)*eyy + c33(i,j,k)*ezz + c34(i,j,k)*eyz + c35(i,j,k)*exz + c36(i,j,k)*exy - az(i,j,k)*rp(i,j,k) - gz(i,j,k)*szz(i,j,k)
-                    rsyz(i,j,k) = c14(i,j,k)*exx + c24(i,j,k)*eyy + c34(i,j,k)*ezz + c44(i,j,k)*eyz + c45(i,j,k)*exz + c46(i,j,k)*exy - gy(i,j,k)*syz(i,j,k)
-                    rsxz(i,j,k) = c15(i,j,k)*exx + c25(i,j,k)*eyy + c35(i,j,k)*ezz + c45(i,j,k)*eyz + c55(i,j,k)*exz + c56(i,j,k)*exy - gx(i,j,k)*sxz(i,j,k)
-                    rsxy(i,j,k) = c16(i,j,k)*exx + c26(i,j,k)*eyy + c36(i,j,k)*ezz + c46(i,j,k)*eyz + c56(i,j,k)*exz + c66(i,j,k)*exy - gx(i,j,k)*sxy(i,j,k)
-
-                    px=(p(i+1,j,k)-p(i-1,j,k))/(2.0_real64*dx)
-                    py=(p(i,j+1,k)-p(i,j-1,k))/(2.0_real64*dy)
-                    pz=(p(i,j,k+1)-p(i,j,k-1))/(2.0_real64*dz)
-                    
-                    rvx(i,j,k)=((sxx(i+1,j,k)-sxx(i-1,j,k))/(2.0_real64*dx) + &
-                                (sxy(i,j+1,k)-sxy(i,j-1,k))/(2.0_real64*dy) + &
-                                (sxz(i,j,k+1)-sxz(i,j,k-1))/(2.0_real64*dz))/positive(rho(i,j,k),1.0_real64)
-                    rvy(i,j,k)=((sxy(i+1,j,k)-sxy(i-1,j,k))/(2.0_real64*dx) + &
-                                (syy(i,j+1,k)-syy(i,j-1,k))/(2.0_real64*dy) + &
-                                (syz(i,j,k+1)-syz(i,j,k-1))/(2.0_real64*dz))/positive(rho(i,j,k),1.0_real64)
-                    rvz(i,j,k)=((sxz(i+1,j,k)-sxz(i-1,j,k))/(2.0_real64*dx) + &
-                                (syz(i,j+1,k)-syz(i,j-1,k))/(2.0_real64*dy) + &
-                                (szz(i,j,k+1)-szz(i,j,k-1))/(2.0_real64*dz))/positive(rho(i,j,k),1.0_real64)
-                                
-                    rqx(i,j,k)=-kx(i,j,k)*px/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
-                    rqy(i,j,k)=-ky(i,j,k)*py/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
-                    rqz(i,j,k)=-kz(i,j,k)*pz/(positive(eta(i,j,k),1.0e-6_real64)*positive(rho_f(i,j,k),1.0_real64))
-
-                    dampx = speed*((vx(i+1,j,k)-2.0_real64*vx(i,j,k)+vx(i-1,j,k))/(dx*dx)) * dx * 0.1_real64
-                    dampy = speed*((vy(i,j+1,k)-2.0_real64*vy(i,j,k)+vy(i,j-1,k))/(dy*dy)) * dy * 0.1_real64
-                    dampz = speed*((vz(i,j,k+1)-2.0_real64*vz(i,j,k)+vz(i,j,k-1))/(dz*dz)) * dz * 0.1_real64
-                    rvx(i,j,k)=rvx(i,j,k)+dampx; rvy(i,j,k)=rvy(i,j,k)+dampy; rvz(i,j,k)=rvz(i,j,k)+dampz
-                enddo
-            enddo
-        enddo
-        !$omp end parallel do
-    end subroutine rhs_biot3_cell
 
 end module biotdg

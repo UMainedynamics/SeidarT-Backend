@@ -313,8 +313,9 @@ contains
             ex = ex + dt*(k1ex+2.0_real64*k2ex+2.0_real64*k3ex+k4ex)/6.0_real64
             ez = ez + dt*(k1ez+2.0_real64*k2ez+2.0_real64*k3ez+k4ez)/6.0_real64
             hy = hy + dt*(k1hy+2.0_real64*k2hy+2.0_real64*k3hy+k4hy)/6.0_real64
-            ex(0,0,isource,ksource) = ex(0,0,isource,ksource) + srcx(it)*dt/positive(eps11(isource,ksource), eps0)
-            ez(0,0,isource,ksource) = ez(0,0,isource,ksource) + srcz(it)*dt/positive(eps33(isource,ksource), eps0)
+            
+            
+
 
             call cell_average(ex, weights, cell_out); call write_image2(cell_out, nx, nz, source, it, 'Ex', SINGLE)
             fieldnorm(it) = maxval(abs(cell_out))
@@ -407,9 +408,95 @@ contains
             hx=hx+dt*(k1hx+2.0_real64*k2hx+2.0_real64*k3hx+k4hx)/6.0_real64
             hy=hy+dt*(k1hy+2.0_real64*k2hy+2.0_real64*k3hy+k4hy)/6.0_real64
             hz=hz+dt*(k1hz+2.0_real64*k2hz+2.0_real64*k3hz+k4hz)/6.0_real64
-            ex(isource,jsource,ksource)=ex(isource,jsource,ksource)+srcx(it)*dt/positive(eps11(isource,ksource),eps0)
-            ey(isource,jsource,ksource)=ey(isource,jsource,ksource)+srcy(it)*dt/positive(eps22(isource,ksource),eps0)
-            ez(isource,jsource,ksource)=ez(isource,jsource,ksource)+srcz(it)*dt/positive(eps33(isource,ksource),eps0)
+            
+            
+            if ( source%source_type == 'pw' ) then 
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then 
+                    ii = nint(XLOC / domain%dx)
+                    do jj = j_min,j_max
+                        do kk = k_min, k_max
+                            r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+                            Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
+                            Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif 
+                if ( active(3) .or. active(4)) then 
+                    jj = nint(YLOC / domain%dy)
+                    do ii = i_min,i_max
+                        do kk = k_min, k_max
+                            r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
+                            Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
+                            Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif 
+                if ( active(5) .or. active(6)) then 
+                    kk = nint(ZLOC / domain%dz)
+                    do ii = i_min,i_max
+                        do jj = j_min, j_max
+                            r = (/ ii * domain%dx, jj * domain%dy, ZLOC/)
+                            Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
+                            Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif 
+            else
+                ! add the source (force vector located at a given grid point)
+                Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
+                            srcx(it) * dt / eps11(isource,ksource)
+                Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
+                            srcy(it) * dt / eps22(isource,ksource) 
+                Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
+                            srcz(it) * dt / eps33(isource,ksource)
+            endif 
+
             call zero_em_boundaries(ex, ey, ez, hx, hy, hz)
             fieldnorm=maxval(sqrt(ex**2+ey**2+ez**2)); norm(it)=fieldnorm
             if (fieldnorm > stability_threshold) stop 'Electromagnetic DG 2.5D solution became unstable'
@@ -503,9 +590,90 @@ contains
             hx=hx+dt*(k1hx+2.0_real64*k2hx+2.0_real64*k3hx+k4hx)/6.0_real64
             hy=hy+dt*(k1hy+2.0_real64*k2hy+2.0_real64*k3hy+k4hy)/6.0_real64
             hz=hz+dt*(k1hz+2.0_real64*k2hz+2.0_real64*k3hz+k4hz)/6.0_real64
-            ex(isource,jsource,ksource)=ex(isource,jsource,ksource)+srcx(it)*dt/positive(eps11(isource,jsource,ksource),eps0)
-            ey(isource,jsource,ksource)=ey(isource,jsource,ksource)+srcy(it)*dt/positive(eps22(isource,jsource,ksource),eps0)
-            ez(isource,jsource,ksource)=ez(isource,jsource,ksource)+srcz(it)*dt/positive(eps33(isource,jsource,ksource),eps0)
+            
+            
+            ! Add the source terms
+            if ( source%source_type == 'pw' ) then
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then
+                    ii = nint(XLOC / domain%dx)
+                    do jj = j_min,j_max
+                        do kk = k_min,k_max
+                            r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1)
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2)
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3)
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif
+                if ( active(3) .or. active(4) ) then
+                    jj = nint(YLOC / domain%dy)
+                    do ii = i_min,i_max
+                        do kk = k_min,k_max
+                            r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1)
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2)
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3)
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif
+                if ( active(5) .or. active(6) ) then
+                    kk = nint(ZLOC / domain%dz)
+                    do ii = i_min,i_max
+                        do jj = j_min,j_max
+                            r = (/ ii * domain%dx, jj * domain%dy, ZLOC /)
+                            call boundary_em_field(r, r0, t, &
+                                            source%source_frequency, &
+                                            source%x_z_rotation, &
+                                            source%x_y_rotation, &
+                                            source%y_z_rotation, &
+                                            vbackground, eta, &
+                                            source%amplitude, &
+                                            source%source_wavelet, &
+                                            Ev, Hv )
+                            Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1)
+                            Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2)
+                            Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3)
+                            Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
+                            Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
+                            Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
+                        enddo
+                    enddo
+                endif
+            else
+                ! add the source (force vector located at a given grid point)
+                Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + &
+                            srcx(it) * dt / eps11(isource,jsource,ksource)
+                Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + &
+                            srcy(it) * dt / eps22(isource,jsource,ksource)
+                Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + &
+                            srcz(it) * dt / eps33(isource,jsource,ksource)
+            endif
+            
             call zero_em_boundaries(ex, ey, ez, hx, hy, hz)
             fieldnorm=maxval(sqrt(ex**2+ey**2+ez**2)); norm(it)=fieldnorm
             if (fieldnorm > stability_threshold) stop 'Electromagnetic DG 3D solution became unstable'
