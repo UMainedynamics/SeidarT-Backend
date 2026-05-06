@@ -143,18 +143,61 @@ contains
         sxx = 0.0_real64; szz = 0.0_real64; sxz = 0.0_real64
         srcx = 0.0_real64; srcz = 0.0_real64; srcxx = 0.0_real64
         srcxz = 0.0_real64; srczz = 0.0_real64; velocnorm = 0.0_real64
-        isource = source%xind + domain%cpml; ksource = source%zind + domain%cpml
+        isource = source%xind 
+        ksource = source%zind
         max_speed = sqrt(maxval(max(c11, c33)) / positive(minval(rho), 1.0_real64))
 
-        if (source%source_type == 'ac') then
+        if ( is_plane_wave_source(source%source_type) ) then 
+            XMIN = domain%dx
+            XMAX = domain%dx * domain%nx
+            XMID = 0.50_real64 * (XMIN + XMAX)
+            ZMIN = domain%dz 
+            ZMAX = domain%dz * domain%nz
+            ZMID = 0.50_real64 * (ZMIN + ZMAX)
+
+            call direction_polarization_vector( source%x_z_rotation, &
+                                                source%x_y_rotation, &
+                                                source%y_z_rotation, &
+                                                p, ehat)
+            call select_injection_faces(p, active)
+
+            r0 = (/ XMID, 0.0_real64, ZMID /)
+            XLOC = XMID
+            ZLOC = ZMID
+            if ( active(1) ) then
+                r0(1) = XMIN
+                XLOC = XMIN
+            endif
+            if ( active(2) ) then
+                r0(1) = XMAX
+                XLOC = XMAX
+            endif
+            if ( active(5) ) then
+                r0(3) = ZMIN
+                ZLOC = ZMIN
+            endif
+            if ( active(6) ) then
+                r0(3) = ZMAX
+                ZLOC = ZMAX
+            endif
+
+            i_min =  1
+            i_max = domain%nx 
+            j_min = 1
+            j_max = domain%nz 
+
+            call array_eigenvalues4_2(c11, c13, c15, c33, c35, c55, &
+                                      eig_array, nx, nz)
+            cbackground = sqrt(maxval(eig_array) / minval(rho))
+        else if ( source%source_type == 'ac') then 
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
             call loadsource('seismicsourcez.dat', source%time_steps, srcz)
         else
             call loadsource('seismicsourcexx.dat', source%time_steps, srcxx)
             call loadsource('seismicsourcexz.dat', source%time_steps, srcxz)
             call loadsource('seismicsourcezz.dat', source%time_steps, srczz)
-        endif
-
+        endif 
+        
         do it = 1, source%time_steps
             call rhs_seismicdg2(vx,vz,sxx,szz,sxz,c11,c13,c15,c33,c35,c55,rho, &
                 gamma_x,gamma_z,gamma_xz,deriv,weights,dx,dz,max_speed,k1vx,k1vz,k1sxx,k1szz,k1sxz)
@@ -170,18 +213,69 @@ contains
             call rhs_seismicdg2(tvx,tvz,tsxx,tszz,tsxz,c11,c13,c15,c33,c35,c55,rho, &
                 gamma_x,gamma_z,gamma_xz,deriv,weights,dx,dz,max_speed,k4vx,k4vz,k4sxx,k4szz,k4sxz)
 
-            vx = vx + dt*(k1vx+2.0_real64*k2vx+2.0_real64*k3vx+k4vx)/6.0_real64
-            vz = vz + dt*(k1vz+2.0_real64*k2vz+2.0_real64*k3vz+k4vz)/6.0_real64
-            sxx = sxx + dt*(k1sxx+2.0_real64*k2sxx+2.0_real64*k3sxx+k4sxx)/6.0_real64
-            szz = szz + dt*(k1szz+2.0_real64*k2szz+2.0_real64*k3szz+k4szz)/6.0_real64
-            sxz = sxz + dt*(k1sxz+2.0_real64*k2sxz+2.0_real64*k3sxz+k4sxz)/6.0_real64
+            ! Add source terms
+            if ( is_plane_wave_source(source%source_type) ) then
+                t = it * source%dt
+                if ( active(1) .or. active(2) ) then
+                    xi = nint(XLOC / domain%dx)
+                    do ip = j_min,j_max
+                        r = (/ XLOC, 0.0_real64, ip * domain%dz /)
+                        call boundary_seismic_field(r, r0, t, &
+                                        source%source_frequency, &
+                                        source%x_z_rotation, &
+                                        source%x_y_rotation, &
+                                        source%y_z_rotation, &
+                                        cbackground, source%amplitude, &
+                                        source%source_wavelet, &
+                                        Vvec, strain_vec, source%source_type)
+                        vx(xi,ip) = vx(xi,ip) + Vvec(1)
+                        vz(xi,ip) = vz(xi,ip) + Vvec(3)
+                        sigmaxx(xi,ip) = sigmaxx(xi,ip) + &
+                            c11(xi,ip) * strain_vec(1) + c13(xi,ip) * strain_vec(3) + &
+                            c15(xi,ip) * strain_vec(5)
+                        sigmazz(xi,ip) = sigmazz(xi,ip) + &
+                            c13(xi,ip) * strain_vec(1) + c33(xi,ip) * strain_vec(3) + &
+                            c35(xi,ip) * strain_vec(5)
+                        sigmaxz(xi,ip) = sigmaxz(xi,ip) + &
+                            c15(xi,ip) * strain_vec(1) + c35(xi,ip) * strain_vec(3) + &
+                            c55(xi,ip) * strain_vec(5)
+                    enddo
+                endif
+                if ( active(5) .or. active(6) ) then
+                    zi = nint(ZLOC / domain%dz)
+                    do ip = i_min,i_max
+                        r = (/ ip * domain%dx, 0.0_real64, ZLOC /)
+                        call boundary_seismic_field(r, r0, t, &
+                                        source%source_frequency, &
+                                        source%x_z_rotation, &
+                                        source%x_y_rotation, &
+                                        source%y_z_rotation, &
+                                        cbackground, source%amplitude, &
+                                        source%source_wavelet, &
+                                        Vvec, strain_vec, source%source_type)
+                        vx(ip,zi) = vx(ip,zi) + Vvec(1)
+                        vz(ip,zi) = vz(ip,zi) + Vvec(3)
+                        sigmaxx(ip,zi) = sigmaxx(ip,zi) + &
+                            c11(ip,zi) * strain_vec(1) + c13(ip,zi) * strain_vec(3) + &
+                            c15(ip,zi) * strain_vec(5)
+                        sigmazz(ip,zi) = sigmazz(ip,zi) + &
+                            c13(ip,zi) * strain_vec(1) + c33(ip,zi) * strain_vec(3) + &
+                            c35(ip,zi) * strain_vec(5)
+                        sigmaxz(ip,zi) = sigmaxz(ip,zi) + &
+                            c15(ip,zi) * strain_vec(1) + c35(ip,zi) * strain_vec(3) + &
+                            c55(ip,zi) * strain_vec(5)
+                    enddo
+                endif
+            else
+                ! Add the source term. If it is an accelerated weight drop the src_ij terms are zero
+                ! If it is any other source, the src_i terms are zero
+                sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
+                sigmaxz(isource+1,jsource+1) = sigmaxz(isource+1, jsource+1) + srcxz(it) / rho(isource+1,jsource+1)  
+                sigmazz(isource,jsource) = sigmazz(isource, jsource) + srczz(it) / rho(isource,jsource) 
+                vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
+                vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
+            endif
 
-            rho0 = positive(rho(isource,ksource), 1.0_real64)
-            vx(0,0,isource,ksource) = vx(0,0,isource,ksource) + srcx(it)*dt/rho0
-            vz(0,0,isource,ksource) = vz(0,0,isource,ksource) + srcz(it)*dt/rho0
-            sxx(0,0,isource,ksource) = sxx(0,0,isource,ksource) + srcxx(it)/rho0
-            szz(0,0,isource,ksource) = szz(0,0,isource,ksource) + srczz(it)/rho0
-            sxz(0,0,isource,ksource) = sxz(0,0,isource,ksource) + srcxz(it)/rho0
 
             call cell_average(vx, weights, cell_out); call write_image2(cell_out, nx, nz, source, it, 'Vx', SINGLE)
             velocnorm(it) = maxval(abs(cell_out))
