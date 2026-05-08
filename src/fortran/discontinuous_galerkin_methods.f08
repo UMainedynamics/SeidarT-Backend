@@ -161,7 +161,7 @@ contains
                     if (i > 1) then
                         left_state = u(DG_P,b,i-1,k)
                     else
-                        left_state = -u(0,b,i,k)
+                        left_state = u(0,b,i,k)
                     endif
                     jump = u(0,b,i,k) - left_state
                     rhs(0,b,i,k) = rhs(0,b,i,k) - speed * jump * 2.0_real64 / (dx * weights(0))
@@ -169,7 +169,7 @@ contains
                     if (i < nx) then
                         right_state = u(0,b,i+1,k)
                     else
-                        right_state = -u(DG_P,b,i,k)
+                        right_state = u(DG_P,b,i,k)
                     endif
                     jump = u(DG_P,b,i,k) - right_state
                     rhs(DG_P,b,i,k) = rhs(DG_P,b,i,k) - speed * jump * 2.0_real64 / (dx * weights(DG_P))
@@ -185,7 +185,7 @@ contains
                     if (k > 1) then
                         left_state = u(b,DG_P,i,k-1)
                     else
-                        left_state = -u(b,0,i,k)
+                        left_state = u(b,0,i,k)
                     endif
                     jump = u(b,0,i,k) - left_state
                     rhs(b,0,i,k) = rhs(b,0,i,k) - speed * jump * 2.0_real64 / (dz * weights(0))
@@ -193,7 +193,7 @@ contains
                     if (k < nz) then
                         right_state = u(b,0,i,k+1)
                     else
-                        right_state = -u(b,DG_P,i,k)
+                        right_state = u(b,DG_P,i,k)
                     endif
                     jump = u(b,DG_P,i,k) - right_state
                     rhs(b,DG_P,i,k) = rhs(b,DG_P,i,k) - speed * jump * 2.0_real64 / (dz * weights(DG_P))

@@ -68,27 +68,41 @@ contains
                 do b = 0, DG_P
                     do a = 0, DG_P
                         div_vs = dvx_dx(a,b,i,k) + dvz_dz(a,b,i,k)
-                        div_q = dqx_dx(a,b,i,k) + dqz_dz(a,b,i,k)
-                        p_rate = -biot_m(i,k) * &
-                            (0.5_real64 * (alpha_x(i,k) + alpha_z(i,k)) * div_vs + div_q)
-                        drag_x = permeability_x(i,k) / &
-                            (positive(viscosity(i,k), 1.0e-6_real64) * positive(rho_fluid(i,k), 1.0_real64))
-                        drag_z = permeability_z(i,k) / &
-                            (positive(viscosity(i,k), 1.0e-6_real64) * positive(rho_fluid(i,k), 1.0_real64))
+                        ! Only compute fluid coupling if material has non-negligible permeability
+                        if (permeability_x(i,k) > 1.0e-30_real64 .or. permeability_z(i,k) > 1.0e-30_real64) then
+                            div_q = dqx_dx(a,b,i,k) + dqz_dz(a,b,i,k)
+                            p_rate = -biot_m(i,k) * &
+                                (0.5_real64 * (alpha_x(i,k) + alpha_z(i,k)) * div_vs + div_q)
+                            drag_x = permeability_x(i,k) / &
+                                (positive(viscosity(i,k), 1.0e-6_real64) * positive(rho_fluid(i,k), 1.0_real64))
+                            drag_z = permeability_z(i,k) / &
+                                (positive(viscosity(i,k), 1.0e-6_real64) * positive(rho_fluid(i,k), 1.0_real64))
+                            rp(a,b,i,k) = p_rate
+                            rqx(a,b,i,k) = -drag_x * dp_dx(a,b,i,k) &
+                                - viscosity(i,k) / &
+                                (positive(permeability_x(i,k), 1.0e-20_real64) * positive(rho_fluid(i,k), 1.0_real64)) &
+                                * qx(a,b,i,k)
+                            rqz(a,b,i,k) = -drag_z * dp_dz(a,b,i,k) &
+                                - viscosity(i,k) / &
+                                (positive(permeability_z(i,k), 1.0e-20_real64) * positive(rho_fluid(i,k), 1.0_real64)) &
+                                * qz(a,b,i,k)
+                        else
+                            p_rate = 0.0_real64
+                            rp(a,b,i,k) = 0.0_real64
+                            rqx(a,b,i,k) = 0.0_real64
+                            rqz(a,b,i,k) = 0.0_real64
+                        endif
 
-                        rp(a,b,i,k) = p_rate
                         rsxx(a,b,i,k) = c11(i,k)*dvx_dx(a,b,i,k) + c13(i,k)*dvz_dz(a,b,i,k) + &
-                            c15(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - alpha_x(i,k) * p_rate - &
+                            c15(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - &
                             gamma_x(i,k) * sigmaxx(a,b,i,k)
                         rszz(a,b,i,k) = c13(i,k)*dvx_dx(a,b,i,k) + c33(i,k)*dvz_dz(a,b,i,k) + &
-                            c35(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - alpha_z(i,k) * p_rate - &
+                            c35(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - &
                             gamma_z(i,k) * sigmazz(a,b,i,k)
                         rsxz(a,b,i,k) = c15(i,k)*dvx_dx(a,b,i,k) + c35(i,k)*dvz_dz(a,b,i,k) + &
                             c55(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - gamma_xz(i,k) * sigmaxz(a,b,i,k)
                         rvx(a,b,i,k) = (dsxx_dx(a,b,i,k) + dsxz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
                         rvz(a,b,i,k) = (dsxz_dx(a,b,i,k) + dszz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
-                        rqx(a,b,i,k) = -drag_x * dp_dx(a,b,i,k)
-                        rqz(a,b,i,k) = -drag_z * dp_dz(a,b,i,k)
                     enddo
                 enddo
             enddo
@@ -97,9 +111,6 @@ contains
 
         call apply_rusanov_penalty(vx, rvx, weights, dx, dz, max_speed)
         call apply_rusanov_penalty(vz, rvz, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(qx, rqx, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(qz, rqz, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(pressure, rp, weights, dx, dz, max_speed)
         call apply_rusanov_penalty(sigmaxx, rsxx, weights, dx, dz, max_speed)
         call apply_rusanov_penalty(sigmazz, rszz, weights, dx, dz, max_speed)
         call apply_rusanov_penalty(sigmaxz, rsxz, weights, dx, dz, max_speed)
@@ -157,6 +168,7 @@ contains
         dz = domain%dz
         dt = source%dt
 
+        print*, (/ nx, nz /)
         call initialize_gll4(nodes, weights, deriv)
 
         allocate(c11(nx,nz), c13(nx,nz), c15(nx,nz), c33(nx,nz), c35(nx,nz), c55(nx,nz))
@@ -233,9 +245,11 @@ contains
         velocnorm(:) = 0.0_real64
         pressurenorm(:) = 0.0_real64
 
-        isource = source%xind + domain%cpml
-        ksource = source%zind + domain%cpml
-        max_speed = sqrt(maxval(max(c11, c33)) / positive(minval(rho), 1.0_real64))
+        isource = source%xind
+        ksource = source%zind
+        max_speed = maxval(sqrt(max(c11, c33) / max(rho, 1.0_real64)))
+        print *, 'max_speed = ', max_speed, ' dt = ', dt, ' CFL = ', max_speed * dt / min(dx, dz)
+        flush(6)
 
         if (source%source_type == 'ac') then
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
@@ -258,16 +272,14 @@ contains
                            gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
                            k1vx, k1vz, k1qx, k1qz, k1p, k1sxx, k1szz, k1sxz)
+            ! RK4 intermediates: freeze p, qx, qz to avoid compound biot_m amplification
             tvx = vx + 0.5_real64 * dt * k1vx
             tvz = vz + 0.5_real64 * dt * k1vz
-            tqx = qx + 0.5_real64 * dt * k1qx
-            tqz = qz + 0.5_real64 * dt * k1qz
-            tp = pressure + 0.5_real64 * dt * k1p
             tsxx = sigmaxx + 0.5_real64 * dt * k1sxx
             tszz = sigmazz + 0.5_real64 * dt * k1szz
             tsxz = sigmaxz + 0.5_real64 * dt * k1sxz
 
-            call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
+            call rhs_biot2(tvx, tvz, qx, qz, pressure, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
@@ -275,14 +287,11 @@ contains
                            k2vx, k2vz, k2qx, k2qz, k2p, k2sxx, k2szz, k2sxz)
             tvx = vx + 0.5_real64 * dt * k2vx
             tvz = vz + 0.5_real64 * dt * k2vz
-            tqx = qx + 0.5_real64 * dt * k2qx
-            tqz = qz + 0.5_real64 * dt * k2qz
-            tp = pressure + 0.5_real64 * dt * k2p
             tsxx = sigmaxx + 0.5_real64 * dt * k2sxx
             tszz = sigmazz + 0.5_real64 * dt * k2szz
             tsxz = sigmaxz + 0.5_real64 * dt * k2sxz
 
-            call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
+            call rhs_biot2(tvx, tvz, qx, qz, pressure, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
@@ -290,37 +299,39 @@ contains
                            k3vx, k3vz, k3qx, k3qz, k3p, k3sxx, k3szz, k3sxz)
             tvx = vx + dt * k3vx
             tvz = vz + dt * k3vz
-            tqx = qx + dt * k3qx
-            tqz = qz + dt * k3qz
-            tp = pressure + dt * k3p
             tsxx = sigmaxx + dt * k3sxx
             tszz = sigmazz + dt * k3szz
             tsxz = sigmaxz + dt * k3sxz
 
-            call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
+            call rhs_biot2(tvx, tvz, qx, qz, pressure, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
                            gamma_x, gamma_z, gamma_xz, &
                            deriv, weights, dx, dz, max_speed, &
                            k4vx, k4vz, k4qx, k4qz, k4p, k4sxx, k4szz, k4sxz)
 
+            ! --- RK4 update for elastic fields (v, σ) ---
             vx = vx + dt * (k1vx + 2.0_real64*k2vx + 2.0_real64*k3vx + k4vx) / 6.0_real64
             vz = vz + dt * (k1vz + 2.0_real64*k2vz + 2.0_real64*k3vz + k4vz) / 6.0_real64
-            qx = qx + dt * (k1qx + 2.0_real64*k2qx + 2.0_real64*k3qx + k4qx) / 6.0_real64
-            qz = qz + dt * (k1qz + 2.0_real64*k2qz + 2.0_real64*k3qz + k4qz) / 6.0_real64
-            pressure = pressure + dt * (k1p + 2.0_real64*k2p + 2.0_real64*k3p + k4p) / 6.0_real64
             sigmaxx = sigmaxx + dt * (k1sxx + 2.0_real64*k2sxx + 2.0_real64*k3sxx + k4sxx) / 6.0_real64
             sigmazz = sigmazz + dt * (k1szz + 2.0_real64*k2szz + 2.0_real64*k3szz + k4szz) / 6.0_real64
             sigmaxz = sigmaxz + dt * (k1sxz + 2.0_real64*k2sxz + 2.0_real64*k3sxz + k4sxz) / 6.0_real64
 
-            vx(0,0,isource,ksource) = vx(0,0,isource,ksource) + srcx(it) * dt / positive(rho(isource,ksource), 1.0_real64)
-            vz(0,0,isource,ksource) = vz(0,0,isource,ksource) + srcz(it) * dt / positive(rho(isource,ksource), 1.0_real64)
-            qx(0,0,isource,ksource) = qx(0,0,isource,ksource) + srcqx(it) * dt
-            qz(0,0,isource,ksource) = qz(0,0,isource,ksource) + srcqz(it) * dt
-            pressure(0,0,isource,ksource) = pressure(0,0,isource,ksource) + srcp(it) * dt
-            sigmaxx(0,0,isource,ksource) = sigmaxx(0,0,isource,ksource) + srcxx(it) / positive(rho(isource,ksource), 1.0_real64)
-            sigmazz(0,0,isource,ksource) = sigmazz(0,0,isource,ksource) + srczz(it) / positive(rho(isource,ksource), 1.0_real64)
-            sigmaxz(0,0,isource,ksource) = sigmaxz(0,0,isource,ksource) + srcxz(it) / positive(rho(isource,ksource), 1.0_real64)
+            ! --- Forward Euler for pressure/Darcy (operator-split, uses k1 from current state) ---
+            pressure = pressure + dt * k1p
+            qx = qx + dt * k1qx
+            qz = qz + dt * k1qz
+
+            ! Distribute source uniformly across all DG nodes in the cell
+            ! to avoid creating a delta function that the DG derivative amplifies
+            vx(:,:,isource,ksource) = vx(:,:,isource,ksource) + srcx(it) * dt / positive(rho(isource,ksource), 1.0_real64)
+            vz(:,:,isource,ksource) = vz(:,:,isource,ksource) + srcz(it) * dt / positive(rho(isource,ksource), 1.0_real64)
+            qx(:,:,isource,ksource) = qx(:,:,isource,ksource) + srcqx(it) * dt
+            qz(:,:,isource,ksource) = qz(:,:,isource,ksource) + srcqz(it) * dt
+            pressure(:,:,isource,ksource) = pressure(:,:,isource,ksource) + srcp(it) * dt
+            sigmaxx(:,:,isource,ksource) = sigmaxx(:,:,isource,ksource) + srcxx(it)
+            sigmazz(:,:,isource,ksource) = sigmazz(:,:,isource,ksource) + srczz(it)
+            sigmaxz(:,:,isource,ksource) = sigmaxz(:,:,isource,ksource) + srcxz(it)
 
             call cell_average(vx, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Vx', SINGLE)
@@ -335,6 +346,13 @@ contains
             call cell_average(pressure, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Pp', SINGLE)
             pressurenorm(it) = maxval(abs(cell_out))
+
+            if (it <= 10 .or. mod(it, 100) == 0 .or. velocnorm(it) > 1.0e10_real64) then
+                print '(A,I6,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4)', &
+                    'it=', it, ' vnorm=', velocnorm(it), &
+                    ' sxx=', maxval(abs(sigmaxx)), ' szz=', maxval(abs(sigmazz)), &
+                    ' p=', maxval(abs(pressure)), ' qx=', maxval(abs(qx))
+            endif
 
             if (velocnorm(it) > stability_threshold) stop 'Biot DG 2D solution became unstable'
         enddo
@@ -429,9 +447,9 @@ contains
         srcqx = 0.0_real64; srcqy = 0.0_real64; srcqz = 0.0_real64; srcp = 0.0_real64
         velocnorm = 0.0_real64; pressurenorm = 0.0_real64
 
-        isource = source%xind + domain%cpml
-        jsource = source%yind + domain%cpml
-        ksource = source%zind + domain%cpml
+        isource = source%xind
+        jsource = source%yind
+        ksource = source%zind
         max_speed = sqrt(maxval(max(c11, c33)) / positive(minval(rho), 1.0_real64))
 
         if (source%source_type == 'ac') then
@@ -522,7 +540,7 @@ contains
         logical, intent(in), optional :: SINGLE_OUTPUT
 
         integer :: nx, ny, nz, i, j, k, it, isource, jsource, ksource
-        real(real64) :: dx, dy, dz, dt, rho0, div_v, div_q, px, py, pz
+        real(real64) :: dx, dy, dz, dt, rho0, div_v, div_q, p_rate, px, py, pz
         logical :: SINGLE
 
         real(real64), allocatable :: c11(:,:,:), c12(:,:,:), c13(:,:,:), c22(:,:,:), c23(:,:,:), c33(:,:,:), rho(:,:,:)
@@ -575,7 +593,9 @@ contains
         srcqx=0.0_real64; srcqy=0.0_real64; srcqz=0.0_real64; srcp=0.0_real64
         velocnorm=0.0_real64; pressurenorm=0.0_real64
 
-        isource=source%xind+domain%cpml; jsource=source%yind+domain%cpml; ksource=source%zind+domain%cpml
+        isource=source%xind
+        jsource=source%yind
+        ksource=source%zind
 
         if (source%source_type == 'ac') then
             call loadsource('seismicsourcex.dat', source%time_steps, srcx)
@@ -594,7 +614,7 @@ contains
         endif
 
         do it=1,source%time_steps
-            !$omp parallel do collapse(3) private(div_v,div_q) schedule(static)
+            !$omp parallel do collapse(3) private(div_v,div_q,p_rate) schedule(static)
             do k=2,nz-1
                 do j=2,ny-1
                     do i=2,nx-1
@@ -604,19 +624,20 @@ contains
                         div_q=(qx(i+1,j,k)-qx(i-1,j,k))/(2.0_real64*dx)+ &
                               (qy(i,j+1,k)-qy(i,j-1,k))/(2.0_real64*dy)+ &
                               (qz(i,j,k+1)-qz(i,j,k-1))/(2.0_real64*dz)
-                        p(i,j,k)=p(i,j,k)-dt*m(i,j,k)*(((ax(i,j,k)+ay(i,j,k)+az(i,j,k))/3.0_real64)*div_v+div_q)
+                        p_rate=-m(i,j,k)*(((ax(i,j,k)+ay(i,j,k)+az(i,j,k))/3.0_real64)*div_v+div_q)
+                        p(i,j,k)=p(i,j,k)+dt*p_rate
 
                         sxx(i,j,k)=sxx(i,j,k)+dt*(c11(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
                             c12(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
-                            c13(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ax(i,j,k)*p(i,j,k)- &
+                            c13(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ax(i,j,k)*p_rate- &
                             gx(i,j,k)*sxx(i,j,k))
                         syy(i,j,k)=syy(i,j,k)+dt*(c12(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
                             c22(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
-                            c23(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ay(i,j,k)*p(i,j,k)- &
+                            c23(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-ay(i,j,k)*p_rate- &
                             gy(i,j,k)*syy(i,j,k))
                         szz(i,j,k)=szz(i,j,k)+dt*(c13(i,j,k)*(vx(i+1,j,k)-vx(i-1,j,k))/(2.0_real64*dx)+ &
                             c23(i,j,k)*(vy(i,j+1,k)-vy(i,j-1,k))/(2.0_real64*dy)+ &
-                            c33(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-az(i,j,k)*p(i,j,k)- &
+                            c33(i,j,k)*(vz(i,j,k+1)-vz(i,j,k-1))/(2.0_real64*dz)-az(i,j,k)*p_rate- &
                             gz(i,j,k)*szz(i,j,k))
                     enddo
                 enddo

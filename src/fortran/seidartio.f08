@@ -207,6 +207,7 @@ module seidartio
         open(newunit = unit_number, form="unformatted", file = trim(filename) )
         
         if ( readfile ) then
+            print *, "Reading file: ", trim(filename)
             read(unit_number) image_data
         else
             write(unit_number) image_data

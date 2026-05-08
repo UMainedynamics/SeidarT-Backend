@@ -42,14 +42,15 @@ program main
      
     ! Get the first command-line argument (input.json)
     call get_command_argument(1, input_json_file)
-    
+    call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
+
     ! Set defaults
     ! seismic flag 
     seismic = .true.
     poroelastic = .false.
     jca = .false.
     density_method = 'arithmetic'
-        
+    
     ! loop over any further key=value flags
     do i = 2, argc
         call get_command_argument(i, arg)
@@ -59,21 +60,23 @@ program main
         select case (key)
         case ('seismic')
             if (value == 'true') then
-            seismic = .true.
+                seismic = .true.
             else if (value == 'false') then
-            seismic = .false.
+                seismic = .false.
             end if
         case ('poroelastic')
             if (value == 'true') then
-            poroelastic = .true.
+                poroelastic = .true.
+                domain%cpml = 0
             else if (value == 'false') then
-            poroelastic = .false.
+                poroelastic = .false.
             end if
         case ('jca')
             if (value == 'true') then
-            jca = .true.
+                jca = .true.
+                domain%cpml = 0
             else if (value == 'false') then
-            jca = .false.
+                jca = .false.
             end if
         case ('density_method')
             density_method = adjustl(value)
@@ -82,6 +85,10 @@ program main
         end select
         end if
     end do
+
+    domain%nx = domain%nx + 2*domain%cpml
+    domain%ny = domain%ny + 2*domain%cpml
+    domain%nz = domain%nz + 2*domain%cpml
 
     ! Validate density_method
     select case (trim(density_method))
@@ -95,11 +102,8 @@ program main
     
     ! --------------------------------------------------------------------------
     ! Get going 
-    call parse_json(trim(input_json_file), domain, seismic_source, electromagnetic_source)
     
-    domain%nx = domain%nx + 2*domain%cpml
-    domain%ny = domain%ny + 2*domain%cpml
-    domain%nz = domain%nz + 2*domain%cpml
+
     
     !----------------------------------------------------------------------
     ! dispatch to the correct solver
