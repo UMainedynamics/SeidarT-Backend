@@ -1,229 +1,301 @@
-Driving: /home/peridotite/miniconda3/envs/seidart/bin/gfortran -v -I/home/peridotite/miniconda3/envs/seidart/include -L/home/peridotite/miniconda3/envs/seidart/lib -ljsonfortran -llapack -lblas -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall -o seidartfdtd-linux-x86_64 src/fortran/constants.f08 src/fortran/seidart_types.f08 src/fortran/seidartio.f08 src/fortran/averaging.f08 src/fortran/plane_wave_source.f08 src/fortran/tensor_operations.f08 src/fortran/discontinuous_galerkin_methods.f08 src/fortran/cpmlfdtd.f08 src/fortran/biotdg.f08 src/fortran/jcadg.f08 src/fortran/main.f08 -l gfortran -l m -shared-libgcc
-Reading specs from /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/specs
-could not find specs file conda.specs
-COLLECT_GCC=/home/peridotite/miniconda3/envs/seidart/bin/gfortran
-COLLECT_LTO_WRAPPER=/home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/lto-wrapper
-Target: x86_64-conda-linux-gnu
-Configured with: ../configure --prefix=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho --with-slibdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --libdir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib --mandir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/share/man --build=x86_64-conda-linux-gnu --host=x86_64-conda-linux-gnu --target=x86_64-conda-linux-gnu --enable-languages=c,c++,fortran,objc,obj-c++ --enable-libgomp --disable-libssp --enable-libquadmath --enable-libquadmath-support --disable-nls --disable-bootstrap --disable-multilib --enable-long-long --without-zstd --with-native-system-header-dir=/usr/include --with-gxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib/gcc/x86_64-conda-linux-gnu/15.2.0/include/c++ --with-gxx-libcxx-include-dir=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../include/c++/v1 --with-pkgversion='conda-forge gcc 15.2.0-18' --with-bugurl=https://github.com/conda-forge/ctng-compilers-feedstock/issues/new/choose --enable-libsanitizer --enable-default-pie --enable-threads=posix --enable-__cxa_atexit --with-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho/x86_64-conda-linux-gnu/sysroot --with-build-sysroot=/home/conda/feedstock_root/build_artifacts/gcc_compilers_1771374251839/_build_env/x86_64-conda-linux-gnu/sysroot --enable-plugin --enable-lto
+Driving: /usr/bin/gfortran -v -cpp -I/home/peridotite/miniconda3/envs/seidart/include -L/home/peridotite/miniconda3/envs/seidart/lib -ljsonfortran -llapack -lblas -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall -fopenmp -DSEIDART_OPENMP_GPU -o seidartfdtd-linux-x86_64 src/fortran/constants.f08 src/fortran/seidart_types.f08 src/fortran/seidartio.f08 src/fortran/averaging.f08 src/fortran/plane_wave_source.f08 src/fortran/tensor_operations.f08 src/fortran/cpmlfdtd.f08 src/fortran/main.f08 -l gfortran -l m -shared-libgcc
+Using built-in specs.
+COLLECT_GCC=/usr/bin/gfortran
+COLLECT_LTO_WRAPPER=/usr/libexec/gcc/x86_64-redhat-linux/15/lto-wrapper
+OFFLOAD_TARGET_NAMES=nvptx-none:amdgcn-amdhsa
+OFFLOAD_TARGET_DEFAULT=1
+Target: x86_64-redhat-linux
+Configured with: ../configure --enable-bootstrap --enable-languages=c,c++,fortran,objc,obj-c++,ada,go,d,m2,cobol,lto --prefix=/usr --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugzilla.redhat.com/ --enable-shared --enable-threads=posix --enable-checking=release --enable-multilib --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-gnu-unique-object --enable-linker-build-id --with-gcc-major-version-only --enable-libstdcxx-backtrace --with-libstdcxx-zoneinfo=/usr/share/zoneinfo --with-linker-hash-style=gnu --enable-plugin --enable-initfini-array --with-isl=/builddir/build/BUILD/gcc-15.2.1-build/gcc-15.2.1-20260123/obj-x86_64-redhat-linux/isl-install --enable-offload-targets=nvptx-none,amdgcn-amdhsa --enable-offload-defaulted --without-cuda-driver --enable-gnu-indirect-function --enable-cet --with-tune=generic --with-arch_32=i686 --build=x86_64-redhat-linux --with-build-config=bootstrap-lto --enable-link-serialization=1 --disable-libssp
 Thread model: posix
-Supported LTO compression algorithms: zlib
-gcc version 15.2.0 (conda-forge gcc 15.2.0-18) 
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/constants.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase constants.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+Supported LTO compression algorithms: zlib zstd
+gcc version 15.2.1 20260123 (Red Hat 15.2.1-7) (GCC) 
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/constants.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/constants.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase constants.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccnY6smL.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/seidart_types.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase seidart_types.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/cc5f53IF.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/seidart_types.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/seidart_types.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase seidart_types.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccQU2Vd6.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/seidartio.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase seidartio.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccxn99Qr.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/seidartio.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/seidartio.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase seidartio.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/cciox3UG.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/averaging.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase averaging.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccPsoEHS.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/averaging.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/averaging.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase averaging.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccwajwgz.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/plane_wave_source.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase plane_wave_source.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccYLcXWn.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/plane_wave_source.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/plane_wave_source.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase plane_wave_source.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccvY57DH.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/tensor_operations.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase tensor_operations.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccn6cr43.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/tensor_operations.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/tensor_operations.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase tensor_operations.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccKqaFxk.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/discontinuous_galerkin_methods.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase discontinuous_galerkin_methods.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccdTy2sb.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/cpmlfdtd.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/cpmlfdtd.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase cpmlfdtd.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
 
 GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccafYsnN.o /tmp/ccUhFOUu.s
-GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
-COLLECT_GCC_OPTIONS='-v' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-dumpdir' 'seidartfdtd-linux-x86_64-'
- /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/cpmlfdtd.f08 -I /home/peridotite/miniconda3/envs/seidart/include -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase cpmlfdtd.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccUhFOUu.s
-GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
-	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
-
-GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
-src/fortran/cpmlfdtd.f08:4615:43:
-
- 4615 |         real(real64) :: XMIN, XMAX, XMID, XLOC
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+src/fortran/cpmlfdtd.f08: In function ‘__cpmlfdtd_MOD_electromag3’:
+src/fortran/cpmlfdtd.f08:4688:43: warning: ‘xloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 4688 |         real(real64) :: XMIN, XMAX, XMID, XLOC
       |                                           ^~~~
-Warning: 'xloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4616:43:
-
- 4616 |         real(real64) :: YMIN, YMAX, YMID, YLOC
+src/fortran/cpmlfdtd.f08:4689:43: warning: ‘yloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 4689 |         real(real64) :: YMIN, YMAX, YMID, YLOC
       |                                           ^~~~
-Warning: 'yloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4984:52:
-
- 4984 |                                             Ev, Hv )
+src/fortran/cpmlfdtd.f08:5057:52: warning: ‘zloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 5057 |                                             Ev, Hv )
       |                                                    ^
-Warning: 'zloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4617:43:
-
- 4617 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+src/fortran/cpmlfdtd.f08:4690:43: note: ‘zloc’ was declared here
+ 4690 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
       |                                           ^~~~
-note: 'zloc' was declared here
-src/fortran/cpmlfdtd.f08:4975:74:
-
- 4975 |                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
-      |                                                                          ^
-Warning: 'i_min' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4614:20:
-
- 4614 |         integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-      |                    ^~~~~
-note: 'i_min' was declared here
-src/fortran/cpmlfdtd.f08:4032:55:
-
- 4032 |         integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-      |                                                       ^~~~~
-Warning: 'k_max' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4033:43:
-
- 4033 |         real(real64) :: XMIN, XMAX, XMID, XLOC
+src/fortran/cpmlfdtd.f08: In function ‘__cpmlfdtd_MOD_electromag25’:
+src/fortran/cpmlfdtd.f08:4069:43: warning: ‘xloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 4069 |         real(real64) :: XMIN, XMAX, XMID, XLOC
       |                                           ^~~~
-Warning: 'xloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4034:43:
-
- 4034 |         real(real64) :: YMIN, YMAX, YMID, YLOC
+src/fortran/cpmlfdtd.f08:4070:43: warning: ‘yloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 4070 |         real(real64) :: YMIN, YMAX, YMID, YLOC
       |                                           ^~~~
-Warning: 'yloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4388:52:
-
- 4388 |                                             Ev, Hv )
+src/fortran/cpmlfdtd.f08:4455:52: warning: ‘zloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 4455 |                                             Ev, Hv )
       |                                                    ^
-Warning: 'zloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4035:43:
-
- 4035 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+src/fortran/cpmlfdtd.f08:4071:43: note: ‘zloc’ was declared here
+ 4071 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
       |                                           ^~~~
-note: 'zloc' was declared here
-src/fortran/cpmlfdtd.f08:4377:74:
-
- 4377 |                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
-      |                                                                          ^
-Warning: 'i_min' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:4032:20:
-
- 4032 |         integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-      |                    ^~~~~
-note: 'i_min' was declared here
-src/fortran/cpmlfdtd.f08:3637:43:
-
- 3637 |         real(real64) :: XMIN, XMAX, XMID, XLOC
+src/fortran/cpmlfdtd.f08: In function ‘__cpmlfdtd_MOD_electromag2’:
+src/fortran/cpmlfdtd.f08:3661:43: warning: ‘xloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3661 |         real(real64) :: XMIN, XMAX, XMID, XLOC
       |                                           ^~~~
-Warning: 'xloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:3884:48:
-
- 3884 |                                         Ev, Hv )
+src/fortran/cpmlfdtd.f08:3920:48: warning: ‘zloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3920 |                                         Ev, Hv )
       |                                                ^
-Warning: 'zloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:3638:43:
-
- 3638 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+src/fortran/cpmlfdtd.f08:3662:43: note: ‘zloc’ was declared here
+ 3662 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
       |                                           ^~~~
-note: 'zloc' was declared here
-src/fortran/cpmlfdtd.f08:3873:66:
-
- 3873 |                         r = (/ XLOC, 0.0_real64, ip * domain%dz /)
+src/fortran/cpmlfdtd.f08:3909:66: warning: ‘i_min’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3909 |                         r = (/ XLOC, 0.0_real64, ip * domain%dz /)
       |                                                                  ^
-Warning: 'i_min' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:3636:20:
-
- 3636 |         integer :: i_min, i_max, k_min, k_max, ip, xi, zi
+src/fortran/cpmlfdtd.f08:3660:20: note: ‘i_min’ was declared here
+ 3660 |         integer :: i_min, i_max, k_min, k_max, ip, xi, zi
       |                    ^~~~~
-note: 'i_min' was declared here
-src/fortran/cpmlfdtd.f08:416:47:
-
+src/fortran/cpmlfdtd.f08: In function ‘__cpmlfdtd_MOD_seismic2’:
+src/fortran/cpmlfdtd.f08:416:47: warning: ‘xloc’ may be used uninitialized [-Wmaybe-uninitialized]
   416 |                     xi = nint(XLOC / domain%dx)
       |                                               ^
-Warning: 'xloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:107:43:
-
+src/fortran/cpmlfdtd.f08:107:43: note: ‘xloc’ was declared here
   107 |         real(real64) :: XMIN, XMAX, XMID, XLOC
       |                                           ^~~~
-note: 'xloc' was declared here
-src/fortran/cpmlfdtd.f08:426:77:
-
+src/fortran/cpmlfdtd.f08:426:77: warning: ‘zloc’ may be used uninitialized [-Wmaybe-uninitialized]
   426 |                                         Vvec, strain_vec, source%source_type)
       |                                                                             ^
-Warning: 'zloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:108:43:
-
+src/fortran/cpmlfdtd.f08:108:43: note: ‘zloc’ was declared here
   108 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
       |                                           ^~~~
-note: 'zloc' was declared here
-src/fortran/cpmlfdtd.f08:418:66:
-
-  418 |                         r = (/ XLOC, 0.0_real64, ip * domain%dz /)
-      |                                                                  ^
-Warning: 'i_min' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:106:20:
-
-  106 |         integer :: i_min, i_max, j_min, j_max, ip, xi, zi
-      |                    ^~~~~
-note: 'i_min' was declared here
-src/fortran/cpmlfdtd.f08:2820:43:
-
- 2820 |         real(real64) :: XMIN, XMAX, XMID, XLOC
+src/fortran/cpmlfdtd.f08: In function ‘__cpmlfdtd_MOD_seismic3’:
+src/fortran/cpmlfdtd.f08:2832:43: warning: ‘xloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2832 |         real(real64) :: XMIN, XMAX, XMID, XLOC
       |                                           ^~~~
-Warning: 'xloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:2821:43:
-
- 2821 |         real(real64) :: YMIN, YMAX, YMID, YLOC
+src/fortran/cpmlfdtd.f08:2833:43: warning: ‘yloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2833 |         real(real64) :: YMIN, YMAX, YMID, YLOC
       |                                           ^~~~
-Warning: 'yloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:3418:69:
-
- 3418 |                                 Vvec, strain_vec, source%source_type)
+src/fortran/cpmlfdtd.f08:3442:69: warning: ‘zloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3442 |                                 Vvec, strain_vec, source%source_type)
       |                                                                     ^
-Warning: 'zloc' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:2822:43:
-
- 2822 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+src/fortran/cpmlfdtd.f08:2834:43: note: ‘zloc’ was declared here
+ 2834 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
       |                                           ^~~~
-note: 'zloc' was declared here
-src/fortran/cpmlfdtd.f08:3414:74:
-
- 3414 |                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+src/fortran/cpmlfdtd.f08:3438:74: warning: ‘i_min’ may be used uninitialized [-Wmaybe-uninitialized]
+ 3438 |                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
       |                                                                          ^
-Warning: 'i_min' may be used uninitialized [-Wmaybe-uninitialized]
-src/fortran/cpmlfdtd.f08:2819:20:
-
- 2819 |         integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
+src/fortran/cpmlfdtd.f08:2831:20: note: ‘i_min’ was declared here
+ 2831 |         integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
       |                    ^~~~~
-note: 'i_min' was declared here
+src/fortran/cpmlfdtd.f08: In function ‘__cpmlfdtd_MOD_seismic25’:
+src/fortran/cpmlfdtd.f08:1444:43: warning: ‘xloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1444 |         real(real64) :: XMIN, XMAX, XMID, XLOC
+      |                                           ^~~~
+src/fortran/cpmlfdtd.f08:1445:43: warning: ‘yloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 1445 |         real(real64) :: YMIN, YMAX, YMID, YLOC
+      |                                           ^~~~
+src/fortran/cpmlfdtd.f08:2059:104: warning: ‘zloc’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2059 |                                             source%source_wavelet, Vvec, strain_vec, source%source_type)
+      |                                                                                                        ^
+src/fortran/cpmlfdtd.f08:1446:43: note: ‘zloc’ was declared here
+ 1446 |         real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+      |                                           ^~~~
+src/fortran/cpmlfdtd.f08:2052:74: warning: ‘i_min’ may be used uninitialized [-Wmaybe-uninitialized]
+ 2052 |                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
+      |                                                                          ^
+src/fortran/cpmlfdtd.f08:1443:20: note: ‘i_min’ was declared here
+ 1443 |         integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
+      |                    ^~~~~
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccTCOKGd.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/f951 src/fortran/main.f08 -cpp=/tmp/cclPUakz.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/main.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase main.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -foffload-options=-l_GCC_gfortran -foffload-options=-l_GCC_m -fintrinsic-modules-path /usr/lib/gcc/x86_64-redhat-linux/15/finclude -fpre-include=/usr/include/finclude/math-vector-fortran.h -o /tmp/ccfELXZo.s
+GNU Fortran (GCC) version 15.2.1 20260123 (Red Hat 15.2.1-7) (x86_64-redhat-linux)
+	compiled by GNU C version 15.2.1 20260123 (Red Hat 15.2.1-7), GMP version 6.3.0, MPFR version 4.2.2, MPC version 1.3.1, isl version isl-0.24-GMP
+
+GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/include-fixed"
+ignoring nonexistent directory "/usr/lib/gcc/x86_64-redhat-linux/15/../../../../x86_64-redhat-linux/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /usr/lib/gcc/x86_64-redhat-linux/15/finclude
+ /usr/lib/gcc/x86_64-redhat-linux/15/include
+ /usr/local/include
+ /usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccJegJHi.o /tmp/ccfELXZo.s
+GNU assembler version 2.45.1 (x86_64-redhat-linux) using BFD version version 2.45.1-4.fc43
+Reading specs from /usr/lib/gcc/x86_64-redhat-linux/15/libgfortran.spec
+rename spec lib to liborig
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+COMPILER_PATH=/usr/libexec/gcc/x86_64-redhat-linux/15/:/usr/libexec/gcc/x86_64-redhat-linux/15/:/usr/libexec/gcc/x86_64-redhat-linux/:/usr/lib/gcc/x86_64-redhat-linux/15/:/usr/lib/gcc/x86_64-redhat-linux/
+LIBRARY_PATH=/usr/lib/gcc/x86_64-redhat-linux/15/:/usr/lib/gcc/x86_64-redhat-linux/15/../../../../lib64/:/lib/../lib64/:/usr/lib/../lib64/:/usr/lib/gcc/x86_64-redhat-linux/15/../../../:/lib/:/usr/lib/
+Reading specs from /usr/lib/gcc/x86_64-redhat-linux/15/libgomp.spec
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64.'
+ /usr/libexec/gcc/x86_64-redhat-linux/15/collect2 -plugin /usr/libexec/gcc/x86_64-redhat-linux/15/liblto_plugin.so -plugin-opt=/usr/libexec/gcc/x86_64-redhat-linux/15/lto-wrapper -plugin-opt=-fresolution=/tmp/ccSNqMsN.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lquadmath -plugin-opt=-pass-through=-lm -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --build-id --no-add-needed --eh-frame-hdr --hash-style=gnu -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o seidartfdtd-linux-x86_64 /usr/lib/gcc/x86_64-redhat-linux/15/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/15/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/15/crtbegin.o /usr/lib/gcc/x86_64-redhat-linux/15/crtoffloadbegin.o -L/home/peridotite/miniconda3/envs/seidart/lib -L/usr/lib/gcc/x86_64-redhat-linux/15 -L/usr/lib/gcc/x86_64-redhat-linux/15/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/15/../../.. -L/lib -L/usr/lib -ljsonfortran -llapack -lblas /tmp/cc5f53IF.o /tmp/ccxn99Qr.o /tmp/ccPsoEHS.o /tmp/ccYLcXWn.o /tmp/ccn6cr43.o /tmp/ccdTy2sb.o /tmp/ccTCOKGd.o /tmp/ccJegJHi.o -lgfortran -lm -lgomp -lgcc_s -lgcc --as-needed -lquadmath --no-as-needed -lm -lpthread -lc -lgcc_s -lgcc /usr/lib/gcc/x86_64-redhat-linux/15/crtfastmath.o /usr/lib/gcc/x86_64-redhat-linux/15/crtend.o /usr/lib/gcc/x86_64-redhat-linux/15/../../../../lib64/crtn.o /usr/lib/gcc/x86_64-redhat-linux/15/crtoffloadend.o
+/usr/libexec/gcc/x86_64-redhat-linux/15/lto-wrapper -fresolution=/tmp/ccSNqMsN.res -flinker-output=exec -foffload-objects=/tmp/cc8xh3bT.ofldlist 
+/usr/libexec/gcc/x86_64-redhat-linux/15/lto-wrapper -fresolution=/tmp/ccSNqMsN.res -flinker-output=exec -foffload-objects=/tmp/cc8xh3bT.ofldlist 
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-foffload-options=-l_GCC_gfortran' '-foffload-options=-l_GCC_m' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64.'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/cc38HDOU.o /tmp/ccN29yJN.s
+GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/f951 src/fortran/main.f08 -cpp=/tmp/ccMOdsRT.fii -quiet -v -I /home/peridotite/miniconda3/envs/seidart/include -iprefix /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/ -isysroot /home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot -D_REENTRANT -D SEIDART_OPENMP_GPU src/fortran/main.f08 -march=znver4 -mmmx -mpopcnt -msse -msse2 -msse3 -mssse3 -msse4.1 -msse4.2 -mavx -mavx2 -msse4a -mno-fma4 -mno-xop -mfma -mavx512f -mbmi -mbmi2 -maes -mpclmul -mavx512vl -mavx512bw -mavx512dq -mavx512cd -mavx512vbmi -mavx512ifma -mavx512vpopcntdq -mavx512vbmi2 -mgfni -mvpclmulqdq -mavx512vnni -mavx512bitalg -mavx512bf16 -mno-avx512vp2intersect -mno-3dnow -madx -mabm -mno-cldemote -mclflushopt -mclwb -mclzero -mcx16 -mno-enqcmd -mf16c -mfsgsbase -mfxsr -mno-hle -msahf -mno-lwp -mlzcnt -mmovbe -mno-movdir64b -mno-movdiri -mmwaitx -mno-pconfig -mpku -mprfchw -mno-ptwrite -mrdpid -mrdrnd -mrdseed -mno-rtm -mno-serialize -mno-sgx -msha -mshstk -mno-tbm -mno-tsxldtrk -mvaes -mno-waitpkg -mwbnoinvd -mxsave -mxsavec -mxsaveopt -mxsaves -mno-amx-tile -mno-amx-int8 -mno-amx-bf16 -mno-uintr -mno-hreset -mno-kl -mno-widekl -mno-avxvnni -mno-avx512fp16 -mno-avxifma -mno-avxvnniint8 -mno-avxneconvert -mno-cmpccxadd -mno-amx-fp16 -mno-prefetchi -mno-raoint -mno-amx-complex -mno-avxvnniint16 -mno-sm3 -mno-sha512 -mno-sm4 -mno-apxf -mno-usermsr -mno-avx10.2 -mno-amx-avx512 -mno-amx-tf32 -mno-amx-transpose -mno-amx-fp8 -mno-movrs -mno-amx-movrs --param l1-cache-size=32 --param l1-cache-line-size=64 --param l2-cache-size=1024 -mtune=znver4 -quiet -dumpdir seidartfdtd-linux-x86_64- -dumpbase main.f08 -dumpbase-ext .f08 -O3 -Wall -version -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -fopenmp -fintrinsic-modules-path /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude -fpre-include=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include/finclude/math-vector-fortran.h -o /tmp/ccN29yJN.s
+GNU Fortran (conda-forge gcc 15.2.0-18) version 15.2.0 (x86_64-conda-linux-gnu)
+	compiled by GNU C version 15.2.0, GMP version 6.2.1, MPFR version 4.1.0, MPC version 1.2.1, isl version isl-0.24-GMP
+
+GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+ignoring nonexistent directory "/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/include"
+ignoring duplicate directory "/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/15.2.0/include"
+ignoring nonexistent directory "/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/local/include"
+ignoring duplicate directory "/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/15.2.0/include-fixed"
+ignoring nonexistent directory "/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/../../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/include"
+#include "..." search starts here:
+#include <...> search starts here:
+ /home/peridotite/miniconda3/envs/seidart/include
+ /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/finclude
+ /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/include
+ /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/include-fixed
+ /home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/include
+End of search list.
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+ /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/as -v -I /home/peridotite/miniconda3/envs/seidart/include --64 -o /tmp/ccKiW1ee.o /tmp/ccN29yJN.s
+GNU assembler version 2.45.1 (x86_64-conda-linux-gnu) using BFD version (GNU Binutils) 2.45.1
+Reading specs from /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/libgfortran.spec
+rename spec lib to liborig
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64-'
+COMPILER_PATH=/home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/:/home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/:/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/bin/
+LIBRARY_PATH=/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/:/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/:/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/lib/../lib/:/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../lib/:/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/:/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib/:/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/lib/:/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../:/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib/:/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/
+Reading specs from /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/libgomp.spec
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64.'
+ /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/collect2 -plugin /home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/liblto_plugin.so -plugin-opt=/home/peridotite/miniconda3/envs/seidart/bin/../libexec/gcc/x86_64-conda-linux-gnu/15.2.0/lto-wrapper -plugin-opt=-fresolution=/tmp/cc9l96id.res -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc -plugin-opt=-pass-through=-lquadmath -plugin-opt=-pass-through=-lm -plugin-opt=-pass-through=-lpthread -plugin-opt=-pass-through=-lc -plugin-opt=-pass-through=-lgcc_s -plugin-opt=-pass-through=-lgcc --sysroot=/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot --eh-frame-hdr -m elf_x86_64 -dynamic-linker /lib64/ld-linux-x86-64.so.2 -pie -o seidartfdtd-linux-x86_64 /home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/Scrt1.o /home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/crti.o /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/crtbeginS.o -L/home/peridotite/miniconda3/envs/seidart/lib -L/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0 -L/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc -L/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/lib/../lib -L/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../lib -L/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib -L/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib/../lib -L/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../../../x86_64-conda-linux-gnu/lib -L/home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/../../.. -L/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib -L/home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/usr/lib -ljsonfortran -llapack -lblas /tmp/cc934OSC.o /tmp/cc567zhJ.o /tmp/cc3FY2PJ.o /tmp/ccRKabKQ.o /tmp/cchNcjob.o /tmp/ccmvannK.o /tmp/cc38HDOU.o /tmp/ccKiW1ee.o -lgfortran -lm -lgomp -lgcc_s -lgcc -lquadmath -lm -lpthread -lc -lgcc_s -lgcc /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/crtfastmath.o /home/peridotite/miniconda3/envs/seidart/bin/../lib/gcc/x86_64-conda-linux-gnu/15.2.0/crtendS.o /home/peridotite/miniconda3/envs/seidart/bin/../x86_64-conda-linux-gnu/sysroot/lib/../lib/crtn.o -rpath /home/peridotite/miniconda3/envs/seidart/lib
+COLLECT_GCC_OPTIONS='-v' '-cpp' '-I' '/home/peridotite/miniconda3/envs/seidart/include' '-L/home/peridotite/miniconda3/envs/seidart/lib' '-O3' '-march=native' '-funroll-loops' '-ffast-math' '-ffp-contract=fast' '-fomit-frame-pointer' '-fPIC' '-Wall' '-fopenmp' '-D' 'SEIDART_OPENMP_GPU' '-o' 'seidartfdtd-linux-x86_64' '-shared-libgcc' '-pthread' '-dumpdir' 'seidartfdtd-linux-x86_64.'

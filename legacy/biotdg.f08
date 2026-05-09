@@ -6,18 +6,266 @@ module biotdg
     use constants
     use discontinuous_galerkin_methods, only: DG_P, DG_NP, positive, &
         initialize_gll4, fill_modal_from_cell, cell_average, dg_derivatives, &
-        apply_rusanov_penalty, is_fluid_injection_source, &
+        apply_rusanov_penalty_masked_local, damp_biot_darcy_fields, &
+        zero_inactive_biot_fields, zero_inactive_mechanical_fields, &
+        apply_spectral_filter, &
+        is_fluid_injection_source, &
         is_pressure_injection_source
 
     implicit none
 
 contains
 
+    subroutine compute_biot_fast_p_speed(c11, c13, c33, c55, rho, alpha_x, alpha_z, biot_m, &
+                                         hydraulic_active, mechanical_active, wave_speed)
+        real(real64), intent(in) :: c11(:,:), c13(:,:), c33(:,:), c55(:,:), rho(:,:)
+        real(real64), intent(in) :: alpha_x(:,:), alpha_z(:,:), biot_m(:,:)
+        real(real64), intent(in) :: hydraulic_active(:,:), mechanical_active(:,:)
+        real(real64), intent(out) :: wave_speed(:,:)
+
+        integer :: i, k
+        real(real64) :: hmask, mm, a11, a13, a33, shear, lambda_fast
+
+        !$omp parallel do collapse(2) private(hmask,mm,a11,a13,a33,shear,lambda_fast) schedule(static)
+        do k = 1, size(wave_speed, 2)
+            do i = 1, size(wave_speed, 1)
+                if (mechanical_active(i,k) <= 0.5_real64 .and. hydraulic_active(i,k) <= 0.5_real64) then
+                    wave_speed(i,k) = 0.0_real64
+                else
+                    if (hydraulic_active(i,k) > 0.5_real64) then
+                        hmask = 1.0_real64
+                    else
+                        hmask = 0.0_real64
+                    endif
+                    mm = max(biot_m(i,k), 0.0_real64) * hmask
+                    a11 = max(c11(i,k) + alpha_x(i,k) * alpha_x(i,k) * mm, 0.0_real64)
+                    a13 = c13(i,k) + alpha_x(i,k) * alpha_z(i,k) * mm
+                    a33 = max(c33(i,k) + alpha_z(i,k) * alpha_z(i,k) * mm, 0.0_real64)
+                    shear = max(c55(i,k), 0.0_real64)
+                    lambda_fast = 0.5_real64 * (a11 + a33 + sqrt((a11 - a33)**2 + 4.0_real64 * a13**2))
+                    wave_speed(i,k) = sqrt(max(lambda_fast, shear) / positive(rho(i,k), 1.0_real64))
+                endif
+            enddo
+        enddo
+        !$omp end parallel do
+    end subroutine compute_biot_fast_p_speed
+
+    logical function is_mask_boundary_cell(hydraulic_active, mechanical_active, i, k) result(is_boundary)
+        real(real64), intent(in) :: hydraulic_active(:,:), mechanical_active(:,:)
+        integer, intent(in) :: i, k
+
+        integer :: nx, nz
+
+        nx = size(hydraulic_active, 1)
+        nz = size(hydraulic_active, 2)
+        is_boundary = .FALSE.
+
+        if (i > 1) then
+            is_boundary = is_boundary .or. &
+                ((hydraulic_active(i,k) > 0.5_real64) .neqv. (hydraulic_active(i-1,k) > 0.5_real64)) .or. &
+                ((mechanical_active(i,k) > 0.5_real64) .neqv. (mechanical_active(i-1,k) > 0.5_real64))
+        endif
+        if (i < nx) then
+            is_boundary = is_boundary .or. &
+                ((hydraulic_active(i,k) > 0.5_real64) .neqv. (hydraulic_active(i+1,k) > 0.5_real64)) .or. &
+                ((mechanical_active(i,k) > 0.5_real64) .neqv. (mechanical_active(i+1,k) > 0.5_real64))
+        endif
+        if (k > 1) then
+            is_boundary = is_boundary .or. &
+                ((hydraulic_active(i,k) > 0.5_real64) .neqv. (hydraulic_active(i,k-1) > 0.5_real64)) .or. &
+                ((mechanical_active(i,k) > 0.5_real64) .neqv. (mechanical_active(i,k-1) > 0.5_real64))
+        endif
+        if (k < nz) then
+            is_boundary = is_boundary .or. &
+                ((hydraulic_active(i,k) > 0.5_real64) .neqv. (hydraulic_active(i,k+1) > 0.5_real64)) .or. &
+                ((mechanical_active(i,k) > 0.5_real64) .neqv. (mechanical_active(i,k+1) > 0.5_real64))
+        endif
+    end function is_mask_boundary_cell
+
+    subroutine build_stability_norm_masks(hydraulic_active, mechanical_active, hydraulic_norm_mask, mechanical_norm_mask)
+        real(real64), intent(in) :: hydraulic_active(:,:), mechanical_active(:,:)
+        real(real64), intent(out) :: hydraulic_norm_mask(:,:), mechanical_norm_mask(:,:)
+
+        integer :: i, k, ii, kk
+        integer :: nx, nz
+        logical :: near_mask_boundary
+
+        nx = size(hydraulic_active, 1)
+        nz = size(hydraulic_active, 2)
+        hydraulic_norm_mask(:,:) = 0.0_real64
+        mechanical_norm_mask(:,:) = 0.0_real64
+
+        !$omp parallel do collapse(2) private(ii,kk,near_mask_boundary) schedule(static)
+        do k = 1, nz
+            do i = 1, nx
+                near_mask_boundary = .FALSE.
+                do kk = max(1, k - 2), min(nz, k + 2)
+                    do ii = max(1, i - 2), min(nx, i + 2)
+                        if (is_mask_boundary_cell(hydraulic_active, mechanical_active, ii, kk)) then
+                            near_mask_boundary = .TRUE.
+                        endif
+                    enddo
+                enddo
+
+                if (.not. near_mask_boundary) then
+                    if (hydraulic_active(i,k) > 0.5_real64) hydraulic_norm_mask(i,k) = 1.0_real64
+                    if (mechanical_active(i,k) > 0.5_real64) mechanical_norm_mask(i,k) = 1.0_real64
+                endif
+            enddo
+        enddo
+        !$omp end parallel do
+    end subroutine build_stability_norm_masks
+
+    real(real64) function masked_max_abs_cell(field, mask) result(norm_value)
+        real(real64), intent(in) :: field(:,:), mask(:,:)
+
+        integer :: i, k
+
+        norm_value = 0.0_real64
+        do k = 1, size(field, 2)
+            do i = 1, size(field, 1)
+                if (mask(i,k) > 0.5_real64) norm_value = max(norm_value, abs(field(i,k)))
+            enddo
+        enddo
+    end function masked_max_abs_cell
+
+    real(real64) function masked_max_abs_nodal(field, mask) result(norm_value)
+        real(real64), intent(in) :: field(0:,0:,:,:), mask(:,:)
+
+        integer :: i, k
+
+        norm_value = 0.0_real64
+        do k = 1, size(field, 4)
+            do i = 1, size(field, 3)
+                if (mask(i,k) > 0.5_real64) norm_value = max(norm_value, maxval(abs(field(:,:,i,k))))
+            enddo
+        enddo
+    end function masked_max_abs_nodal
+
+    subroutine max_abs_location_nodal(field, mask, max_value, max_i, max_k, max_a, max_b)
+        real(real64), intent(in) :: field(0:,0:,:,:), mask(:,:)
+        real(real64), intent(out) :: max_value
+        integer, intent(out) :: max_i, max_k, max_a, max_b
+
+        integer :: a, b, i, k
+        real(real64) :: value
+
+        max_value = 0.0_real64
+        max_i = 1
+        max_k = 1
+        max_a = 0
+        max_b = 0
+        do k = 1, size(field, 4)
+            do i = 1, size(field, 3)
+                if (mask(i,k) <= 0.5_real64) cycle
+                do b = 0, DG_P
+                    do a = 0, DG_P
+                        value = abs(field(a,b,i,k))
+                        if (value > max_value) then
+                            max_value = value
+                            max_i = i
+                            max_k = k
+                            max_a = a
+                            max_b = b
+                        endif
+                    enddo
+                enddo
+            enddo
+        enddo
+    end subroutine max_abs_location_nodal
+
+    subroutine inject_gaussian_source_2d(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz, &
+                                         rho, hydraulic_active, mechanical_active, nodes, dx, dz, &
+                                         isource, ksource, dt, srcx, srcz, srcqx, srcqz, srcp, &
+                                         srcxx, srcxz, srczz)
+        real(real64), intent(inout) :: vx(0:,0:,:,:), vz(0:,0:,:,:)
+        real(real64), intent(inout) :: qx(0:,0:,:,:), qz(0:,0:,:,:), pressure(0:,0:,:,:)
+        real(real64), intent(inout) :: sigmaxx(0:,0:,:,:), sigmazz(0:,0:,:,:), sigmaxz(0:,0:,:,:)
+        real(real64), intent(in) :: rho(:,:), hydraulic_active(:,:), mechanical_active(:,:)
+        real(real64), intent(in) :: nodes(0:DG_P), dx, dz, dt
+        integer, intent(in) :: isource, ksource
+        real(real64), intent(in) :: srcx, srcz, srcqx, srcqz, srcp, srcxx, srcxz, srczz
+
+        integer :: a, b
+        real(real64) :: xdist, zdist, dist_sq, sigma2, weight
+        real(real64) :: mechanical_weight_sum, hydraulic_weight_sum
+
+        sigma2 = (0.35_real64 * min(dx, dz))**2
+        mechanical_weight_sum = 0.0_real64
+        hydraulic_weight_sum = 0.0_real64
+
+        do b = 1, 3
+            do a = 1, 3
+                xdist = 0.5_real64 * dx * nodes(a)
+                zdist = 0.5_real64 * dz * nodes(b)
+                dist_sq = xdist**2 + zdist**2
+                weight = exp(-0.5_real64 * dist_sq / sigma2)
+                if (mechanical_active(isource,ksource) > 0.5_real64) mechanical_weight_sum = mechanical_weight_sum + weight
+                if (hydraulic_active(isource,ksource) > 0.5_real64) hydraulic_weight_sum = hydraulic_weight_sum + weight
+            enddo
+        enddo
+
+        do b = 1, 3
+            do a = 1, 3
+                xdist = 0.5_real64 * dx * nodes(a)
+                zdist = 0.5_real64 * dz * nodes(b)
+                dist_sq = xdist**2 + zdist**2
+                weight = exp(-0.5_real64 * dist_sq / sigma2)
+
+                if (mechanical_active(isource,ksource) > 0.5_real64 .and. mechanical_weight_sum > 0.0_real64) then
+                    weight = weight / mechanical_weight_sum
+                    vx(a,b,isource,ksource) = vx(a,b,isource,ksource) + &
+                        weight * srcx * dt / positive(rho(isource,ksource), 1.0_real64)
+                    vz(a,b,isource,ksource) = vz(a,b,isource,ksource) + &
+                        weight * srcz * dt / positive(rho(isource,ksource), 1.0_real64)
+                    sigmaxx(a,b,isource,ksource) = sigmaxx(a,b,isource,ksource) + weight * srcxx
+                    sigmazz(a,b,isource,ksource) = sigmazz(a,b,isource,ksource) + weight * srczz
+                    sigmaxz(a,b,isource,ksource) = sigmaxz(a,b,isource,ksource) + weight * srcxz
+                endif
+            enddo
+        enddo
+
+        do b = 1, 3
+            do a = 1, 3
+                xdist = 0.5_real64 * dx * nodes(a)
+                zdist = 0.5_real64 * dz * nodes(b)
+                dist_sq = xdist**2 + zdist**2
+                if (hydraulic_active(isource,ksource) > 0.5_real64 .and. hydraulic_weight_sum > 0.0_real64) then
+                    weight = exp(-0.5_real64 * dist_sq / sigma2) / hydraulic_weight_sum
+                    qx(a,b,isource,ksource) = qx(a,b,isource,ksource) + weight * srcqx * dt
+                    qz(a,b,isource,ksource) = qz(a,b,isource,ksource) + weight * srcqz * dt
+                    pressure(a,b,isource,ksource) = pressure(a,b,isource,ksource) + weight * srcp * dt
+                endif
+            enddo
+        enddo
+    end subroutine inject_gaussian_source_2d
+
+    subroutine apply_mechanical_spectral_filter(vx, vz, sigmaxx, sigmazz, sigmaxz, mechanical_active)
+        real(real64), intent(inout) :: vx(0:,0:,:,:), vz(0:,0:,:,:)
+        real(real64), intent(inout) :: sigmaxx(0:,0:,:,:), sigmazz(0:,0:,:,:), sigmaxz(0:,0:,:,:)
+        real(real64), intent(in) :: mechanical_active(:,:)
+
+        integer :: i, k
+
+        do k = 1, size(vx, 4)
+            do i = 1, size(vx, 3)
+                if (mechanical_active(i,k) > 0.5_real64) then
+                    call apply_spectral_filter(vx(:,:,i,k))
+                    call apply_spectral_filter(vz(:,:,i,k))
+                    call apply_spectral_filter(sigmaxx(:,:,i,k))
+                    call apply_spectral_filter(sigmazz(:,:,i,k))
+                    call apply_spectral_filter(sigmaxz(:,:,i,k))
+                endif
+            enddo
+        enddo
+    end subroutine apply_mechanical_spectral_filter
+
     subroutine rhs_biot2(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz, &
                          c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                          alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                         hydraulic_active, mechanical_active, &
                          gamma_x, gamma_z, gamma_xz, &
-                         deriv, weights, dx, dz, max_speed, &
+                         deriv, weights, dx, dz, wave_speed, &
                          rvx, rvz, rqx, rqz, rp, rsxx, rszz, rsxz)
         real(real64), intent(in) :: vx(0:,0:,:,:), vz(0:,0:,:,:)
         real(real64), intent(in) :: qx(0:,0:,:,:), qz(0:,0:,:,:)
@@ -28,9 +276,11 @@ contains
         real(real64), intent(in) :: rho(:,:), rho_fluid(:,:), viscosity(:,:)
         real(real64), intent(in) :: alpha_x(:,:), alpha_z(:,:), biot_m(:,:)
         real(real64), intent(in) :: permeability_x(:,:), permeability_z(:,:)
+        real(real64), intent(in) :: hydraulic_active(:,:), mechanical_active(:,:)
         real(real64), intent(in) :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:)
         real(real64), intent(in) :: deriv(0:DG_P,0:DG_P), weights(0:DG_P)
-        real(real64), intent(in) :: dx, dz, max_speed
+        real(real64), intent(in) :: dx, dz
+        real(real64), intent(in) :: wave_speed(:,:)
         real(real64), intent(out) :: rvx(0:,0:,:,:), rvz(0:,0:,:,:)
         real(real64), intent(out) :: rqx(0:,0:,:,:), rqz(0:,0:,:,:)
         real(real64), intent(out) :: rp(0:,0:,:,:), rsxx(0:,0:,:,:)
@@ -42,7 +292,7 @@ contains
         real(real64), allocatable :: dsxx_dx(:,:,:,:), dsxx_dz(:,:,:,:), dszz_dx(:,:,:,:), dszz_dz(:,:,:,:)
         real(real64), allocatable :: dsxz_dx(:,:,:,:), dsxz_dz(:,:,:,:)
         integer :: a, b, i, k
-        real(real64) :: div_vs, div_q, p_rate, drag_x, drag_z
+        real(real64) :: div_vs, div_q, p_rate, mobility_x, mobility_z
 
         allocate(dvx_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dvx_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
         allocate(dvz_dx(0:DG_P,0:DG_P,size(vx,3),size(vx,4)), dvz_dz(0:DG_P,0:DG_P,size(vx,3),size(vx,4)))
@@ -62,30 +312,23 @@ contains
         call dg_derivatives(sigmazz, deriv, dx, dz, dszz_dx, dszz_dz)
         call dg_derivatives(sigmaxz, deriv, dx, dz, dsxz_dx, dsxz_dz)
 
-        !$omp parallel do collapse(2) private(a,b,div_vs,div_q,p_rate,drag_x,drag_z) schedule(static)
+        !$omp parallel do collapse(2) private(a,b,div_vs,div_q,p_rate,mobility_x,mobility_z) schedule(static)
         do k = 1, size(vx, 4)
             do i = 1, size(vx, 3)
                 do b = 0, DG_P
                     do a = 0, DG_P
                         div_vs = dvx_dx(a,b,i,k) + dvz_dz(a,b,i,k)
-                        ! Only compute fluid coupling if material has non-negligible permeability
-                        if (permeability_x(i,k) > 1.0e-30_real64 .or. permeability_z(i,k) > 1.0e-30_real64) then
+                        if (hydraulic_active(i,k) > 0.5_real64) then
                             div_q = dqx_dx(a,b,i,k) + dqz_dz(a,b,i,k)
                             p_rate = -biot_m(i,k) * &
-                                (0.5_real64 * (alpha_x(i,k) + alpha_z(i,k)) * div_vs + div_q)
-                            drag_x = permeability_x(i,k) / &
+                                (alpha_x(i,k) * dvx_dx(a,b,i,k) + alpha_z(i,k) * dvz_dz(a,b,i,k) + div_q)
+                            mobility_x = permeability_x(i,k) / &
                                 (positive(viscosity(i,k), 1.0e-6_real64) * positive(rho_fluid(i,k), 1.0_real64))
-                            drag_z = permeability_z(i,k) / &
+                            mobility_z = permeability_z(i,k) / &
                                 (positive(viscosity(i,k), 1.0e-6_real64) * positive(rho_fluid(i,k), 1.0_real64))
                             rp(a,b,i,k) = p_rate
-                            rqx(a,b,i,k) = -drag_x * dp_dx(a,b,i,k) &
-                                - viscosity(i,k) / &
-                                (positive(permeability_x(i,k), 1.0e-20_real64) * positive(rho_fluid(i,k), 1.0_real64)) &
-                                * qx(a,b,i,k)
-                            rqz(a,b,i,k) = -drag_z * dp_dz(a,b,i,k) &
-                                - viscosity(i,k) / &
-                                (positive(permeability_z(i,k), 1.0e-20_real64) * positive(rho_fluid(i,k), 1.0_real64)) &
-                                * qz(a,b,i,k)
+                            rqx(a,b,i,k) = -mobility_x * dp_dx(a,b,i,k)
+                            rqz(a,b,i,k) = -mobility_z * dp_dz(a,b,i,k)
                         else
                             p_rate = 0.0_real64
                             rp(a,b,i,k) = 0.0_real64
@@ -93,27 +336,38 @@ contains
                             rqz(a,b,i,k) = 0.0_real64
                         endif
 
-                        rsxx(a,b,i,k) = c11(i,k)*dvx_dx(a,b,i,k) + c13(i,k)*dvz_dz(a,b,i,k) + &
-                            c15(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - &
-                            gamma_x(i,k) * sigmaxx(a,b,i,k)
-                        rszz(a,b,i,k) = c13(i,k)*dvx_dx(a,b,i,k) + c33(i,k)*dvz_dz(a,b,i,k) + &
-                            c35(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - &
-                            gamma_z(i,k) * sigmazz(a,b,i,k)
-                        rsxz(a,b,i,k) = c15(i,k)*dvx_dx(a,b,i,k) + c35(i,k)*dvz_dz(a,b,i,k) + &
-                            c55(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - gamma_xz(i,k) * sigmaxz(a,b,i,k)
-                        rvx(a,b,i,k) = (dsxx_dx(a,b,i,k) + dsxz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
-                        rvz(a,b,i,k) = (dsxz_dx(a,b,i,k) + dszz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
+                        if (mechanical_active(i,k) > 0.5_real64) then
+                            rsxx(a,b,i,k) = c11(i,k)*dvx_dx(a,b,i,k) + c13(i,k)*dvz_dz(a,b,i,k) + &
+                                c15(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - &
+                                alpha_x(i,k) * p_rate - gamma_x(i,k) * sigmaxx(a,b,i,k)
+                            rszz(a,b,i,k) = c13(i,k)*dvx_dx(a,b,i,k) + c33(i,k)*dvz_dz(a,b,i,k) + &
+                                c35(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - &
+                                alpha_z(i,k) * p_rate - gamma_z(i,k) * sigmazz(a,b,i,k)
+                            rsxz(a,b,i,k) = c15(i,k)*dvx_dx(a,b,i,k) + c35(i,k)*dvz_dz(a,b,i,k) + &
+                                c55(i,k)*(dvz_dx(a,b,i,k) + dvx_dz(a,b,i,k)) - gamma_xz(i,k) * sigmaxz(a,b,i,k)
+                            rvx(a,b,i,k) = (dsxx_dx(a,b,i,k) + dsxz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
+                            rvz(a,b,i,k) = (dsxz_dx(a,b,i,k) + dszz_dz(a,b,i,k)) / positive(rho(i,k), 1.0_real64)
+                        else
+                            rsxx(a,b,i,k) = 0.0_real64
+                            rszz(a,b,i,k) = 0.0_real64
+                            rsxz(a,b,i,k) = 0.0_real64
+                            rvx(a,b,i,k) = 0.0_real64
+                            rvz(a,b,i,k) = 0.0_real64
+                        endif
                     enddo
                 enddo
             enddo
         enddo
         !$omp end parallel do
 
-        call apply_rusanov_penalty(vx, rvx, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(vz, rvz, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(sigmaxx, rsxx, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(sigmazz, rszz, weights, dx, dz, max_speed)
-        call apply_rusanov_penalty(sigmaxz, rsxz, weights, dx, dz, max_speed)
+        call apply_rusanov_penalty_masked_local(vx, rvx, mechanical_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(vz, rvz, mechanical_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(qx, rqx, hydraulic_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(qz, rqz, hydraulic_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(pressure, rp, hydraulic_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(sigmaxx, rsxx, mechanical_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(sigmazz, rszz, mechanical_active, weights, dx, dz, wave_speed)
+        call apply_rusanov_penalty_masked_local(sigmaxz, rsxz, mechanical_active, weights, dx, dz, wave_speed)
 
         deallocate(dvx_dx, dvx_dz, dvz_dx, dvz_dz, dqx_dx, dqx_dz, dqz_dx, dqz_dz)
         deallocate(dp_dx, dp_dz, dsxx_dx, dsxx_dz, dszz_dx, dszz_dz, dsxz_dx, dsxz_dz)
@@ -128,7 +382,9 @@ contains
 
         integer :: nx, nz
         integer :: it, isource, ksource
+        integer :: max_vz_i, max_vz_k, max_vz_a, max_vz_b
         real(real64) :: dx, dz, dt, max_speed
+        real(real64) :: max_vz_value
         logical :: SINGLE
         real(real64) :: nodes(0:DG_P), weights(0:DG_P), deriv(0:DG_P,0:DG_P)
 
@@ -136,6 +392,8 @@ contains
         real(real64), allocatable :: rho(:,:), rho_fluid(:,:), viscosity(:,:)
         real(real64), allocatable :: alpha_x(:,:), alpha_z(:,:), biot_m(:,:)
         real(real64), allocatable :: permeability_x(:,:), permeability_z(:,:)
+        real(real64), allocatable :: hydraulic_active(:,:), mechanical_active(:,:), wave_speed(:,:)
+        real(real64), allocatable :: hydraulic_norm_mask(:,:), mechanical_norm_mask(:,:)
         real(real64), allocatable :: gamma_x(:,:), gamma_z(:,:), gamma_xz(:,:)
         real(real64), allocatable :: cell_vx(:,:), cell_vz(:,:), cell_out(:,:)
         real(real64), allocatable :: vx(:,:,:,:), vz(:,:,:,:), qx(:,:,:,:), qz(:,:,:,:), pressure(:,:,:,:)
@@ -175,6 +433,8 @@ contains
         allocate(rho(nx,nz), rho_fluid(nx,nz), viscosity(nx,nz))
         allocate(alpha_x(nx,nz), alpha_z(nx,nz), biot_m(nx,nz))
         allocate(permeability_x(nx,nz), permeability_z(nx,nz))
+        allocate(hydraulic_active(nx,nz), mechanical_active(nx,nz), wave_speed(nx,nz))
+        allocate(hydraulic_norm_mask(nx,nz), mechanical_norm_mask(nx,nz))
         allocate(gamma_x(nx,nz), gamma_z(nx,nz), gamma_xz(nx,nz))
         allocate(cell_vx(nx,nz), cell_vz(nx,nz), cell_out(nx,nz))
 
@@ -220,6 +480,8 @@ contains
         call material_rw2('biot_m.dat', biot_m, .TRUE.)
         call material_rw2('permeability_x.dat', permeability_x, .TRUE.)
         call material_rw2('permeability_z.dat', permeability_z, .TRUE.)
+        call material_rw2('hydraulic_active.dat', hydraulic_active, .TRUE.)
+        call material_rw2('mechanical_active.dat', mechanical_active, .TRUE.)
         call material_rw2('gamma_x.dat', gamma_x, .TRUE.)
         call material_rw2('gamma_z.dat', gamma_z, .TRUE.)
         call material_rw2('gamma_xz.dat', gamma_xz, .TRUE.)
@@ -234,6 +496,8 @@ contains
         sigmaxx(:,:,:,:) = 0.0_real64
         sigmazz(:,:,:,:) = 0.0_real64
         sigmaxz(:,:,:,:) = 0.0_real64
+        call zero_inactive_mechanical_fields(vx, vz, sigmaxx, sigmazz, sigmaxz, mechanical_active)
+        call zero_inactive_biot_fields(qx, qz, pressure, hydraulic_active)
         srcx(:) = 0.0_real64
         srcz(:) = 0.0_real64
         srcxx(:) = 0.0_real64
@@ -247,8 +511,13 @@ contains
 
         isource = source%xind
         ksource = source%zind
-        max_speed = maxval(sqrt(max(c11, c33) / max(rho, 1.0_real64)))
+        call compute_biot_fast_p_speed(c11, c13, c33, c55, rho, alpha_x, alpha_z, biot_m, &
+                                       hydraulic_active, mechanical_active, wave_speed)
+        call build_stability_norm_masks(hydraulic_active, mechanical_active, hydraulic_norm_mask, mechanical_norm_mask)
+        max_speed = maxval(wave_speed)
         print *, 'max_speed = ', max_speed, ' dt = ', dt, ' CFL = ', max_speed * dt / min(dx, dz)
+        print *, 'stability norm cells: mechanical = ', int(sum(mechanical_norm_mask)), &
+            ' hydraulic = ', int(sum(hydraulic_norm_mask))
         flush(6)
 
         if (source%source_type == 'ac') then
@@ -269,89 +538,117 @@ contains
             call rhs_biot2(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           hydraulic_active, mechanical_active, &
                            gamma_x, gamma_z, gamma_xz, &
-                           deriv, weights, dx, dz, max_speed, &
+                           deriv, weights, dx, dz, wave_speed, &
                            k1vx, k1vz, k1qx, k1qz, k1p, k1sxx, k1szz, k1sxz)
-            ! RK4 intermediates: freeze p, qx, qz to avoid compound biot_m amplification
             tvx = vx + 0.5_real64 * dt * k1vx
             tvz = vz + 0.5_real64 * dt * k1vz
+            tqx = qx + 0.5_real64 * dt * k1qx
+            tqz = qz + 0.5_real64 * dt * k1qz
+            call damp_biot_darcy_fields(tqx, tqz, hydraulic_active, viscosity, &
+                                        permeability_x, permeability_z, rho_fluid, 0.5_real64 * dt)
+            tp = pressure + 0.5_real64 * dt * k1p
             tsxx = sigmaxx + 0.5_real64 * dt * k1sxx
             tszz = sigmazz + 0.5_real64 * dt * k1szz
             tsxz = sigmaxz + 0.5_real64 * dt * k1sxz
+            call apply_mechanical_spectral_filter(tvx, tvz, tsxx, tszz, tsxz, mechanical_active)
 
-            call rhs_biot2(tvx, tvz, qx, qz, pressure, tsxx, tszz, tsxz, &
+            call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           hydraulic_active, mechanical_active, &
                            gamma_x, gamma_z, gamma_xz, &
-                           deriv, weights, dx, dz, max_speed, &
+                           deriv, weights, dx, dz, wave_speed, &
                            k2vx, k2vz, k2qx, k2qz, k2p, k2sxx, k2szz, k2sxz)
             tvx = vx + 0.5_real64 * dt * k2vx
             tvz = vz + 0.5_real64 * dt * k2vz
+            tqx = qx + 0.5_real64 * dt * k2qx
+            tqz = qz + 0.5_real64 * dt * k2qz
+            call damp_biot_darcy_fields(tqx, tqz, hydraulic_active, viscosity, &
+                                        permeability_x, permeability_z, rho_fluid, 0.5_real64 * dt)
+            tp = pressure + 0.5_real64 * dt * k2p
             tsxx = sigmaxx + 0.5_real64 * dt * k2sxx
             tszz = sigmazz + 0.5_real64 * dt * k2szz
             tsxz = sigmaxz + 0.5_real64 * dt * k2sxz
+            call apply_mechanical_spectral_filter(tvx, tvz, tsxx, tszz, tsxz, mechanical_active)
 
-            call rhs_biot2(tvx, tvz, qx, qz, pressure, tsxx, tszz, tsxz, &
+            call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           hydraulic_active, mechanical_active, &
                            gamma_x, gamma_z, gamma_xz, &
-                           deriv, weights, dx, dz, max_speed, &
+                           deriv, weights, dx, dz, wave_speed, &
                            k3vx, k3vz, k3qx, k3qz, k3p, k3sxx, k3szz, k3sxz)
             tvx = vx + dt * k3vx
             tvz = vz + dt * k3vz
+            tqx = qx + dt * k3qx
+            tqz = qz + dt * k3qz
+            call damp_biot_darcy_fields(tqx, tqz, hydraulic_active, viscosity, &
+                                        permeability_x, permeability_z, rho_fluid, dt)
+            tp = pressure + dt * k3p
             tsxx = sigmaxx + dt * k3sxx
             tszz = sigmazz + dt * k3szz
             tsxz = sigmaxz + dt * k3sxz
+            call apply_mechanical_spectral_filter(tvx, tvz, tsxx, tszz, tsxz, mechanical_active)
 
-            call rhs_biot2(tvx, tvz, qx, qz, pressure, tsxx, tszz, tsxz, &
+            call rhs_biot2(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz, &
                            c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity, &
                            alpha_x, alpha_z, biot_m, permeability_x, permeability_z, &
+                           hydraulic_active, mechanical_active, &
                            gamma_x, gamma_z, gamma_xz, &
-                           deriv, weights, dx, dz, max_speed, &
+                           deriv, weights, dx, dz, wave_speed, &
                            k4vx, k4vz, k4qx, k4qz, k4p, k4sxx, k4szz, k4sxz)
 
-            ! --- RK4 update for elastic fields (v, σ) ---
             vx = vx + dt * (k1vx + 2.0_real64*k2vx + 2.0_real64*k3vx + k4vx) / 6.0_real64
             vz = vz + dt * (k1vz + 2.0_real64*k2vz + 2.0_real64*k3vz + k4vz) / 6.0_real64
+            qx = qx + dt * (k1qx + 2.0_real64*k2qx + 2.0_real64*k3qx + k4qx) / 6.0_real64
+            qz = qz + dt * (k1qz + 2.0_real64*k2qz + 2.0_real64*k3qz + k4qz) / 6.0_real64
+            call damp_biot_darcy_fields(qx, qz, hydraulic_active, viscosity, &
+                                        permeability_x, permeability_z, rho_fluid, dt)
+            pressure = pressure + dt * (k1p + 2.0_real64*k2p + 2.0_real64*k3p + k4p) / 6.0_real64
             sigmaxx = sigmaxx + dt * (k1sxx + 2.0_real64*k2sxx + 2.0_real64*k3sxx + k4sxx) / 6.0_real64
             sigmazz = sigmazz + dt * (k1szz + 2.0_real64*k2szz + 2.0_real64*k3szz + k4szz) / 6.0_real64
             sigmaxz = sigmaxz + dt * (k1sxz + 2.0_real64*k2sxz + 2.0_real64*k3sxz + k4sxz) / 6.0_real64
+            call apply_mechanical_spectral_filter(vx, vz, sigmaxx, sigmazz, sigmaxz, mechanical_active)
 
-            ! --- Forward Euler for pressure/Darcy (operator-split, uses k1 from current state) ---
-            pressure = pressure + dt * k1p
-            qx = qx + dt * k1qx
-            qz = qz + dt * k1qz
-
-            ! Distribute source uniformly across all DG nodes in the cell
-            ! to avoid creating a delta function that the DG derivative amplifies
-            vx(:,:,isource,ksource) = vx(:,:,isource,ksource) + srcx(it) * dt / positive(rho(isource,ksource), 1.0_real64)
-            vz(:,:,isource,ksource) = vz(:,:,isource,ksource) + srcz(it) * dt / positive(rho(isource,ksource), 1.0_real64)
-            qx(:,:,isource,ksource) = qx(:,:,isource,ksource) + srcqx(it) * dt
-            qz(:,:,isource,ksource) = qz(:,:,isource,ksource) + srcqz(it) * dt
-            pressure(:,:,isource,ksource) = pressure(:,:,isource,ksource) + srcp(it) * dt
-            sigmaxx(:,:,isource,ksource) = sigmaxx(:,:,isource,ksource) + srcxx(it)
-            sigmazz(:,:,isource,ksource) = sigmazz(:,:,isource,ksource) + srczz(it)
-            sigmaxz(:,:,isource,ksource) = sigmaxz(:,:,isource,ksource) + srcxz(it)
+            call inject_gaussian_source_2d(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz, &
+                                           rho, hydraulic_active, mechanical_active, nodes, dx, dz, &
+                                           isource, ksource, dt, srcx(it), srcz(it), srcqx(it), &
+                                           srcqz(it), srcp(it), srcxx(it), srcxz(it), srczz(it))
+            call apply_mechanical_spectral_filter(vx, vz, sigmaxx, sigmazz, sigmaxz, mechanical_active)
 
             call cell_average(vx, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Vx', SINGLE)
-            velocnorm(it) = maxval(abs(cell_out))
+            velocnorm(it) = masked_max_abs_cell(cell_out, mechanical_norm_mask)
             call cell_average(vz, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Vz', SINGLE)
-            velocnorm(it) = max(velocnorm(it), maxval(abs(cell_out)))
+            velocnorm(it) = max(velocnorm(it), masked_max_abs_cell(cell_out, mechanical_norm_mask))
             call cell_average(qx, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Qx', SINGLE)
             call cell_average(qz, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Qz', SINGLE)
             call cell_average(pressure, weights, cell_out)
             call write_image2(cell_out, nx, nz, source, it, 'Pp', SINGLE)
-            pressurenorm(it) = maxval(abs(cell_out))
+            pressurenorm(it) = masked_max_abs_cell(cell_out, hydraulic_norm_mask)
 
             if (it <= 10 .or. mod(it, 100) == 0 .or. velocnorm(it) > 1.0e10_real64) then
-                print '(A,I6,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4)', &
+                print '(A,I6,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4,A,ES12.4)', &
                     'it=', it, ' vnorm=', velocnorm(it), &
-                    ' sxx=', maxval(abs(sigmaxx)), ' szz=', maxval(abs(sigmazz)), &
-                    ' p=', maxval(abs(pressure)), ' qx=', maxval(abs(qx))
+                    ' wall_v=', max(masked_max_abs_nodal(vx, mechanical_active), &
+                    masked_max_abs_nodal(vz, mechanical_active)), &
+                    ' sxx=', masked_max_abs_nodal(sigmaxx, mechanical_norm_mask), &
+                    ' szz=', masked_max_abs_nodal(sigmazz, mechanical_norm_mask), &
+                    ' p=', pressurenorm(it), ' qx=', masked_max_abs_nodal(qx, hydraulic_norm_mask)
+            endif
+
+            if (it <= 10 .or. mod(it, 10) == 0 .or. velocnorm(it) > 1.0e10_real64) then
+                call max_abs_location_nodal(vz, mechanical_active, max_vz_value, max_vz_i, max_vz_k, max_vz_a, max_vz_b)
+                print '(A,I6,A,ES12.4,A,I6,A,I6,A,I2,A,I2,A,I6,A,I6)', &
+                    'it=', it, ' maxVz=', max_vz_value, &
+                    ' i=', max_vz_i, ' k=', max_vz_k, &
+                    ' a=', max_vz_a, ' b=', max_vz_b, &
+                    ' isrc=', isource, ' ksrc=', ksource
             endif
 
             if (velocnorm(it) > stability_threshold) stop 'Biot DG 2D solution became unstable'
@@ -359,6 +656,20 @@ contains
 
         call write_array('velocity_norm.dat', source%time_steps, velocnorm)
         call write_array('pore_pressure_norm.dat', source%time_steps, pressurenorm)
+        deallocate(c11, c13, c15, c33, c35, c55, rho, rho_fluid, viscosity)
+        deallocate(alpha_x, alpha_z, biot_m, permeability_x, permeability_z, hydraulic_active, mechanical_active)
+        deallocate(hydraulic_norm_mask, mechanical_norm_mask)
+        deallocate(wave_speed)
+        deallocate(gamma_x, gamma_z, gamma_xz, cell_vx, cell_vz, cell_out)
+        deallocate(vx, vz, qx, qz, pressure, sigmaxx, sigmazz, sigmaxz)
+        deallocate(rvx, rvz, rqx, rqz, rp, rsxx, rszz, rsxz)
+        deallocate(tvx, tvz, tqx, tqz, tp, tsxx, tszz, tsxz)
+        deallocate(k1vx, k1vz, k1qx, k1qz, k1p, k1sxx, k1szz, k1sxz)
+        deallocate(k2vx, k2vz, k2qx, k2qz, k2p, k2sxx, k2szz, k2sxz)
+        deallocate(k3vx, k3vz, k3qx, k3qz, k3p, k3sxx, k3szz, k3sxz)
+        deallocate(k4vx, k4vz, k4qx, k4qz, k4p, k4sxx, k4szz, k4sxz)
+        deallocate(srcx, srcz, srcxx, srcxz, srczz, srcqx, srcqz, srcp)
+        deallocate(velocnorm, pressurenorm)
     end subroutine biotdg2
 
     subroutine biotdg25(domain, source, SINGLE_OUTPUT)

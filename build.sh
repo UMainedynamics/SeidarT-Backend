@@ -3,6 +3,7 @@
 # -----------------------------------------------------------------------------
 user_defined_builddir=false
 openmp_compile=false
+compute_mode="serial"
 clean=false
 debug=false
 # Loop through the arguments
@@ -15,6 +16,28 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     -o|--openmp)
       openmp_compile=true
+      compute_mode="cpu"
+      shift
+      ;;
+    --compute)
+      compute_mode="$2"
+      case "$compute_mode" in
+        serial|cpu|gpu|hybrid)
+          ;;
+        *)
+          echo "Invalid compute mode: $compute_mode"
+          echo "Usage: cmd [-b install_directory] [-c|--clean] [-d|--debug] [-o|--openmp] [--compute serial|cpu|gpu|hybrid]"
+          exit 1
+          ;;
+      esac
+      if [[ "$compute_mode" == "cpu" || "$compute_mode" == "gpu" || "$compute_mode" == "hybrid" ]]; then
+        openmp_compile=true
+      fi
+      shift 2
+      ;;
+    --gpu)
+      openmp_compile=true
+      compute_mode="gpu"
       shift
       ;;
     -c|--clean)
@@ -27,7 +50,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     -*|--*)
       echo "Unknown option: $1"
-      echo "Usage: cmd [-b install_directory] [-c|--clean] [-d|--debug]"
+      echo "Usage: cmd [-b install_directory] [-c|--clean] [-d|--debug] [-o|--openmp] [--compute serial|cpu|gpu|hybrid]"
       exit 1
       ;;
     *)
@@ -96,13 +119,36 @@ echo "Using GFortran from $FC"
 #                                           -finit-real=snan -finit-integer=0 \
 #                                           -Wall"
 # else
-FFLAGS="-I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
+FFLAGS="-cpp -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
 # fi 
 
 # OpenMP support (optional)
 if [[ "$openmp_compile" = true ]]; then
     FFLAGS="$FFLAGS -fopenmp"
 fi
+
+case "$compute_mode" in
+  cpu)
+    FFLAGS="$FFLAGS -DSEIDART_OPENMP_CPU"
+    ;;
+  gpu)
+    FFLAGS="$FFLAGS -DSEIDART_OPENMP_GPU"
+    ;;
+  hybrid)
+    FFLAGS="$FFLAGS -DSEIDART_OPENMP_CPU -DSEIDART_OPENMP_GPU"
+    ;;
+esac
+
+if [[ "$compute_mode" == "gpu" || "$compute_mode" == "hybrid" ]]; then
+    if [[ -n "$OFFLOAD_TARGET" ]]; then
+        FFLAGS="$FFLAGS -foffload=$OFFLOAD_TARGET"
+        echo "OpenMP offload target is set to $OFFLOAD_TARGET"
+    else
+        echo "OpenMP GPU offload requested. Set OFFLOAD_TARGET, e.g. nvptx-none or amdgcn-amdhsa, if your compiler needs an explicit target."
+    fi
+fi
+
+echo "Compute mode is set to $compute_mode"
 
 # Source files
 SRC_DIR="src/fortran"
@@ -112,10 +158,7 @@ SOURCES="$SRC_DIR/constants.f08 \
          $SRC_DIR/averaging.f08 \
          $SRC_DIR/plane_wave_source.f08 \
          $SRC_DIR/tensor_operations.f08 \
-         $SRC_DIR/discontinuous_galerkin_methods.f08 \
          $SRC_DIR/cpmlfdtd.f08 \
-         $SRC_DIR/biotdg.f08 \
-         $SRC_DIR/jcadg.f08 \
          $SRC_DIR/main.f08"
 EXECUTABLE="seidartfdtd-$os-$arch"
 
