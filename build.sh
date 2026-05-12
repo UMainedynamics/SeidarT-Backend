@@ -119,7 +119,8 @@ echo "Using GFortran from $FC"
 #                                           -finit-real=snan -finit-integer=0 \
 #                                           -Wall"
 # else
-FFLAGS="-cpp -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
+LIBFLAGS="-ljsonfortran -llapack -lblas -lzstd"
+FFLAGS="-cpp -I${INCLUDE_PATH} -L${LIB_PATH} -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
 # fi 
 
 # OpenMP support (optional)
@@ -167,7 +168,32 @@ mkdir -p "$BIN_PATH"
 
 # Compile the executable
 echo "Compiling the SeidarT CPML FDTD executable..."
-$FC -v $FFLAGS $ICONV -o $EXECUTABLE $SOURCES > compile_output.txt 2>&1
+# $FC -v $FFLAGS $ICONV -o $EXECUTABLE $SOURCES 
+
+# -------
+mkdir -p build
+# Define the base flags (removed -cpp if you wish, but needed for #ifdefs)
+BASE_FLAGS="$FFLAGS $ICONV -Jbuild"
+
+echo "Step 1: Compiling Base Modules..."
+$FC $BASE_FLAGS -c src/fortran/constants.f08 -o build/constants.o
+$FC $BASE_FLAGS -c src/fortran/seidart_types.f08 -o build/seidart_types.o
+
+echo "Step 2: Compiling IO and Utilities..."
+$FC $BASE_FLAGS -c src/fortran/seidartio.f08 -o build/seidartio.o
+$FC $BASE_FLAGS -c src/fortran/averaging.f08 -o build/averaging.o
+$FC $BASE_FLAGS -c src/fortran/tensor_operations.f08 -o build/tensor_operations.o
+
+echo "Step 3: Compiling Solver and Physics..."
+$FC $BASE_FLAGS -c src/fortran/plane_wave_source.f08 -o build/plane_wave_source.o
+$FC $BASE_FLAGS -c src/fortran/cpmlfdtd.f08 -o build/cpmlfdtd.o
+$FC $BASE_FLAGS -c src/fortran/main.f08 -o build/main.o
+
+echo "Step 4: Linking everything..."
+$FC build/*.o -o "$EXECUTABLE" \
+    $FFLAGS -L"$LIB_PATH" $LIBFLAGS > compile_output.txt 2>&1
+
+# ------
 
 if [[ $? -ne 0 ]]; then
     echo "Compilation failed. Check compile_output.txt for details."
@@ -184,7 +210,7 @@ fi
 # -----------------------------------------------------------------------------
 # Move the executable to the correct folder
 echo "Moving the executable to $BIN_PATH..."
-mv $EXECUTABLE $BIN_PATH/seidartfdtd
+mv "$EXECUTABLE" "$BIN_PATH/seidartfdtd" || exit 1
 
 echo "Build and installation complete. Executable is located in $BIN_PATH."
 

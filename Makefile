@@ -27,7 +27,7 @@ else ifeq ($(UNAME_S), Darwin)
 endif
 
 
-FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
+FFLAGS := -I${INCLUDE_PATH} -L${LIB_PATH} -ljsonfortran -llapack -lblas -lzstd -g -Wall -fbacktrace -ffpe-trap=invalid,zero,overflow -O0 -fcheck=all
 
 # Source files
 SRC_DIR := src/fortran

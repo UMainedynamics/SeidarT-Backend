@@ -5,7 +5,7 @@ module cpmlfdtd
     use plane_wave_source
     use tensor_operations
     use averaging!, only: scalar_mean    
-    use iso_fortran_env, only: real64, real32
+    use iso_fortran_env, only: real64, real32, int16, int32
 
     implicit none 
     
@@ -103,9 +103,11 @@ module cpmlfdtd
         real(real64) :: p(3), ehat(3), r(3), r0(3), Vvec(3), strain_vec(6)
         real(real64), allocatable :: eig_array(:,:,:)
         logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, ip, xi, zi
-        real(real64) :: XMIN, XMAX, XMID, XLOC
-        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+        integer :: i_min=0, i_max=0, j_min=0, j_max=0
+        integer :: ip, xi, zi
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64
+        real(real64) :: XLOC=0.0_real64, ZLOC=0.0_real64
 
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
@@ -1440,10 +1442,12 @@ module cpmlfdtd
         real(real64) :: p(3), ehat(3), r(3), r0(3), Vvec(3), strain_vec(6)
         real(real64), allocatable :: eig_array(:,:,:)
         logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-        real(real64) :: XMIN, XMAX, XMID, XLOC
-        real(real64) :: YMIN, YMAX, YMID, YLOC
-        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+        integer :: i_min=0, i_max=0, j_min=0, j_max=0, k_min=0, k_max=0
+        integer :: ii, jj, kk
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
+        real(real64) :: YMIN=0.0_real64, YMAX=0.0_real64, YMID=0.0_real64
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64
+        real(real64) :: XLOC=0.0_real64, YLOC=0.0_real64, ZLOC=0.0_real64
         
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
@@ -2828,10 +2832,12 @@ module cpmlfdtd
         real(real64) :: p(3), ehat(3), r(3), r0(3), Vvec(3), strain_vec(6)
         real(real64), allocatable :: eig_array(:,:,:,:)
         logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-        real(real64) :: XMIN, XMAX, XMID, XLOC
-        real(real64) :: YMIN, YMAX, YMID, YLOC
-        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+        integer :: i_min=0, i_max=0, j_min=0, j_max=0, k_min=0, k_max=0
+        integer :: ii, jj, kk
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
+        real(real64) :: YMIN=0.0_real64, YMAX=0.0_real64, YMID=0.0_real64
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64 
+        real(real64) :: XLOC=0.0_real64, YLOC=0.0_real64, ZLOC=0.0_real64
         
         ! The default data output is single precision unless SINGLE_OUTPUT is 
         ! set to .FALSE.
@@ -3657,9 +3663,11 @@ module cpmlfdtd
         real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3) 
         real(real64), allocatable :: eig_array(:,:,:) 
         logical :: active(6)
-        integer :: i_min, i_max, k_min, k_max, ip, xi, zi
-        real(real64) :: XMIN, XMAX, XMID, XLOC
-        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+        integer :: i_min=0, i_max=0, k_min=0, k_max=0
+        integer :: ip, xi, zi
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64
+        real(real64) :: XLOC=0.0_real64, ZLOC=0.0_real64
 
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
@@ -4065,10 +4073,17 @@ module cpmlfdtd
         real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3) 
         real(real64), allocatable :: eig_array(:,:,:) 
         logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-        real(real64) :: XMIN, XMAX, XMID, XLOC
-        real(real64) :: YMIN, YMAX, YMID, YLOC
-        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+        integer :: i_min=0, i_max=0, j_min=0, j_max=0, k_min=0, k_max=0
+        integer :: ii, jj, kk
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
+        real(real64) :: YMIN=0.0_real64, YMAX=0.0_real64, YMID=0.0_real64
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64
+        real(real64) :: XLOC=0.0_real64, YLOC=0.0_real64, ZLOC=0.0_real64
+        
+        logical :: block_output, legacy_output
+        integer :: block_count 
+        integer :: steps_per_block 
+        character(len=256) :: current_block_file
 
         ! Check if SINGLE_OUTPUT is provided, default to single precision if not
         if (present(SINGLE_OUTPUT)) then
@@ -4076,7 +4091,7 @@ module cpmlfdtd
         else
             SINGLE = .TRUE.
         endif
-        
+
         
         nx = domain%nx
         ny = domain%ny
@@ -4299,16 +4314,21 @@ module cpmlfdtd
         Ey_old = Ey 
         Ez_old = Ez
         
+        ! Initialize the block count 
+        call setup_io_params(nx, ny, nz, domain%cpml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io(nx, ny, nz, domain%cpml, steps_per_block) 
+        block_count = 0
+        
 #ifdef SEIDART_OPENMP_GPU
-        !$omp target data &
-        !$omp& map(to: aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz) &
-        !$omp& map(to: sig11, sig12, sig13, sig22, sig23, sig33) &
-        !$omp& map(to: kappa, acoef, bcoef, kappa_half, acoef_half, bcoef_half) &
-        !$omp& map(tofrom: Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old) &
-        !$omp& map(tofrom: memory_dEx_dy, memory_dEy_dx, memory_dEx_dz) &
-        !$omp& map(tofrom: memory_dEz_dx, memory_dEz_dy, memory_dEy_dz) &
-        !$omp& map(tofrom: memory_dHz_dx, memory_dHx_dz, memory_dHz_dy) &
-        !$omp& map(tofrom: memory_dHy_dz, memory_dHx_dy, memory_dHy_dx)
+            !$omp target data &
+            !$omp& map(to: aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz) &
+            !$omp& map(to: sig11, sig12, sig13, sig22, sig23, sig33) &
+            !$omp& map(to: kappa, acoef, bcoef, kappa_half, acoef_half, bcoef_half) &
+            !$omp& map(tofrom: Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old) &
+            !$omp& map(tofrom: memory_dEx_dy, memory_dEy_dx, memory_dEx_dz) &
+            !$omp& map(tofrom: memory_dEz_dx, memory_dEz_dy, memory_dEy_dz) &
+            !$omp& map(tofrom: memory_dHz_dx, memory_dHx_dz, memory_dHz_dy) &
+            !$omp& map(tofrom: memory_dHy_dz, memory_dHx_dy, memory_dHy_dx)
 #endif
         do it = 1,source%time_steps
             !--------------------------------------------------------
@@ -4316,8 +4336,8 @@ module cpmlfdtd
             !--------------------------------------------------------
             ! Update Hx
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target teams distribute parallel do collapse(3) &
-            !$omp& private(i, j, k, dEz_dy, dEy_dz)
+                !$omp target teams distribute parallel do collapse(3) &
+                !$omp& private(i, j, k, dEz_dy, dEy_dz)
 #endif
             do k = 1,nz-1
                 do i = 1,nx-1  
@@ -4341,8 +4361,8 @@ module cpmlfdtd
 
                 ! Update Hy
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target teams distribute parallel do collapse(3) &
-            !$omp& private(i, j, k, dEx_dz, dEz_dx)
+                !$omp target teams distribute parallel do collapse(3) &
+                !$omp& private(i, j, k, dEx_dz, dEz_dx)
 #endif
             do k = 1,nz-1
                 do i = 1,nx-1      
@@ -4367,8 +4387,8 @@ module cpmlfdtd
 
                 ! Update Hz
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target teams distribute parallel do collapse(3) &
-            !$omp& private(i, j, k, dEx_dy, dEy_dx)
+                !$omp target teams distribute parallel do collapse(3) &
+                !$omp& private(i, j, k, dEx_dy, dEy_dx)
 #endif
             do k = 2,nz-1
                 do i = 1,nx-1      
@@ -4393,9 +4413,9 @@ module cpmlfdtd
             ! compute electric field and update memory variables for C-PML
             !--------------------------------------------------------
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target teams distribute parallel do collapse(3) &
-            !$omp& private(i, j, k, dHz_dy, dHy_dz, dHz_dx, dHx_dz) &
-            !$omp& private(dHy_dx, dHx_dy, rhs_x, rhs_y, rhs_z)
+                !$omp target teams distribute parallel do collapse(3) &
+                !$omp& private(i, j, k, dHz_dy, dHy_dz, dHz_dx, dHx_dz) &
+                !$omp& private(dHy_dx, dHx_dy, rhs_x, rhs_y, rhs_z)
 #endif
             do k =2,nz-1 
                 do i = 2,nx-1
@@ -4433,7 +4453,7 @@ module cpmlfdtd
             end do 
 
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target update from(Ex, Ey, Ez, Hx, Hy, Hz)
+                !$omp target update from(Ex, Ey, Ez, Hx, Hy, Hz)
 #endif
             if ( source%source_type == 'pw' ) then 
                 t = it * source%dt
@@ -4570,7 +4590,7 @@ module cpmlfdtd
             Ez_old = Ez 
             
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target update to(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
+                !$omp target update to(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
 #endif
             ! check norm of velocity to make sure the solution isn't diverging
             velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )
@@ -4578,15 +4598,31 @@ module cpmlfdtd
             ! print *,'Max vals for Ex, Ey, Ez: ', maxval(Ex), maxval(Ey), maxval(Ez)
 
             ! print *, maxval(Ex), maxval(Ey), maxval(Ez)
-            call write_image(Ex, domain, source, it, 'Ex', SINGLE)
-            call write_image(Ey, domain, source, it, 'Ey', SINGLE)
-            call write_image(Ez, domain, source, it, 'Ez', SINGLE)
+            if (block_output) then
+                if (current_step_in_block == 0) then
+                    block_count = block_count + 1
+                    ii = (block_count - 1) * steps_per_block + 1 
+                    jj = min(block_count * steps_per_block, source%time_steps)
+                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a, i0, a)") &
+                        'EM25.', ii, '-', jj, '.', source%xind, '.', &
+                        source%yind, '.', source%zind, '.blk.zst'
+                endif
+                call add_step_to_block(current_block_file, Ex, Ey, Ez)                
+            endif
 
-        enddo   ! end of time loop
+            
+            if (legacy_output) then
+                call write_image(Ex, domain, source, it, 'Ex', SINGLE)
+                call write_image(Ey, domain, source, it, 'Ey', SINGLE)
+                call write_image(Ez, domain, source, it, 'Ez', SINGLE)
+            endif
+        enddo
 #ifdef SEIDART_OPENMP_GPU
-        !$omp end target data
+            !$omp end target data
 #endif
-    
+        if (block_output) call finalize_io(current_block_file)
+        
+        
         deallocate( eps11, eps12, eps13, eps22, eps23, eps33)
         deallocate( sig11, sig12, sig13, sig22, sig23, sig33)
         deallocate( kappa, alpha, acoef, bcoef, kappa_half)
@@ -4602,7 +4638,7 @@ module cpmlfdtd
         
         deallocate(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
         deallocate(eig_array)
-        
+
     end subroutine electromag25
     
     
@@ -4620,8 +4656,6 @@ module cpmlfdtd
         use constants
         use omp_lib
         
-        implicit none
-
         ! Input arguments
         type(Domain_Type), intent(in) :: domain
         type(Source_Type), intent(in) :: source
@@ -4684,10 +4718,12 @@ module cpmlfdtd
         real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3)
         real(real64), allocatable :: eig_array(:,:,:,:)
         logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, k_min, k_max, ii, jj, kk
-        real(real64) :: XMIN, XMAX, XMID, XLOC
-        real(real64) :: YMIN, YMAX, YMID, YLOC
-        real(real64) :: ZMIN, ZMAX, ZMID, ZLOC
+        integer :: i_min=0, i_max=0, j_min=0, j_max=0, k_min=0, k_max=0
+        integer :: ii, jj, kk
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
+        real(real64) :: YMIN=0.0_real64, YMAX=0.0_real64, YMID=0.0_real64
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64
+        real(real64) :: XLOC=0.0_real64, YLOC=0.0_real64, ZLOC=0.0_real64
 
         ! Check if SINGLE_OUTPUT is provided, default to single precision if not
         if (present(SINGLE_OUTPUT)) then

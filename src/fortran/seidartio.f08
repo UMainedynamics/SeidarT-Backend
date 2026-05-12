@@ -1,12 +1,40 @@
 module seidartio 
 
     use iso_fortran_env, only: real64, real32
+    use, intrinsic :: iso_c_binding
     use json_module 
     use seidart_types 
     
     implicit none 
     
     public :: parse_json
+    
+    real(c_float), allocatable, save, target :: block_buffer(:,:,:,:,:)
+    integer, save :: total_block_limit = 0
+    integer, save :: current_step_in_block = 0
+    integer, save :: output_cpml = 0
+
+    interface
+        integer(c_size_t) function ZSTD_compressBound(srcSize) bind(C, name="ZSTD_compressBound")
+            import :: c_size_t
+            integer(c_size_t), value :: srcSize
+        end function ZSTD_compressBound
+
+        integer(c_size_t) function ZSTD_compress(dst, dstCap, src, srcSize, compressionLevel) &
+            bind(C, name="ZSTD_compress")
+            import :: c_ptr, c_size_t, c_int
+            type(c_ptr), value :: dst
+            integer(c_size_t), value :: dstCap
+            type(c_ptr), value :: src
+            integer(c_size_t), value :: srcSize
+            integer(c_int), value :: compressionLevel
+        end function ZSTD_compress
+
+        integer(c_int) function ZSTD_isError(code) bind(C, name="ZSTD_isError")
+            import :: c_size_t, c_int
+            integer(c_size_t), value :: code
+        end function ZSTD_isError
+    end interface
     
     ! private :: 
     ! ---------------------------- Declarations --------------------------------
@@ -345,35 +373,7 @@ module seidartio
 
     end subroutine write_image2
     
-    ! subroutine write_image2(image_data, nx, nz, src, it, channel, SINGLE)
-    
-    !     implicit none
 
-    !     integer, parameter :: dp = kind(0.d0)
-    !     integer :: unit_number
-    !     integer :: nx, nz, it
-    !     integer,dimension(2) :: src
-    !     real(kind=dp) :: image_data(nx, nz)
-    !     character(len=2) :: channel
-    !     character(len=100) :: filename
-    !     logical :: SINGLE
-
-    !     ! WRITE (filename, "(a2, i6.6, '.dat')" ) channel, it
-    !     WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a1, a4)" ) &
-    !                 channel,'.', it,'.', src(1),'.', src(2), '.','.dat'
-    !     open(newunit = unit_number, form = 'unformatted', file = trim(filename) )
-
-    !     if (SINGLE) then
-    !         write(unit_number) sngl(image_data)
-    !     else
-    !         write(unit_number) image_data 
-    !     end if 
-
-
-    !     close(unit = unit_number)
-
-    ! end subroutine write_image2
-    
     ! --------------------------------------------------------------------------
     subroutine write_image3(image_data, nx, ny, nz, source, it, channel, SINGLE)
     
@@ -432,5 +432,200 @@ module seidartio
         close(unit_number)
 
     end subroutine loadcpml
+    
+    ! ==========================================================================
+    ! =========================== ZSTD block writing ===========================
+    subroutine init_io(nx, ny, nz, cpml, n_steps_per_block)
+        integer, intent(in) :: nx, ny, nz, cpml, n_steps_per_block
+        integer :: output_nx, output_ny, output_nz
+
+        if (n_steps_per_block < 1) then
+            print *, 'Error: steps per zstd block must be at least 1'
+            stop
+        end if
+        if (cpml < 0) then
+            print *, 'Error: cpml must be non-negative for zstd block output'
+            stop
+        end if
+
+        output_nx = nx - 2 * cpml
+        output_ny = ny - 2 * cpml
+        output_nz = nz - 2 * cpml
+        if (output_nx < 1 .or. output_ny < 1 .or. output_nz < 1) then
+            print *, 'Error: cpml removes the entire zstd block output domain'
+            stop
+        end if
+
+        if (allocated(block_buffer)) deallocate(block_buffer)
+        output_cpml = cpml
+        total_block_limit = n_steps_per_block 
+        ! shape: (x, y, z, component, step) 
+        allocate(block_buffer(output_nx, output_ny, output_nz, 3, total_block_limit) )
+        current_step_in_block = 0 
+
+    end subroutine init_io  
+    
+    ! --------------------------------------------------------------------------
+    subroutine add_step_to_block(filename, Ex, Ey, Ez) 
+        character(len=*), intent(in) :: filename
+        real(c_double), intent(in) :: Ex(:,:,:)
+        real(c_double), intent(in) :: Ey(:,:,:)
+        real(c_double), intent(in) :: Ez(:,:,:)
+
+        if (.not. allocated(block_buffer)) then
+            print *, 'Error: zstd block I/O has not been initialized'
+            stop
+        end if
+        
+        current_step_in_block = current_step_in_block + 1
+        
+        block_buffer(:,:,:,1,current_step_in_block) = &
+            real(Ex(output_cpml+1:size(Ex,1)-output_cpml, &
+                    output_cpml+1:size(Ex,2)-output_cpml, &
+                    output_cpml+1:size(Ex,3)-output_cpml), c_float)
+        block_buffer(:,:,:,2,current_step_in_block) = &
+            real(Ey(output_cpml+1:size(Ey,1)-output_cpml, &
+                    output_cpml+1:size(Ey,2)-output_cpml, &
+                    output_cpml+1:size(Ey,3)-output_cpml), c_float)
+        block_buffer(:,:,:,3,current_step_in_block) = &
+            real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
+                    output_cpml+1:size(Ez,2)-output_cpml, &
+                    output_cpml+1:size(Ez,3)-output_cpml), c_float)
+        
+        ! if the block is full, write it and reset 
+        if (current_step_in_block == total_block_limit) then
+            call write_zstd_block(filename)
+        end if
+    end subroutine add_step_to_block 
+    
+    ! --------------------------------------------------------------------------
+    subroutine write_zstd_block(filename) 
+        character(len=*), intent(in) :: filename
+        
+        integer(c_size_t) :: src_size, max_dst_size, compressed_size
+        integer(c_size_t) :: n_values
+        integer(c_int) :: compression_level 
+        type(c_ptr) :: src_ptr, dst_ptr 
+        
+        ! For file I/O
+        integer :: i_unit, io_status
+        character(kind=c_char), allocatable, target :: comp_buffer(:)
+
+        if (.not. allocated(block_buffer)) then
+            print *, 'Error: zstd block I/O has not been initialized'
+            stop
+        end if
+
+        if (current_step_in_block < 1) return
+
+        ! Compress only the populated leading portion of the Fortran-order buffer.
+        n_values = int(size(block_buffer, 1), c_size_t) * &
+                   int(size(block_buffer, 2), c_size_t) * &
+                   int(size(block_buffer, 3), c_size_t) * &
+                   int(size(block_buffer, 4), c_size_t) * &
+                   int(current_step_in_block, c_size_t)
+        src_size = n_values * c_sizeof(block_buffer(1,1,1,1,1))
+        max_dst_size = ZSTD_compressBound(src_size)
+        allocate(comp_buffer(max_dst_size))
+        
+        src_ptr = c_loc(block_buffer(1,1,1,1,1))
+        dst_ptr = c_loc(comp_buffer(1))
+        
+        ! Level 3 is a good balance. Use 1 for speed or up to 22 for max compression.
+        compression_level = 3 
+        compressed_size = ZSTD_compress(dst_ptr, max_dst_size, src_ptr, src_size, compression_level)
+        
+        if (ZSTD_isError(compressed_size) /= 0) then
+            print *, 'Error: ZSTD compression failed for file: ', trim(filename)
+            deallocate(comp_buffer)
+            stop
+        end if
+
+        open(newunit=i_unit, file=trim(filename), access='stream', form='unformatted', &
+             status='replace', action='write', iostat=io_status)
+        if (io_status /= 0) then
+            print *, 'Error opening zstd output file: ', trim(filename)
+            deallocate(comp_buffer)
+            stop
+        end if
+        write(i_unit) comp_buffer(1:compressed_size)
+        close(i_unit)
+        
+        deallocate(comp_buffer) 
+        print*, "Successfully wrote zstd block to file: ", trim(filename), &
+                " steps=", current_step_in_block, &
+                " raw_bytes=", src_size, &
+                " compressed_bytes=", compressed_size
+        current_step_in_block = 0
+    
+    end subroutine write_zstd_block
+
+    ! --------------------------------------------------------------------------
+    subroutine finalize_io(filename)
+        character(len=*), intent(in) :: filename
+
+        if (allocated(block_buffer)) then
+            if (current_step_in_block > 0) call write_zstd_block(filename)
+            deallocate(block_buffer)
+        end if
+        total_block_limit = 0
+        current_step_in_block = 0
+        output_cpml = 0
+
+    end subroutine finalize_io
+    
+    
+    ! --------------------------------------------------------------------------
+    subroutine setup_io_params(nx, ny, nz, cpml, block_output, steps_per_block, legacy_output)
+        integer, intent(in) :: nx, ny, nz, cpml
+        logical, intent(out) :: block_output, legacy_output
+        integer, intent(out) :: steps_per_block
+        
+        character(len=32) :: env_val 
+        integer :: stat 
+        real(8) :: bytes_per_step 
+        integer :: output_nx, output_ny, output_nz
+        
+        ! Block output defaul is true, legacy is false 
+        block_output = .true. 
+        legacy_output = .false.
+        ! Check for legacy override 
+        call get_environment_variable("FDTD_LEGACY_OUTPUT", env_val, status = stat) 
+        if (stat == 0 .and. trim(env_val) == "TRUE") then
+            legacy_output = .true.
+            block_output = .false.
+        endif
+
+        output_nx = nx - 2 * cpml
+        output_ny = ny - 2 * cpml
+        output_nz = nz - 2 * cpml
+        if (output_nx < 1 .or. output_ny < 1 .or. output_nz < 1) then
+            print *, 'Error: cpml removes the entire zstd block output domain'
+            stop
+        end if
+        
+        ! check for steps per block override 
+        call get_environment_variable("FDTD_STEPS_PER_BLOCK", env_val, status = stat) 
+        if (stat == 0) then
+            read(env_val, *) steps_per_block
+        else 
+            ! auto calculate with target ~2GB buffer 
+            ! bytes = interior cells * 3 components * 4 bytes per real32 
+            bytes_per_step = real(output_nx, 8) * output_ny * output_nz * 3 * 4 
+            
+            ! steps = 2GB (2^31 bytes) / bytes_per_step 
+            steps_per_block = max(1, int(2147483648.0_8 / bytes_per_step))
+            if (steps_per_block > 500 ) steps_per_block = 500 
+        endif
+        
+        print*, "---- I/O Configuration ----"
+        print*, "Block output: ", block_output
+        print*, "Legacy output: ", legacy_output
+        print*, "Block output dimensions: ", output_nx, output_ny, output_nz
+        print*, "Block output precision: real32"
+        print*, "Steps per block: ", steps_per_block
+        
+    end subroutine setup_io_params
+    
 
 end module seidartio
