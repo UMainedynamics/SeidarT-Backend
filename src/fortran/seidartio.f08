@@ -726,10 +726,11 @@ module seidartio
         print*, "---- I/O Configuration (2D) ----"
         print*, "Block output: ", block_output
         print*, "Legacy output: ", legacy_output
-        print*, "Block output dimensions: ", output_nx, output_nz
-        print*, "Block output precision: real32"
-        print*, "Steps per block: ", steps_per_block
-
+        if (block_output) then
+            print*, "Block output dimensions: ", output_nx, output_nz
+            print*, "Block output precision: real32"
+            print*, "Steps per block: ", steps_per_block
+        end if
     end subroutine setup_io_params_2d
 
     
