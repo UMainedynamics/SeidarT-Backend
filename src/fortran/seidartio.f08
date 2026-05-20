@@ -245,6 +245,30 @@ module seidartio
 
     end subroutine material_rw2
     
+        ! --------------------------------------------------------------------------
+    subroutine material_rw2c(filename, image_data, readfile)
+
+        implicit none
+        
+        character(len=*) :: filename
+        complex(real64),dimension(:,:) :: image_data
+        logical :: readfile
+        integer :: unit_number
+        
+        
+        open(newunit = unit_number, form="unformatted", file = trim(filename) )
+        
+        if ( readfile ) then
+            print *, "Reading file: ", trim(filename)
+            read(unit_number) image_data
+        else
+            write(unit_number) image_data
+        endif
+        
+        close(unit_number)
+
+    end subroutine material_rw2c
+    
     ! --------------------------------------------------------------------------
     subroutine material_rw3(filename, image_data, readfile)
 
@@ -573,7 +597,141 @@ module seidartio
         output_cpml = 0
 
     end subroutine finalize_io
-    
+
+    ! ==========================================================================
+    ! ======================== 2D ZSTD block writing ===========================
+    ! These are 2D companions to the 3D routines above. The trick is that
+    ! init_io_2d allocates block_buffer with y-dimension = 1, so
+    ! write_zstd_block and finalize_io work unchanged.
+    ! ==========================================================================
+
+    ! --------------------------------------------------------------------------
+    !> Initialize the block buffer for 2D field output.
+    !!
+    !! Allocates block_buffer as (output_nx, 1, output_nz, 3, steps_per_block).
+    !! The singleton y-dimension makes write_zstd_block and finalize_io
+    !! work identically for 2D and 3D cases.
+    subroutine init_io_2d(nx, nz, cpml, n_steps_per_block)
+        integer, intent(in) :: nx, nz, cpml, n_steps_per_block
+        integer :: output_nx, output_nz
+
+        if (n_steps_per_block < 1) then
+            print *, 'Error: steps per zstd block must be at least 1'
+            stop
+        end if
+        if (cpml < 0) then
+            print *, 'Error: cpml must be non-negative for zstd block output'
+            stop
+        end if
+
+        output_nx = nx - 2 * cpml
+        output_nz = nz - 2 * cpml
+        if (output_nx < 1 .or. output_nz < 1) then
+            print *, 'Error: cpml removes the entire zstd block output domain'
+            stop
+        end if
+
+        if (allocated(block_buffer)) deallocate(block_buffer)
+        output_cpml = cpml
+        total_block_limit = n_steps_per_block
+        ! shape: (x, 1, z, component, step) — y-dim is 1 for 2D
+        allocate(block_buffer(output_nx, 1, output_nz, 3, total_block_limit))
+        current_step_in_block = 0
+
+    end subroutine init_io_2d
+
+    ! --------------------------------------------------------------------------
+    !> Accumulate one time step of 2D field data into the block buffer.
+    !!
+    !! Accepts rank-2 field arrays Ex(nx,nz), Ey(nx,nz), Ez(nx,nz),
+    !! strips the CPML padding, converts to real32, and stores in the
+    !! block_buffer(:,1,:,component,step) slice.
+    !! When the block is full, automatically calls write_zstd_block.
+    subroutine add_step_to_block_2d(filename, Ex, Ey, Ez)
+        character(len=*), intent(in) :: filename
+        real(c_double), intent(in) :: Ex(:,:)
+        real(c_double), intent(in) :: Ey(:,:)
+        real(c_double), intent(in) :: Ez(:,:)
+
+        if (.not. allocated(block_buffer)) then
+            print *, 'Error: zstd block I/O has not been initialized'
+            stop
+        end if
+
+        current_step_in_block = current_step_in_block + 1
+
+        block_buffer(:,1,:,1,current_step_in_block) = &
+            real(Ex(output_cpml+1:size(Ex,1)-output_cpml, &
+                    output_cpml+1:size(Ex,2)-output_cpml), c_float)
+        block_buffer(:,1,:,2,current_step_in_block) = &
+            real(Ey(output_cpml+1:size(Ey,1)-output_cpml, &
+                    output_cpml+1:size(Ey,2)-output_cpml), c_float)
+        block_buffer(:,1,:,3,current_step_in_block) = &
+            real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
+                    output_cpml+1:size(Ez,2)-output_cpml), c_float)
+
+        ! if the block is full, write it and reset
+        if (current_step_in_block == total_block_limit) then
+            call write_zstd_block(filename)
+        end if
+    end subroutine add_step_to_block_2d
+
+    ! --------------------------------------------------------------------------
+    !> Configure block I/O parameters for a 2D simulation.
+    !!
+    !! Reads FDTD_LEGACY_OUTPUT and FDTD_STEPS_PER_BLOCK from the environment,
+    !! computes output dimensions after CPML stripping, and auto-sizes the
+    !! block to target ~2 GB of buffer memory.
+    subroutine setup_io_params_2d(nx, nz, cpml, block_output, steps_per_block, legacy_output)
+        integer, intent(in) :: nx, nz, cpml
+        logical, intent(out) :: block_output, legacy_output
+        integer, intent(out) :: steps_per_block
+
+        character(len=32) :: env_val
+        integer :: stat
+        real(8) :: bytes_per_step
+        integer :: output_nx, output_nz
+
+        ! Block output default is true, legacy is false
+        block_output = .true.
+        legacy_output = .false.
+        ! Check for legacy override
+        call get_environment_variable("FDTD_LEGACY_OUTPUT", env_val, status = stat)
+        if (stat == 0 .and. trim(env_val) == "TRUE") then
+            legacy_output = .true.
+            block_output = .false.
+        endif
+
+        output_nx = nx - 2 * cpml
+        output_nz = nz - 2 * cpml
+        if (output_nx < 1 .or. output_nz < 1) then
+            print *, 'Error: cpml removes the entire zstd block output domain'
+            stop
+        end if
+
+        ! check for steps per block override
+        call get_environment_variable("FDTD_STEPS_PER_BLOCK", env_val, status = stat)
+        if (stat == 0) then
+            read(env_val, *) steps_per_block
+        else
+            ! auto calculate with target ~2GB buffer
+            ! bytes = interior cells * 3 components * 4 bytes per real32
+            ! (no y dimension for 2D)
+            bytes_per_step = real(output_nx, 8) * output_nz * 3 * 4
+            ! steps = 2GB (2^31 bytes) / bytes_per_step
+            steps_per_block = max(1, int(2147483648.0_8 / bytes_per_step))
+            if (steps_per_block > 500) steps_per_block = 500
+        endif
+
+        print*, "---- I/O Configuration (2D) ----"
+        print*, "Block output: ", block_output
+        print*, "Legacy output: ", legacy_output
+        print*, "Block output dimensions: ", output_nx, output_nz
+        print*, "Block output precision: real32"
+        print*, "Steps per block: ", steps_per_block
+
+    end subroutine setup_io_params_2d
+
     
     ! --------------------------------------------------------------------------
     subroutine setup_io_params(nx, ny, nz, cpml, block_output, steps_per_block, legacy_output)
