@@ -1967,11 +1967,8 @@ module cpmlfdtd
 
             if (legacy_output) then
                 call write_image2(real(vx, real64), nx, nz, source, it, 'Vx', SINGLE)
-                call write_image2(aimag(vx),        nx, nz, source, it, 'Vi', SINGLE)
                 call write_image2(real(vy, real64), nx, nz, source, it, 'Vy', SINGLE)
-                call write_image2(aimag(vy),        nx, nz, source, it, 'Wi', SINGLE)
                 call write_image2(real(vz, real64), nx, nz, source, it, 'Vz', SINGLE)
-                call write_image2(aimag(vz),        nx, nz, source, it, 'Zi', SINGLE)
             endif
         enddo  ! end time loop
 
@@ -4754,7 +4751,7 @@ module cpmlfdtd
                 !$omp target teams distribute parallel do collapse(2) &
                 !$omp& private(i, k, dEy_dz)
 #endif
-            do k = 2, nz-1
+            do k = 2, nz-2
                 do i = 2, nx-1
                     ! Update Hx
                     dEy_dz = ( 27.0_real64*(Ey(i,k+1) - Ey(i,k)) - &
@@ -4774,8 +4771,8 @@ module cpmlfdtd
                 !$omp target teams distribute parallel do collapse(2) &
                 !$omp& private(i, k, dEx_dz, dEz_dx)
 #endif
-            do k = 2, nz-1
-                do i = 2, nx-1
+            do k = 2, nz-2
+                do i = 2, nx-2
 
                     dEx_dz = ( 27.0_real64*(Ex(i,k+1) - Ex(i,k)) - &
                               (Ex(i,k+2) - Ex(i,k-1)) ) / (24.0_real64*dz)
@@ -4801,7 +4798,7 @@ module cpmlfdtd
                 !$omp& private(i, k, dEy_dx)
 #endif
             do k = 2, nz-1
-                do i = 2, nx-1
+                do i = 2, nx-2
 
                     dEy_dx = ( 27.0_real64*(Ey(i+1,k) - Ey(i,k)) - &
                               (Ey(i+2,k) - Ey(i-1,k)) ) / (24.0_real64*dx)
@@ -4945,12 +4942,9 @@ module cpmlfdtd
 
             
             if (legacy_output) then
-                call write_image2( real(Ex, real64), nx, nz, source, it, 'Ex_r', SINGLE )
-                call write_image2( aimag(Ex),        nx, nz, source, it, 'Ex_i', SINGLE )
-                call write_image2( real(Ey, real64), nx, nz, source, it, 'Ey_r', SINGLE )
-                call write_image2( aimag(Ey),        nx, nz, source, it, 'Ey_i', SINGLE )
-                call write_image2( real(Ez, real64), nx, nz, source, it, 'Ez_r', SINGLE )
-                call write_image2( aimag(Ez),        nx, nz, source, it, 'Ez_i', SINGLE )
+                call write_image2( real(Ex, real64), nx, nz, source, it, 'Ex', SINGLE )
+                call write_image2( real(Ey, real64), nx, nz, source, it, 'Ey', SINGLE )
+                call write_image2( real(Ez, real64), nx, nz, source, it, 'Ez', SINGLE )
             endif
         enddo
 #ifdef SEIDART_OPENMP_GPU
