@@ -2293,14 +2293,14 @@ module cpmlfdtd
         !----------------------------------------------------------------------
         ! OpenMP Unified Device Target Data Map
         !----------------------------------------------------------------------
-        !$omp target data map(to: bcoef, acoef, bcoef_half, acoef_half, kappa, kappa_half) &
+        !$omp target data map(to: acoef, bcoef, acoef_half, bcoef_half, kappa, kappa_half) &
         !$omp             map(to: aEz, bEz, aEx, bEx, dEz, eEz, dEx, eEx, epsilon11, epsilon33) &
-        !$omp             map(to: srcx, srcz) &
+        !$omp             map(to: srcx, srcz, daHy, dbHy) &
         !$omp             map(tofrom: Ex, Ez, Hy, Ex_old, Ez_old) &
-        !$omp             map(tofrom: memory_dEx_dz, memory_dEz_dx, memory_dHy_dx, memory_dHy_dz)
+        !$omp             map(tofrom: memory_dEx_dz, memory_dEz_dx, memory_dHy_dx, memory_dHy_dz) &
+        !$omp             map(tofrom: velocnorm)
         
         do it = 1,source%time_steps
-            velocnorm = 0.0_real64
 #ifndef SEIDART_OPENMP_GPU
             !$omp parallel private(i, j, dEx_dz, dEz_dx, dHy_dz, dHy_dx) &
             !$omp& shared(Ex, Ez, Hy, memory_dEx_dz, memory_dEz_dx, memory_dHy_dz, memory_dHy_dx, bcoef, acoef, kappa, aEz, bEz, aEx, bEx, dEz, eEz, dEx, eEx, daHy, dbHy)
@@ -2325,7 +2325,6 @@ module cpmlfdtd
                     
                     ! Now update the Magnetic field
                     Hy(i,j) = daHy*Hy(i,j) + dbHy*( dEz_dx - dEx_dz )
-                    ! velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
                     
                 enddo  
             enddo
@@ -2362,7 +2361,9 @@ module cpmlfdtd
 #endif
             !----------------------------------------------------------------------------
             if ( source%source_type == 'pw' ) then 
-                !$omp target update from(Ex, Ez, Hy)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update from(Ex, Ez, Hy)
+#endif
                 t = it * source%dt
                 if ( active(1) .or. active(2) ) then 
                     xi = nint(XLOC / domain%dx)
@@ -2404,21 +2405,25 @@ module cpmlfdtd
                         Hy(ip,zi) = Hy(ip,zi) + Hv(2)
                     enddo 
                 endif 
-                !$omp target update to(Ex, Ez, Hy)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update to(Ex, Ez, Hy)
+#endif
             else
-                !$omp target map(to: it)
-                !$omp target
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target
+#endif
                 Ex(isource,jsource) = Ex(isource,jsource) + &
                                 srcx(it) * dt / epsilon11(isource,jsource)
                 Ez(isource,jsource) = Ez(isource,jsource) + &
                                 srcz(it) * dt / epsilon33(isource,jsource) 
-                
-                !$omp end target
+#ifdef SEIDART_OPENMP_GPU 
+            !$omp end target
+#endif
             endif 
 
 
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-            #ifdef SEIDART_OPENMP_GPU
+#ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop
 #endif
             do j = 1, nz
@@ -2453,19 +2458,28 @@ module cpmlfdtd
             enddo
 
             ! Norm Tracking on Device via Reduction
+            ! velocnorm is mapped tofrom in the target data region so the
+            ! reduction result is returned to the host after each loop iteration.
+            velocnorm = 0.0_real64
 #ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop collapse(2) reduction(max:velocnorm)
+#else
+            !$omp parallel do collapse(2) reduction(max:velocnorm) schedule(static)
 #endif
             do j = 1, nz
                 do i = 1, nx
                     velocnorm = max(velocnorm, sqrt(Ex(i,j)**2 + Ez(i,j)**2))
                 enddo
             enddo
-            
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif            
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
 
             ! Memory extraction strictly targeted for Image Processing
+#ifdef SEIDART_OPENMP_GPU
             !$omp target update from(Ex, Ez)
+#endif
             call write_image2(Ex, nx, nz, source, it, 'Ex', SINGLE)
             call write_image2(Ez, nx, nz, source, it, 'Ez', SINGLE)
         enddo
@@ -2483,651 +2497,6 @@ module cpmlfdtd
     end subroutine electromag2
 
 
-!!!!!!!!!!!!!!!!!!1 Original !!!!!!!!!!!!!!!!11
-!     ! =========================================================================
-!     subroutine electromag25(domain, source, SINGLE_OUTPUT)
-!         !--------------------------------------------------------------------------------------
-!         ! Electromagnetic wave propagation in a 3D grid with Convolutional-PML (C-PML)
-!         ! absorbing conditions for an anisotropic medium.
-!         !
-!         ! This subroutine solves electromagnetic wave propagation using a finite-difference
-!         ! time-domain (FDTD) method in a 3D grid, with PML absorbing conditions.
-!         !
-!         !--------------------------------------------------------------------------------------
-        
-!         use constants
-        
-!         implicit none
-
-!         ! Input arguments
-!         type(Domain_Type), intent(in) :: domain
-!         type(Source_Type), intent(in) :: source
-!         logical, intent(in), optional :: SINGLE_OUTPUT
-        
-!         ! Local variables
-!         ! real(real64), allocatable :: epsilonx(:,:), epsilony(:,:), epsilonz(:,:), &
-!                                         ! sigmax(:,:), sigmay(:,:), sigmaz(:,:)
-
-!         ! real(real64) :: DT
-!         real(real64) :: velocnorm
-!         integer :: isource, jsource, ksource, i, j, k, it
-
-!         ! Coefficients for the finite difference scheme
-!         ! real(real64), allocatable :: caEx(:,:), cbEx(:,:), caEy(:,:), cbEy(:,:), caEz(:,:), cbEz(:,:)
-!         real(real64), allocatable :: aEx(:,:), bEx(:,:), cEx(:,:), &
-!                                      aEy(:,:), bEy(:,:), cEy(:,:), &
-!                                      aEz(:,:), bEz(:,:), cEz(:,:) 
-!         real(real64), allocatable :: det(:,:) 
-!         real(real64) :: daHx, dbHx, daHy, dbHy, daHz, dbHz
-
-!         real(real64) :: dEx_dy, dEy_dx, dEy_dz, dEz_dy, dEz_dx, dEx_dz, &
-!                         dHx_dy, dHx_dz, dHy_dx, dHy_dz, dHz_dy, dHz_dx
-        
-!         real(real64) :: rhs_x, rhs_y, rhs_z 
-
-!         ! Source arrays
-!         real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
-
-!         ! 1D arrays for the damping profiles in each direction
-!         real(real64), allocatable :: kappa(:,:), alpha(:,:), acoef(:,:), bcoef(:,:), & 
-!                         kappa_half(:,:), alpha_half(:,:), acoef_half(:,:), bcoef_half(:,:)
-
-        
-!         real(real64), allocatable :: Ex(:,:,:), Ey(:,:,:), Ez(:,:,:), &
-!                                     Hx(:,:,:), Hy(:,:,:), Hz(:,:,:) 
-!         real(real64), allocatable :: Ex_old(:,:,:), Ey_old(:,:,:), Ez_old(:,:,:)
-!         real(real64), allocatable :: memory_dEx_dy(:,:,:), memory_dEy_dx(:,:,:), &
-!                                     memory_dEx_dz(:,:,:), memory_dEz_dx(:,:,:), &
-!                                     memory_dEz_dy(:,:,:), memory_dEy_dz(:,:,:)
-!         real(real64), allocatable :: memory_dHz_dx(:,:,:), memory_dHx_dz(:,:,:), &
-!                                     memory_dHz_dy(:,:,:), memory_dHy_dz(:,:,:), &
-!                                     memory_dHx_dy(:,:,:), memory_dHy_dx(:,:,:)
-!         real(real64), allocatable :: eps11(:,:), eps12(:,:), eps13(:,:), &
-!                                     eps22(:,:), eps23(:,:), eps33(:,:)
-!         real(real64), allocatable :: sig11(:,:), sig12(:,:), sig13(:,:), &
-!                                     sig22(:,:), sig23(:,:), sig33(:,:)
-        
-        
-!         integer :: nx, ny, nz
-!         real(real64) :: dx, dy, dz, dt   
-            
-!         ! Boolean flag to save as double precision or single precision
-!         logical :: SINGLE
-
-!         ! values for plane wave
-!         real(real64) :: t, eta, eps_r_min, vbackground
-!         real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3) 
-!         real(real64), allocatable :: eig_array(:,:,:) 
-!         logical :: active(6)
-!         integer :: i_min=0, i_max=0, j_min=0, j_max=0, k_min=0, k_max=0
-!         integer :: ii, jj, kk
-!         real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64
-!         real(real64) :: YMIN=0.0_real64, YMAX=0.0_real64, YMID=0.0_real64
-!         real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64
-!         real(real64) :: XLOC=0.0_real64, YLOC=0.0_real64, ZLOC=0.0_real64
-        
-!         logical :: block_output, legacy_output
-!         integer :: block_count 
-!         integer :: steps_per_block 
-!         character(len=256) :: current_block_file
-
-!         ! Check if SINGLE_OUTPUT is provided, default to single precision if not
-!         if (present(SINGLE_OUTPUT)) then
-!             SINGLE = SINGLE_OUTPUT
-!         else
-!             SINGLE = .TRUE.
-!         endif
-
-        
-!         nx = domain%nx
-!         ny = domain%ny
-!         nz = domain%nz
-!         dx = domain%dx
-!         dy = domain%dy
-!         dz = domain%dz
-!         dt = source%dt
-!         allocate(eps11(nx,nz), eps12(nx,nz), eps13(nx,nz), &
-!                     eps22(nx,nz), eps23(nx,nz), eps33(nx,nz))
-!         allocate(sig11(nx,nz), sig12(nx,nz), sig13(nx,nz), &
-!                     sig22(nx,nz), sig23(nx,nz), sig33(nx,nz))
-        
-!         allocate(alpha(nx,nz), kappa(nx,nz), acoef(nx,nz), bcoef(nx,nz) )         
-!         allocate(alpha_half(nx,nz), kappa_half(nx,nz), acoef_half(nx,nz), bcoef_half(nx,nz) )
-
-!         allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
-        
-!         ! Allocate more
-!         allocate(aEx(nx,nz), bEx(nx,nz), cEx(nx,nz), &
-!                  aEy(nx,nz), bEy(nx,nz), cEy(nx,nz), &
-!                  aEz(nx,nz), bEz(nx,nz), cEz(nx,nz))
-!         allocate(det(nx,nz))
-!         allocate( memory_dEx_dy(nx,ny,nz), memory_dEy_dx(nx,ny,nz), &
-!                     memory_dEx_dz(nx,ny,nz), memory_dEz_dx(nx,ny,nz), &
-!                     memory_dEz_dy(nx,ny,nz), memory_dEy_dz(nx,ny,nz) )
-!         allocate(memory_dHz_dx(nx,ny,nz), memory_dHx_dz(nx,ny,nz), & 
-!                     memory_dHz_dy(nx,ny,nz), memory_dHy_dz(nx,ny,nz), &
-!                     memory_dHx_dy(nx,ny,nz), memory_dHy_dx(nx,ny,nz) )
-        
-!         allocate(Ex(nx, ny, nz), Ey(nx, ny, nz), Ez(nx, ny, nz))
-!         allocate(Ex_old(nx, ny, nz), Ey_old(nx, ny, nz), Ez_old(nx, ny, nz))
-!         allocate(Hx(nx, ny, nz), Hy(nx, ny, nz), Hz(nx, ny, nz))
-        
-!         allocate(eig_array(nx, nz, 3) )
-
-!         ! ------------------------ Load Permittivity Coefficients ------------------------
-!         ! Load Epsilon
-!         call material_rw2('e11.dat', eps11, .TRUE.)
-!         call material_rw2('e12.dat', eps12, .TRUE.)
-!         call material_rw2('e13.dat', eps13, .TRUE.)
-!         call material_rw2('e22.dat', eps22, .TRUE.)
-!         call material_rw2('e23.dat', eps23, .TRUE.)
-!         call material_rw2('e33.dat', eps33, .TRUE.)
-!         ! Load Sigma
-!         call material_rw2('s11.dat', sig11, .TRUE.)
-!         call material_rw2('s12.dat', sig12, .TRUE.)
-!         call material_rw2('s13.dat', sig13, .TRUE.)
-!         call material_rw2('s22.dat', sig22, .TRUE.)
-!         call material_rw2('s23.dat', sig23, .TRUE.)
-!         call material_rw2('s33.dat', sig33, .TRUE.)
-
-!         ! ------------------------ Assign some constants -----------------------
-!         ! Assign the source location indices
-!         isource = source%xind + domain%cpml
-!         jsource = source%yind + domain%cpml
-!         ksource = source%zind + domain%cpml
-
-!         ! Define the 
-!         ! DT = minval( (/dx, dy, dz/) )/ ( 2.0d0 * Clight/ sqrt( minval( (/ eps11, eps22, eps33 /) ) ) )
-
-!         ! Compute the coefficients of the FD scheme. First scale the relative 
-!         ! permittivity and permeabilities to get the absolute values 
-!         dbHx = dt/mu0 !dt/(mu0*mu ) 
-!         daHx = 1.0_real64 ! This seems useless, but this saves room for a permeability value that isn't assumed to be unity.
-
-!         dbHy = dt/mu0 !dt/(mu0*mu ) 
-!         daHy = 1.0_real64 ! 
-
-!         dbHz = dt/mu0 !dt/(mu0*mu ) 
-!         daHz = 1.0_real64 
-
-
-!         ! ----------------------------------------------------------------------
-!         !---
-!         !--- program starts here
-!         !---
-        
-!         ! ================================ LOAD SOURCE ================================
-!         if ( source%source_type == 'pw' ) then 
-!             XMIN = domain%dx * (1 + domain%cpml) 
-!             XMAX = domain%dx * ( domain%nx - domain%cpml) !2*cpml was added in python so we have to correct. 
-!             XMID = 0.50_real64 * (XMIN + XMAX)
-!             YMIN = domain%dy * (1 + domain%cpml)
-!             YMAX = domain%dy * ( domain%ny - domain%cpml)
-!             YMID = 0.50_real64 * (YMIN + YMAX)
-!             ZMIN = domain%dz * (1 + domain%cpml) 
-!             ZMAX = domain%dz * (domain%nz - domain%cpml)
-!             ZMID = 0.50_real64 * (ZMIN + ZMAX)
-!             call direction_polarization_vector( source%x_z_rotation, &
-!                                                 source%x_y_rotation, &
-!                                                 source%y_z_rotation, &
-!                                                 p, ehat)
-!             call select_injection_faces(p, active)
-!             r0 = (/ XMID, YMID, ZMID /)
-!             XLOC = XMID 
-!             YLOC = YMID 
-!             ZLOC = ZMID 
-!             if ( active(1) ) then 
-!                 r0(1) = XMIN
-!                 XLOC = XMIN
-!             endif
-!             if ( active(2) ) then 
-!                 r0(1) = XMAX
-!                 XLOC = XMAX
-!             endif
-!             if ( active(3) ) then 
-!                 r0(2) = YMIN 
-!                 YLOC = YMIN
-!             endif
-!             if ( active(4) ) then 
-!                 r0(2) = YMAX 
-!                 YLOC = YMAX 
-!             endif
-!             if ( active(5) ) then
-!                 r0(3) = ZMIN
-!                 ZLOC = ZMIN
-!             endif 
-!             if ( active(6) ) then 
-!                 r0(3) = ZMAX
-!                 ZLOC = ZMAX
-!             endif
-
-!             i_min = domain%cpml + 3
-!             i_max = domain%nx - domain%cpml - 2
-!             j_min = domain%cpml + 3 
-!             j_max = domain%ny - domain%cpml - 2
-!             k_min = domain%cpml + 3 
-!             k_max = domain%nz - domain%cpml - 2
-            
-!             call array_eigenvalues2_25(eps11, eps12, eps13, eps22, eps23, eps33, eig_array, nx, nz)
-!             eps_r_min = minval(eig_array)
-!             vbackground = clight / sqrt(eps_r_min)
-!             eta = sqrt(mu0 / (eps0*eps_r_min))
-!         else
-!             call loadsource('electromagneticsourcex.dat', source%time_steps, srcx)
-!             call loadsource('electromagneticsourcey.dat', source%time_steps, srcy)
-!             call loadsource('electromagneticsourcez.dat', source%time_steps, srcz)
-!         endif
-!         ! =============================================================================
-
-!         !--- define profile of absorption in PML region
-
-!         ! Initialize CPML damping variables
-!         kappa(:,:) = 1.0_real64
-!         kappa_half(:,:) = 1.0_real64
-!         alpha(:,:) = 0.0_real64
-!         alpha_half(:,:) = 0.0_real64
-!         acoef(:,:) = 0.0_real64
-!         acoef_half(:,:) = 0.0_real64
-!         bcoef(:,:) = 0.0_real64 
-!         bcoef_half(:,:) = 0.0_real64 
-
-
-!         ! ------------------------------ Load the boundary ----------------------------
-!         call material_rw2('kappa_cpml.dat', kappa, .TRUE.)
-!         call material_rw2('alpha_cpml.dat', alpha, .TRUE.)
-!         call material_rw2('acoef_cpml.dat', acoef, .TRUE.)
-!         call material_rw2('bcoef_cpml.dat', bcoef, .TRUE.)
-
-
-!         call material_rw2('kappa_half_cpml.dat', kappa_half, .TRUE.)
-!         call material_rw2('alpha_half_cpml.dat', alpha_half, .TRUE.)
-!         call material_rw2('acoef_half_cpml.dat', acoef_half, .TRUE.)
-!         call material_rw2('bcoef_half_cpml.dat', bcoef_half, .TRUE.)
-
-!         ! -----------------------------------------------------------------------------
-!         ! Load initial conditions
-!         call material_rw3('initialconditionEx.dat', Ex, .TRUE.)
-!         call material_rw3('initialconditionEy.dat', Ey, .TRUE.)
-!         call material_rw3('initialconditionEz.dat', Ez, .TRUE.)
-        
-!         Hx(:,:,:) = 0.0_real64  
-!         Hy(:,:,:) = 0.0_real64 
-!         Hz(:,:,:) = 0.0_real64 
-        
-!         ! PML
-!         memory_dEx_dy(:,:,:) = 0.0_real64
-!         memory_dEy_dx(:,:,:) = 0.0_real64
-!         memory_dEx_dz(:,:,:) = 0.0_real64
-!         memory_dEz_dx(:,:,:) = 0.0_real64
-!         memory_dEz_dy(:,:,:) = 0.0_real64
-!         memory_dEy_dz(:,:,:) = 0.0_real64
-
-!         memory_dHz_dx(:,:,:) = 0.0_real64
-!         memory_dHx_dz(:,:,:) = 0.0_real64
-!         memory_dHz_dy(:,:,:) = 0.0_real64
-!         memory_dHy_dz(:,:,:) = 0.0_real64
-!         memory_dHx_dy(:,:,:) = 0.0_real64
-!         memory_dHy_dx(:,:,:) = 0.0_real64
-        
-!         ! Scale the permittivity in terms of relative permittivity 
-!         eps11 = eps11 * eps0
-!         eps12 = eps12 * eps0 
-!         eps13 = eps13 * eps0
-!         eps22 = eps22 * eps0 
-!         eps23 = eps23 * eps0 
-!         eps33 = eps33 * eps0
-        
-!         det =   eps11*(eps22*eps33 - eps23*eps23) - &
-!                 eps12*(eps12*eps33 - eps23*eps13) + & 
-!                 eps13*(eps12*eps23 - eps22*eps13)
-        
-!         aEx = (eps22*eps33 - eps23*eps23) / det
-!         bEx = - (eps12*eps33 - eps23*eps13) / det 
-!         cEx = (eps12*eps23 - eps22*eps13) / det 
-        
-!         aEy = bEx  
-!         bEy =   (eps11*eps33 - eps13*eps13) / det
-!         cEy = - (eps11*eps23 - eps12*eps13) / det 
-        
-!         aEz = cEx
-!         bEz = cEy
-!         cEz = (eps11*eps22 - eps12*eps12) / det
-        
-!         ! ---
-!         ! ---  beginning of time loop
-!         ! ---
-!         Ex_old = Ex 
-!         Ey_old = Ey 
-!         Ez_old = Ez
-        
-!         ! Initialize the block count 
-!         call setup_io_params(nx, ny, nz, domain%cpml, block_output, steps_per_block, legacy_output)
-!         if (block_output) call init_io(nx, ny, nz, domain%cpml, steps_per_block) 
-!         block_count = 0
-        
-! #ifdef SEIDART_OPENMP_GPU
-!             !$omp target data &
-!             !$omp& map(to: aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz) &
-!             !$omp& map(to: sig11, sig12, sig13, sig22, sig23, sig33) &
-!             !$omp& map(to: kappa, acoef, bcoef, kappa_half, acoef_half, bcoef_half) &
-!             !$omp& map(tofrom: Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old) &
-!             !$omp& map(tofrom: memory_dEx_dy, memory_dEy_dx, memory_dEx_dz) &
-!             !$omp& map(tofrom: memory_dEz_dx, memory_dEz_dy, memory_dEy_dz) &
-!             !$omp& map(tofrom: memory_dHz_dx, memory_dHx_dz, memory_dHz_dy) &
-!             !$omp& map(tofrom: memory_dHy_dz, memory_dHx_dy, memory_dHy_dx)
-! #endif
-!         do it = 1,source%time_steps
-!             !--------------------------------------------------------
-!             ! compute magnetic field and update memory variables for C-PML
-!             !--------------------------------------------------------
-!             ! Update Hx
-! #ifdef SEIDART_OPENMP_GPU
-!                 !$omp target teams distribute parallel do collapse(3) &
-!                 !$omp& private(i, j, k, dEz_dy, dEy_dz)
-! #endif
-!             do k = 1,nz-1
-!                 do i = 1,nx-1  
-!                     do j = 1,ny-1
-!                         ! Values needed for the magnetic field updates
-!                         dEz_dy = ( Ez(i,j+1,k) - Ez(i,j,k) )/dy
-!                         dEy_dz = ( Ey(i,j,k+1) - Ey(i,j,k) )/dz
-            
-!                         ! The rest of the equation needed for agnetic field updates
-!                         memory_dEy_dz(i,j,k) = bcoef_half(i,k) * memory_dEy_dz(i,j,k) + acoef_half(i,k) * dEy_dz
-!                         memory_dEz_dy(i,j,k) = bcoef_half(i,k) * memory_dEz_dy(i,j,k) + acoef_half(i,k) * dEz_dy
-                        
-!                         dEz_dy = dEz_dy/ kappa_half(i,k) + memory_dEz_dy(i,j,k)
-!                         dEy_dz = dEy_dz/ kappa_half(i,k) + memory_dEy_dz(i,j,k)
-
-!                         ! Now update the Magnetic field
-!                         Hx(i,j,k) = daHx*Hx(i,j,k) + dbHx*( dEy_dz - dEz_dy )
-!                     enddo
-!                 enddo  
-!             enddo
-
-!                 ! Update Hy
-! #ifdef SEIDART_OPENMP_GPU
-!                 !$omp target teams distribute parallel do collapse(3) &
-!                 !$omp& private(i, j, k, dEx_dz, dEz_dx)
-! #endif
-!             do k = 1,nz-1
-!                 do i = 1,nx-1      
-!                     do j = 1,ny-1
-                    
-!                         ! Values needed for the magnetic field updates
-!                         dEx_dz = ( Ex(i,j,k+1) - Ex(i,j,k) )/dz
-!                         dEz_dx = ( Ez(i+1,j,k) - Ez(i,j,k) )/dx
-                        
-!                         memory_dEx_dz(i,j,k) = bcoef(i,k) * memory_dEx_dz(i,j,k) + acoef(i,k) * dEx_dz
-!                         memory_dEz_dx(i,j,k) = bcoef(i,k) * memory_dEz_dx(i,j,k) + acoef(i,k) * dEz_dx
-                        
-!                         dEx_dz = dEx_dz/ kappa(i,k) + memory_dEx_dz(i,j,k)
-!                         dEz_dx = dEz_dx/ kappa(i,k) + memory_dEz_dx(i,j,k)
-                        
-!                         ! Now update the Magnetic field
-!                         Hy(i,j,k) = daHy*Hy(i,j,k) + dbHy*( dEz_dx - dEx_dz )
-
-!                     enddo
-!                 enddo  
-!             enddo
-
-!                 ! Update Hz
-! #ifdef SEIDART_OPENMP_GPU
-!                 !$omp target teams distribute parallel do collapse(3) &
-!                 !$omp& private(i, j, k, dEx_dy, dEy_dx)
-! #endif
-!             do k = 2,nz-1
-!                 do i = 1,nx-1      
-!                     do j = 1,ny-1
-!                         ! Values needed for the magnetic field updates
-!                         dEx_dy = ( Ex(i,j+1,k) - Ex(i,j,k) )/dy
-!                         dEy_dx = ( Ey(i+1,j,k) - Ey(i,j,k) )/dx
-                        
-!                         memory_dEx_dy(i,j,k) = bcoef(i,k) * memory_dEx_dy(i,j,k) + acoef(i,k) * dEx_dy
-!                         memory_dEy_dx(i,j,k) = bcoef(i,k) * memory_dEy_dx(i,j,k) + acoef(i,k) * dEy_dx
-                        
-!                         dEx_dy = dEx_dy/ kappa(i,k) + memory_dEx_dy(i,j,k)
-!                         dEy_dx = dEy_dx/ kappa(i,k) + memory_dEy_dx(i,j,k)
-
-!                         ! Now update the Magnetic field
-!                         Hz(i,j,k) = daHz*Hz(i,j,k) + dbHz*( dEx_dy - dEy_dx )
-!                     enddo
-!                 enddo  
-!             enddo
-
-!             !--------------------------------------------------------
-!             ! compute electric field and update memory variables for C-PML
-!             !--------------------------------------------------------
-! #ifdef SEIDART_OPENMP_GPU
-!                 !$omp target teams distribute parallel do collapse(3) &
-!                 !$omp& private(i, j, k, dHz_dy, dHy_dz, dHz_dx, dHx_dz) &
-!                 !$omp& private(dHy_dx, dHx_dy, rhs_x, rhs_y, rhs_z)
-! #endif
-!             do k =2,nz-1 
-!                 do i = 2,nx-1
-!                     do j = 2,ny-1 
-!                         dHz_dy = ( Hz(i,j,k) - Hz(i,j-1,k) )/dy
-!                         dHy_dz = ( Hy(i,j,k) - Hy(i,j,k-1) )/dz
-!                         dHz_dx = ( Hz(i,j,k) - Hz(i-1,j,k) )/dx
-!                         dHx_dz = ( Hx(i,j,k) - Hx(i,j,k-1) )/dz
-!                         dHy_dx = ( Hy(i,j,k) - Hy(i-1,j,k) )/dx
-!                         dHx_dy = ( Hx(i,j,k) - Hx(i,j-1,k) )/dy
-                        
-!                         memory_dHz_dy(i,j,k) = bcoef_half(i,k) * memory_dHz_dy(i,j,k) + acoef_half(i,k) * dHz_dy
-!                         memory_dHy_dz(i,j,k) = bcoef(i,k) * memory_dHy_dz(i,j,k) + acoef(i,k) * dHy_dz
-!                         memory_dHz_dx(i,j,k) = bcoef_half(i,k) * memory_dHz_dx(i,j,k) + acoef_half(i,k) * dHz_dx
-!                         memory_dHx_dz(i,j,k) = bcoef_half(i,k) * memory_dHx_dz(i,j,k) + acoef_half(i,k) * dHx_dz
-!                         memory_dHx_dy(i,j,k) = bcoef_half(i,k) * memory_dHx_dy(i,j,k) + acoef_half(i,k) * dHx_dy
-!                         memory_dHy_dx(i,j,k) = bcoef_half(i,k) * memory_dHy_dx(i,j,k) + acoef_half(i,k) * dHy_dx
-                        
-!                         dHz_dy = dHz_dy/kappa_half(i,k) + memory_dHz_dy(i,j,k)
-!                         dHy_dz = dHy_dz/kappa(i,k) + memory_dHy_dz(i,j,k)
-!                         dHz_dx = dHz_dx/kappa_half(i,k) + memory_dHz_dx(i,j,k)
-!                         dHx_dz = dHx_dz/kappa_half(i,k) + memory_dHx_dz(i,j,k)
-!                         dHx_dy = dHx_dy/kappa_half(i,k) + memory_dHx_dy(i,j,k)
-!                         dHy_dx = dHy_dx/kappa_half(i,k) + memory_dHy_dx(i,j,k)
-                        
-!                         rhs_x = dHz_dy - dHy_dz - (sig11(i,k) * Ex_old(i,j,k) + sig12(i,k)*Ey_old(i,j,k) + sig13(i,k) * Ez_old(i,j,k))
-!                         rhs_y = dHx_dz - dHz_dx - (sig12(i,k) * Ex_old(i,j,k) + sig22(i,k)*Ey_old(i,j,k) + sig23(i,k) * Ez_old(i,j,k))
-!                         rhs_z = dHy_dx - dHx_dy - (sig13(i,k) * Ex_old(i,j,k) + sig23(i,k)*Ey_old(i,j,k) + sig33(i,k) * Ez_old(i,j,k))
-                        
-!                         Ex(i,j,k) = Ex_old(i,j,k) + ( aEx(i,k) * rhs_x + bEx(i,k) * rhs_y + cEx(i,k) * rhs_z ) * dt
-!                         Ey(i,j,k) = Ey_old(i,j,k) + ( aEy(i,k) * rhs_x + bEy(i,k) * rhs_y + cEy(i,k) * rhs_z ) * dt
-!                         Ez(i,j,k) = Ez_old(i,j,k) + ( aEz(i,k) * rhs_x + bEz(i,k) * rhs_y + cEz(i,k) * rhs_z ) * dt
-!                     end do 
-!                 end do 
-!             end do 
-
-! #ifdef SEIDART_OPENMP_GPU
-!                 !$omp target update from(Ex, Ey, Ez, Hx, Hy, Hz)
-! #endif
-!             if ( source%source_type == 'pw' ) then 
-!                 t = it * source%dt
-!                 if ( active(1) .or. active(2) ) then 
-!                     ii = nint(XLOC / domain%dx)
-!                     do jj = j_min,j_max
-!                         do kk = k_min, k_max
-!                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
-!                             Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
-!                             Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
-!                             call boundary_em_field(r, r0, t, &
-!                                             source%source_frequency, &
-!                                             source%x_z_rotation, &
-!                                             source%x_y_rotation, &
-!                                             source%y_z_rotation, &
-!                                             vbackground, eta, &
-!                                             source%amplitude, &
-!                                             source%source_wavelet, &
-!                                             Ev, Hv )
-!                             Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
-!                             Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
-!                             Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
-!                             Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
-!                             Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
-!                             Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
-!                         enddo
-!                     enddo
-!                 endif 
-!                 if ( active(3) .or. active(4)) then 
-!                     jj = nint(YLOC / domain%dy)
-!                     do ii = i_min,i_max
-!                         do kk = k_min, k_max
-!                             r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
-!                             Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
-!                             Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
-!                             call boundary_em_field(r, r0, t, &
-!                                             source%source_frequency, &
-!                                             source%x_z_rotation, &
-!                                             source%x_y_rotation, &
-!                                             source%y_z_rotation, &
-!                                             vbackground, eta, &
-!                                             source%amplitude, &
-!                                             source%source_wavelet, &
-!                                             Ev, Hv )
-!                             Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
-!                             Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
-!                             Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
-!                             Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
-!                             Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
-!                             Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
-!                         enddo
-!                     enddo
-!                 endif 
-!                 if ( active(5) .or. active(6)) then 
-!                     kk = nint(ZLOC / domain%dz)
-!                     do ii = i_min,i_max
-!                         do jj = j_min, j_max
-!                             r = (/ ii * domain%dx, jj * domain%dy, ZLOC/)
-!                             Ev = (/ Ex(ii,jj,kk), Ey(ii,jj,kk), Ez(ii,jj,kk) /)
-!                             Hv = (/ Hx(ii,jj,kk), Hy(ii,jj,kk), Hz(ii,jj,kk) /)
-!                             call boundary_em_field(r, r0, t, &
-!                                             source%source_frequency, &
-!                                             source%x_z_rotation, &
-!                                             source%x_y_rotation, &
-!                                             source%y_z_rotation, &
-!                                             vbackground, eta, &
-!                                             source%amplitude, &
-!                                             source%source_wavelet, &
-!                                             Ev, Hv )
-!                             Ex(ii,jj,kk) = Ex(ii,jj,kk) + Ev(1) 
-!                             Ey(ii,jj,kk) = Ey(ii,jj,kk) + Ev(2) 
-!                             Ez(ii,jj,kk) = Ez(ii,jj,kk) + Ev(3) 
-!                             Hx(ii,jj,kk) = Hx(ii,jj,kk) + Hv(1)
-!                             Hy(ii,jj,kk) = Hy(ii,jj,kk) + Hv(2)
-!                             Hz(ii,jj,kk) = Hz(ii,jj,kk) + Hv(3)
-!                         enddo
-!                     enddo
-!                 endif 
-!             else
-!                 ! add the source (force vector located at a given grid point)
-!                 Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + & 
-!                             srcx(it) * dt / eps11(isource,ksource)
-!                 Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + & 
-!                             srcy(it) * dt / eps22(isource,ksource) 
-!                 Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + & 
-!                             srcz(it) * dt / eps33(isource,ksource)
-!             endif 
-
-!             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-!             Ex(1,:,:) = 0.0_real64
-!             Ex(:,1,:) = 0.0_real64
-!             Ex(:,:,1) = 0.0_real64
-!             Ex(nx,:,:) = 0.0_real64
-!             Ex(:,ny,:) = 0.0_real64
-!             Ex(:,:,nz) = 0.0_real64 
-
-!             Ey(1,:,:) = 0.0_real64
-!             Ey(:,1,:) = 0.0_real64
-!             Ey(:,:,1) = 0.0_real64
-!             Ey(nx,:,:) = 0.0_real64
-!             Ey(:,ny,:) = 0.0_real64
-!             Ey(:,:,nz) = 0.0_real64
-            
-!             Ez(1,:,:) = 0.0_real64
-!             Ez(:,1,:) = 0.0_real64
-!             Ez(:,:,1) = 0.0_real64
-!             Ez(nx,:,:) = 0.0_real64
-!             Ez(:,ny,:) = 0.0_real64
-!             Ez(:,:,nz) = 0.0_real64
-            
-!             Hx(1,:,:) = 0.0_real64
-!             Hx(:,1,:) = 0.0_real64
-!             Hx(:,:,1) = 0.0_real64
-!             Hx(nx,:,:) = 0.0_real64
-!             Hx(:,ny,:) = 0.0_real64
-!             Hx(:,:,nz) = 0.0_real64
-
-!             Hy(1,:,:) = 0.0_real64
-!             Hy(:,1,:) = 0.0_real64
-!             Hy(:,:,1) = 0.0_real64
-!             Hy(nx,:,:) = 0.0_real64
-!             Hy(:,ny,:) = 0.0_real64
-!             Hy(:,:,nz) = 0.0_real64
-            
-!             Hz(1,:,:) = 0.0_real64
-!             Hz(:,1,:) = 0.0_real64
-!             Hz(:,:,1) = 0.0_real64
-!             Hz(nx,:,:) = 0.0_real64
-!             Hz(:,ny,:) = 0.0_real64
-!             Hz(:,:,nz) = 0.0_real64
-            
-!             Ex_old = Ex 
-!             Ey_old = Ey 
-!             Ez_old = Ez 
-            
-! #ifdef SEIDART_OPENMP_GPU
-!                 !$omp target update to(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
-! #endif
-!             ! check norm of velocity to make sure the solution isn't diverging
-!             velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )
-!             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
-!             ! print *,'Max vals for Ex, Ey, Ez: ', maxval(Ex), maxval(Ey), maxval(Ez)
-
-!             ! print *, maxval(Ex), maxval(Ey), maxval(Ez)
-!             if (block_output) then
-!                 if (current_step_in_block == 0) then
-!                     block_count = block_count + 1
-!                     ii = (block_count - 1) * steps_per_block + 1 
-!                     jj = min(block_count * steps_per_block, source%time_steps)
-!                     write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a, i0, a)") &
-!                         'EM25.', ii, '-', jj, '.', source%xind, '.', &
-!                         source%yind, '.', source%zind, '.blk.zst'
-!                 endif
-!                 call add_step_to_block(current_block_file, Ex, Ey, Ez)                
-!             endif
-
-            
-!             if (legacy_output) then
-!                 call write_image(Ex, domain, source, it, 'Ex', SINGLE)
-!                 call write_image(Ey, domain, source, it, 'Ey', SINGLE)
-!                 call write_image(Ez, domain, source, it, 'Ez', SINGLE)
-!             endif
-!         enddo
-! #ifdef SEIDART_OPENMP_GPU
-!             !$omp end target data
-! #endif
-!         if (block_output) call finalize_io(current_block_file)
-        
-        
-!         deallocate( eps11, eps12, eps13, eps22, eps23, eps33)
-!         deallocate( sig11, sig12, sig13, sig22, sig23, sig33)
-!         deallocate( kappa, alpha, acoef, bcoef, kappa_half)
-!         deallocate( alpha_half, acoef_half, bcoef_half)
-!         deallocate( srcx, srcy, srcz)
-!         deallocate( aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz, det)
-!         deallocate( memory_dEx_dy, memory_dEy_dx, &
-!                     memory_dEx_dz, memory_dEz_dx, &
-!                     memory_dEz_dy, memory_dEy_dz )
-!         deallocate( memory_dHz_dx, memory_dHx_dz, & 
-!                     memory_dHz_dy, memory_dHy_dz, &
-!                     memory_dHx_dy, memory_dHy_dx )
-        
-!         deallocate(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
-!         deallocate(eig_array)
-
-!     end subroutine electromag25
-
-!!!!!!!!!!!!!!!! Test new solver
     ! =========================================================================
     subroutine electromag25(domain, source)
         !--------------------------------------------------------------------------------------
@@ -3682,9 +3051,7 @@ module cpmlfdtd
 
     end subroutine electromag25
   
-    
-!!!!!!!!!!!!!!!! End
-    ! =========================================================================
+        ! =========================================================================
     subroutine electromag3(domain, source, SINGLE_OUTPUT)
         !--------------------------------------------------------------------------------------
         ! Electromagnetic wave propagation in a 3D grid with Convolutional-PML (C-PML)
