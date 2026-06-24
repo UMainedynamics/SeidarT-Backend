@@ -897,14 +897,47 @@ module cpmlfdtd
         call array_averaging2d(rhoxz, density_code, '-i')
         call array_averaging2d(rhozz, density_code, '-j')
 
-        ! ======================== I/O Setup ========================
+! ======================== I/O Setup ========================
         call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
         if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
         block_count = 0
         ! ======================== Time Loop ========================
+        velocnorm = 0.0_real64
+
+#ifdef SEIDART_OPENMP_GPU
+        !$omp target data &
+        !$omp& map(to: c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26) &
+        !$omp& map(to: c33,c34,c35,c36,c44,c45,c46,c55,c56,c66) &
+        !$omp& map(to: rhoxx,rhoyx,rhozx,rhoxy,rhoyy,rhozy,rhoxz,rhoyz,rhozz) &
+        !$omp& map(to: kappa,kappa_half,acoef,acoef_half,bcoef,bcoef_half) &
+        !$omp& map(to: gamma_x,gamma_y,gamma_z,gamma_xy,gamma_yz,gamma_xz) &
+        !$omp& map(to: srcx,srcy,srcz,srcxx,srcxy,srcxz,srcyy,srcyz,srczz) &
+        !$omp& map(to: ky) &
+        !$omp& map(tofrom: vx,vy,vz) &
+        !$omp& map(tofrom: sigmaxx,sigmaxy,sigmaxz,sigmayy,sigmayz,sigmazz) &
+        !$omp& map(tofrom: mem_dvx_dx1,mem_dvy_dx1,mem_dvz_dx1) &
+        !$omp& map(tofrom: mem_dvx_dz1,mem_dvy_dz1,mem_dvz_dz1) &
+        !$omp& map(tofrom: mem_dvx_dx2,mem_dvy_dx2,mem_dvz_dx2) &
+        !$omp& map(tofrom: mem_dvx_dz2,mem_dvy_dz2,mem_dvz_dz2) &
+        !$omp& map(tofrom: mem_dvx_dx3,mem_dvy_dx3,mem_dvz_dx3) &
+        !$omp& map(tofrom: mem_dvx_dz3,mem_dvy_dz3,mem_dvz_dz3) &
+        !$omp& map(tofrom: mem_dvx_dx4,mem_dvy_dx4,mem_dvz_dx4) &
+        !$omp& map(tofrom: mem_dvx_dz4,mem_dvy_dz4,mem_dvz_dz4) &
+        !$omp& map(tofrom: mem_dsigmaxx_dx,mem_dsigmaxz_dz) &
+        !$omp& map(tofrom: mem_dsigmaxy_dx,mem_dsigmayz_dz) &
+        !$omp& map(tofrom: mem_dsigmaxz_dx,mem_dsigmazz_dz)
+#endif
+
         do it = 1,source%time_steps
             ! -------- Stress Update Loop 1: sigmaxx, sigmayy, sigmazz --------
             ! x: forward half, z: backward full
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#endif
             do k = 3,nz-1
                 do i = 2,nx-2
                     dvx_dx = (27.0_real64*(vx(i+1,k)-vx(i,k)) - (vx(i+2,k)-vx(i-1,k))) / (24.0_real64*dx)
@@ -947,9 +980,19 @@ module cpmlfdtd
                           c36(i,k)*(dvy_dx+dvx_dy) ) * dt ) / (1 + gamma_z(i,k)*dt)
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
             ! -------- Stress Update Loop 2: sigmaxy --------
             ! x: backward full, z: backward full
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#endif
             do k = 3,nz-1
                 do i = 3,nx-1
                     dvx_dx = (27.0_real64*(vx(i,k)-vx(i-1,k)) - (vx(i+1,k)-vx(i-2,k))) / (24.0_real64*dx)
@@ -982,9 +1025,19 @@ module cpmlfdtd
                           c66(i,k)*(dvy_dx+dvx_dy) ) * dt ) / (1 + gamma_xy(i,k)*dt)
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
             ! -------- Stress Update Loop 3: sigmaxz --------
             ! x: backward full, z: forward half
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#endif
             do k = 2,nz-2
                 do i = 3,nx-1
                     dvx_dx = (27.0_real64*(vx(i,k)-vx(i-1,k)) - (vx(i+1,k)-vx(i-2,k))) / (24.0_real64*dx)
@@ -1016,9 +1069,21 @@ module cpmlfdtd
                           c45(i,k)*(dvy_dz+dvz_dy) + c55(i,k)*(dvx_dz+dvz_dx) + &
                           c56(i,k)*(dvy_dx+dvx_dy) ) * dt ) / (1 + gamma_xz(i,k)*dt)
                 enddo
+            enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
-                ! -------- Stress Update Loop 4: sigmayz --------
-                ! x: forward half, z: forward half (shares k-loop with sigmaxz)
+            ! -------- Stress Update Loop 4: sigmayz --------
+            ! x: forward half, z: forward half (split from loop 3 to enable collapse(2))
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#endif
+            do k = 2,nz-2
                 do i = 2,nx-2
                     dvx_dx = (27.0_real64*(vx(i+1,k)-vx(i,k)) - (vx(i+2,k)-vx(i-1,k))) / (24.0_real64*dx)
                     dvy_dx = (27.0_real64*(vy(i+1,k)-vy(i,k)) - (vy(i+2,k)-vy(i-1,k))) / (24.0_real64*dx)
@@ -1050,8 +1115,18 @@ module cpmlfdtd
                           c46(i,k)*(dvy_dx+dvx_dy) ) * dt ) / (1 + gamma_yz(i,k)*dt)
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
             ! -------- Velocity Updates --------
             ! vx: dsigmaxx/dx + dsigmaxy/dy + dsigmaxz/dz
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dsigmaxx_dx,dsigmaxy_dy,dsigmaxz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dsigmaxx_dx,dsigmaxy_dy,dsigmaxz_dz)
+#endif
             do k = 3,nz-1
                 do i = 3,nx-1
                     dsigmaxx_dx = (27.0_real64*sigmaxx(i,k) - 27.0_real64*sigmaxx(i-1,k) + sigmaxx(i-2,k)) / (24.0_real64*dx)
@@ -1067,8 +1142,21 @@ module cpmlfdtd
                     vx(i,k) = vx(i,k) + &
                         (dsigmaxx_dx/rhoxx(i,k) + dsigmaxy_dy/rhoyx(i,k) + dsigmaxz_dz/rhozx(i,k)) * dt
                 enddo
+            enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
-                ! vy: dsigmaxy/dx + dsigmayy/dy + dsigmayz/dz
+            ! vy: dsigmaxy/dx + dsigmayy/dy + dsigmayz/dz
+            ! (split from vx k-loop to enable collapse(2) parallelization)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dsigmaxy_dx,dsigmayy_dy,dsigmayz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dsigmaxy_dx,dsigmayy_dy,dsigmayz_dz)
+#endif
+            do k = 3,nz-1
                 do i = 2,nx-2
                     dsigmaxy_dx = (-27.0_real64*sigmaxy(i,k) + 27.0_real64*sigmaxy(i+1,k) - sigmaxy(i+2,k)) / (24.0_real64*dx)
                     dsigmayy_dy = IUNIT * ky * sigmayy(i,k)
@@ -1084,8 +1172,18 @@ module cpmlfdtd
                         (dsigmaxy_dx/rhoxy(i,k) + dsigmayy_dy/rhoyy(i,k) + dsigmayz_dz/rhozy(i,k)) * dt
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
             ! vz: dsigmaxz/dx + dsigmayz/dy + dsigmazz/dz
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(2) &
+            !$omp& private(dsigmaxz_dx,dsigmayz_dy,dsigmazz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i,k,dsigmaxz_dx,dsigmayz_dy,dsigmazz_dz)
+#endif
             do k = 2,nz-2
                 do i = 2,nx-2
                     dsigmaxz_dx = (-27.0_real64*sigmaxz(i,k) + 27.0_real64*sigmaxz(i+1,k) - sigmaxz(i+2,k)) / (24.0_real64*dx)
@@ -1102,6 +1200,9 @@ module cpmlfdtd
                         (dsigmaxz_dx/rhoxz(i,k) + dsigmayz_dy/rhoyz(i,k) + dsigmazz_dz/rhozz(i,k)) * dt
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
             ! -------- Source Injection --------
             if ( is_plane_wave_source(source%source_type) ) then
@@ -1184,6 +1285,9 @@ module cpmlfdtd
             vz(:,1) = (0.0_real64,0.0_real64);  vz(:,nz) = (0.0_real64,0.0_real64)
 
             ! -------- Stability Check --------
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update from(vx, vy, vz)
+#endif
             velocnorm = maxval(sqrt(real(vx*conjg(vx) + vy*conjg(vy) + vz*conjg(vz), real64)))
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
 
@@ -1207,6 +1311,9 @@ module cpmlfdtd
                 call write_image2(real(vz, real64), nx, nz, source, it, 'Vz', SINGLE)
             endif
         enddo  ! end time loop
+#ifdef SEIDART_OPENMP_GPU
+        !$omp end target data
+#endif
 
         if (block_output) call finalize_io(current_block_file)
 
@@ -1229,7 +1336,6 @@ module cpmlfdtd
 
     end subroutine seismic25
 
-    
 
     ! =========================================================================
     subroutine seismic3(domain, source, density_method, SINGLE_OUTPUT)
@@ -1519,6 +1625,9 @@ module cpmlfdtd
         acoef(:,:,:) = 0.0_real64
         acoef_half(:,:,:) = 0.0_real64
 
+        bcoef(:,:,:) = 0.0_real64
+        bcoef_half(:,:,:) = 0.0_real64
+
         ! ------------------------- Boundary Conditions -------------------------
         call material_rw3('kappa_cpml.dat', kappa, .TRUE.)
         call material_rw3('alpha_cpml.dat', alpha, .TRUE.)
@@ -1608,15 +1717,46 @@ module cpmlfdtd
         ! Do it 
         
         ! =============================== Forward Model ===============================
+#ifdef SEIDART_OPENMP_GPU
+        !$omp target data &
+        !$omp& map(to: c11,c12,c13,c14,c15,c16,c22,c23,c24,c25,c26) &
+        !$omp& map(to: c33,c34,c35,c36,c44,c45,c46,c55,c56,c66) &
+        !$omp& map(to: rho) &
+        !$omp& map(to: kappa,kappa_half,acoef,acoef_half,bcoef,bcoef_half) &
+        !$omp& map(to: gamma_x,gamma_y,gamma_z,gamma_xy,gamma_yz,gamma_xz) &
+        !$omp& map(to: srcx,srcy,srcz,srcxx,srcxy,srcxz,srcyy,srcyz,srczz) &
+        !$omp& map(to: density_code) &
+        !$omp& map(tofrom: vx,vy,vz) &
+        !$omp& map(tofrom: sigmaxx,sigmaxy,sigmaxz,sigmayy,sigmayz,sigmazz) &
+        !$omp& map(tofrom: memory_dvx_dx1,memory_dvx_dy1,memory_dvx_dz1) &
+        !$omp& map(tofrom: memory_dvy_dx1,memory_dvy_dy1,memory_dvy_dz1) &
+        !$omp& map(tofrom: memory_dvz_dx1,memory_dvz_dy1,memory_dvz_dz1) &
+        !$omp& map(tofrom: memory_dvx_dx2,memory_dvx_dy2,memory_dvx_dz2) &
+        !$omp& map(tofrom: memory_dvy_dx2,memory_dvy_dy2,memory_dvy_dz2) &
+        !$omp& map(tofrom: memory_dvz_dx2,memory_dvz_dy2,memory_dvz_dz2) &
+        !$omp& map(tofrom: memory_dvx_dx3,memory_dvx_dy3,memory_dvx_dz3) &
+        !$omp& map(tofrom: memory_dvy_dx3,memory_dvy_dy3,memory_dvy_dz3) &
+        !$omp& map(tofrom: memory_dvz_dx3,memory_dvz_dy3,memory_dvz_dz3) &
+        !$omp& map(tofrom: memory_dvx_dx4,memory_dvx_dy4,memory_dvx_dz4) &
+        !$omp& map(tofrom: memory_dvy_dx4,memory_dvy_dy4,memory_dvy_dz4) &
+        !$omp& map(tofrom: memory_dvz_dx4,memory_dvz_dy4,memory_dvz_dz4) &
+        !$omp& map(tofrom: memory_dsigmaxx_dx,memory_dsigmayy_dy,memory_dsigmazz_dz) &
+        !$omp& map(tofrom: memory_dsigmaxy_dx,memory_dsigmaxy_dy,memory_dsigmaxz_dx) &
+        !$omp& map(tofrom: memory_dsigmaxz_dz,memory_dsigmayz_dy,memory_dsigmayz_dz)
+#endif
         do it = 1,source%time_steps
             !------------------------------------------------------------
             ! compute stress sigma and update memory variables for C-PML
             !------------------------------------------------------------
             ! Loop 1: update sigmaxx, sigmayy, sigmazz
-#ifndef SEIDART_OPENMP_GPU
-            !!$omp parallel do private(i, j, k, &
-            !!$omp&    dvx_dx, dvy_dx, dvz_dx, dvx_dy, dvy_dy, dvz_dy, dvx_dz, dvy_dz, dvz_dz) &
-            !!$omp& schedule(static)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
 #endif
             do k = 3,nz-1
                 do j = 3,ny-1
@@ -1677,13 +1817,17 @@ module cpmlfdtd
                 enddo
             enddo
 #ifndef SEIDART_OPENMP_GPU
-            !!$omp end parallel do
+            !$omp end parallel do
 #endif
             ! Loop 2: update sigmaxy
-#ifndef SEIDART_OPENMP_GPU
-            !!$omp parallel do collapse(2) private(i, j, k, &
-            !!$omp&    dvx_dx, dvy_dx, dvz_dx, dvx_dy, dvy_dy, dvz_dy, dvx_dz, dvy_dz, dvz_dz) &
-            !!$omp& schedule(static)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
 #endif
             do k = 3,nz-1
                 do j = 2,ny-2
@@ -1730,13 +1874,17 @@ module cpmlfdtd
                 enddo
             enddo
 #ifndef SEIDART_OPENMP_GPU
-            !!$omp end parallel do
+            !$omp end parallel do
 #endif
             ! Loop 3: update sigmaxz and sigmayz
-#ifndef SEIDART_OPENMP_GPU
-            !!$omp parallel do collapse(2) private(i, j, k, &
-            !!$omp&    dvx_dx, dvy_dx, dvz_dx, dvx_dy, dvy_dy, dvz_dy, dvx_dz, dvy_dz, dvz_dz) &
-            !!$omp& schedule(static)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
 #endif
             do k = 2,nz-2
                 do j = 3,ny-1
@@ -1782,8 +1930,23 @@ module cpmlfdtd
 
                     enddo
                 enddo
+            enddo  ! end Loop 3 k-loop
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
+
                 ! Loop 4
                 !   ! update sigmayz, y-direction is full nodes
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    dvx_dx,dvy_dx,dvz_dx,dvx_dy,dvy_dy,dvz_dy,dvx_dz,dvy_dz,dvz_dz)
+#endif
+            do k = 2,nz-2
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! Forward difference half grid
@@ -1826,12 +1989,28 @@ module cpmlfdtd
                                     (1 + gamma_yz(i,j,k) * dt )
                     enddo
                 enddo
-            enddo
+            enddo  ! end Loop 4 k-loop
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
+
 
             !--------------------------------------------------------
             ! compute velocity and update memory variables for C-PML
             !--------------------------------------------------------
             ! Loop 5
+            ! -- vx --
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    rhoxx,rhoyx,rhozx, &
+            !$omp&    dsigmaxx_dx,dsigmaxy_dy,dsigmaxz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    rhoxx,rhoyx,rhozx, &
+            !$omp&    dsigmaxx_dx,dsigmaxy_dy,dsigmaxz_dz)
+#endif
             do k = 3,nz-1
                 do j = 3,ny-1
                     do i = 3,nx-1
@@ -1856,7 +2035,24 @@ module cpmlfdtd
                             (dsigmaxx_dx/rhoxx + dsigmaxy_dy/rhoyx + dsigmaxz_dz/rhozx) * dt 
                     enddo
                 enddo
+            enddo  ! end vx k-loop
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
 
+            ! -- vy --
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    rhoxy,rhoyy,rhozy, &
+            !$omp&    dsigmaxy_dx,dsigmayy_dy,dsigmayz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    rhoxy,rhoyy,rhozy, &
+            !$omp&    dsigmaxy_dx,dsigmayy_dy,dsigmayz_dz)
+#endif
+            do k = 3,nz-1
                 do j = 2,ny-2
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
@@ -1881,7 +2077,23 @@ module cpmlfdtd
                             (dsigmaxy_dx/rhoxy + dsigmayy_dy/rhoyy + dsigmayz_dz/rhozy) * dt
                     enddo
                 enddo
-            enddo
+            enddo  ! end vy k-loop
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
+
+            ! -- vz --
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(i,j,k, &
+            !$omp&    rhoxz,rhoyz,rhozz, &
+            !$omp&    dsigmaxz_dx,dsigmayz_dy,dsigmazz_dz)
+#else
+            !$omp parallel do collapse(3) schedule(static) &
+            !$omp& private(i,j,k, &
+            !$omp&    rhoxz,rhoyz,rhozz, &
+            !$omp&    dsigmaxz_dx,dsigmayz_dy,dsigmazz_dz)
+#endif
 
             do k = 2,nz-2
                 do j = 3,ny-1
@@ -1914,8 +2126,9 @@ module cpmlfdtd
                 enddo
             enddo
 #ifndef SEIDART_OPENMP_GPU
-            !!$omp end parallel do
+            !$omp end parallel do
 #endif
+
             
             if ( is_plane_wave_source(source%source_type) ) then
                 t = it * source%dt
@@ -1989,6 +2202,9 @@ module cpmlfdtd
                     enddo
                 endif
             else
+#ifdef SEIDART_OPENMP_GPU
+                !$omp target
+#endif
                 sigmaxx(isource,jsource,ksource) = sigmaxx(isource,jsource,ksource) + srcxx(it) / rho(isource,jsource,ksource)
                 sigmaxy(isource+1,jsource+1,ksource) = sigmaxy(isource+1,jsource+1,ksource) + srcxy(it) / rho(isource+1,jsource+1,ksource)
                 sigmaxz(isource+1,jsource,ksource+1) = sigmaxz(isource+1,jsource,ksource+1) + srcxz(it) / rho(isource+1,jsource,ksource)
@@ -2001,6 +2217,9 @@ module cpmlfdtd
                         srcy(it) * dt / rho(isource,jsource,ksource)
                 vz(isource,jsource,ksource+1) = vz(isource,jsource,ksource+1) + &
                         srcz(it) * dt / rho(isource,jsource,ksource+1)
+#ifdef SEIDART_OPENMP_GPU
+                !$omp end target
+#endif
             endif
 
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
@@ -2029,6 +2248,10 @@ module cpmlfdtd
             vz(:,:,nz) = 0.0_real64
 
             ! check norm of velocity to make sure the solution isn't diverging
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update from(vx,vy,vz, &
+            !$omp&    sigmaxx,sigmayy,sigmazz,sigmaxy,sigmaxz,sigmayz)
+#endif
             velocnorm(it) = maxval( sqrt(vx**2 + vy**2 + vz**2) )
             stressnorm(it) = maxval( &
                         sqrt(sigmaxx**2 + sigmayy**2 + sigmazz**2 + &
@@ -2052,6 +2275,9 @@ module cpmlfdtd
             ! call write_image3(sigmaxz, nx, ny, nz, it, 'S5')
 
         enddo   ! end of time loop
+#ifdef SEIDART_OPENMP_GPU
+        !$omp end target data
+#endif
         
         call write_array('velocity_norm.dat', source%time_steps, velocnorm )
         call write_array('stress_norm.dat', source%time_steps, stressnorm )
