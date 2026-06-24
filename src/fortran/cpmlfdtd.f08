@@ -289,19 +289,24 @@ module cpmlfdtd
         !---  beginning of time loop
         !---
         
-        !---
+         !---
         !---  Beginning of OpenMP Target (GPU) Data Region
         !----------------------------------------------------------------------
         ! OpenMP Unified Device Target Data Map
         !----------------------------------------------------------------------
+        ! Reset velocnorm before the time loop
+        velocnorm = 0.0_real64
+
         !$omp target data map(to: c11, c13, c15, c33, c35, c55, rho) &
         !$omp             map(to: kappa, kappa_half, acoef, acoef_half, bcoef, bcoef_half) &
         !$omp             map(to: gamma_x, gamma_z, gamma_xz) &
         !$omp             map(to: srcx, srcz, srcxx, srcxz, srczz) &
+        !$omp             map(to: density_code) &
         !$omp             map(tofrom: vx, vz, sigmaxx, sigmazz, sigmaxz) &
         !$omp             map(tofrom: memory_dvx_dx1, memory_dvx_dz1, memory_dvz_dx1, memory_dvz_dz1) &
         !$omp             map(tofrom: memory_dvx_dx2, memory_dvx_dz2, memory_dvz_dx2, memory_dvz_dz2) &
-        !$omp             map(tofrom: memory_dsigmaxx_dx, memory_dsigmazz_dz, memory_dsigmaxz_dx, memory_dsigmaxz_dz)
+        !$omp             map(tofrom: memory_dsigmaxx_dx, memory_dsigmazz_dz, memory_dsigmaxz_dx, memory_dsigmaxz_dz) &
+        !$omp             map(tofrom: velocnorm)
                 
         do it = 1,source%time_steps
             ! ------------------------------------------------------------
@@ -384,8 +389,13 @@ module cpmlfdtd
             !  compute velocity and update memory variables for C-PML
             ! --------------------------------------------------------
             
+#ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop collapse(2) &
             !$omp private(rhoxx, rhozx, value_dsigmaxx_dx, value_dsigmaxz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i, j, rhoxx, rhozx, value_dsigmaxx_dx, value_dsigmaxz_dz)
+#endif
             do j = 3,nz-1
                 do i = 3,nx-1
                     
@@ -404,9 +414,17 @@ module cpmlfdtd
                     
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
             
+#ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop collapse(2) &
             !$omp private(rhoxz, rhozz, value_dsigmaxz_dx, value_dsigmazz_dz)
+#else
+            !$omp parallel do collapse(2) schedule(static) &
+            !$omp& private(i, j, rhoxz, rhozz, value_dsigmaxz_dx, value_dsigmazz_dz)
+#endif
             do j = 2,nz-2
                 do i = 2,nx-2
                     
@@ -426,16 +444,18 @@ module cpmlfdtd
                     vz(i,j) = vz(i,j) + dt * (value_dsigmaxz_dx/rhoxz + value_dsigmazz_dz/rhozz)
                 enddo
             enddo
-            !$omp end do
-            
-            !$omp end parallel
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
             
             ! --------------------------------------------------------
             !  Source Injection and Boundaries (Run on Host or Updates)
             ! --------------------------------------------------------
             if ( is_plane_wave_source(source%source_type) ) then
                 ! Plane wave boundary routines typically require Host context due to heavy logical calls
+#ifdef SEIDART_OPENMP_GPU
                 !$omp target update from(vx, vz, sigmaxx, sigmazz, sigmaxz)
+#endif
                 t = it * source%dt
                 if ( active(1) .or. active(2) ) then
                     xi = nint(XLOC / domain%dx)
@@ -487,24 +507,30 @@ module cpmlfdtd
                             c55(ip,zi) * strain_vec(5)
                     enddo
                 endif
+#ifdef SEIDART_OPENMP_GPU
                 !$omp target update to(vx, vz, sigmaxx, sigmazz, sigmaxz)
+#endif
             else
                 ! Add the source term. If it is an accelerated weight drop the src_ij terms are zero
                 ! If it is any other source, the src_i terms are zero
-                !$omp target map(to: it)
-                !$omp target 
+#ifdef SEIDART_OPENMP_GPU
+                !$omp target
+#endif
                 sigmaxx(isource,jsource) = sigmaxx(isource, jsource) + srcxx(it) / rho(isource,jsource)
                 sigmaxz(isource+1,jsource+1) = sigmaxz(isource+1, jsource+1) + srcxz(it) / rho(isource+1,jsource+1)  
                 sigmazz(isource,jsource) = sigmazz(isource, jsource) + srczz(it) / rho(isource,jsource) 
                 vx(isource,jsource) = vx(isource,jsource) + srcx(it) / rho(isource,jsource)
                 vz(isource,jsource) = vz(isource,jsource) + srcz(it) / rho(isource,jsource)
+#ifdef SEIDART_OPENMP_GPU
                 !$omp end target
+#endif
             endif
         
             ! Dirichlet conditions (rigid boundaries) on the edges or at the 
             ! bottom of the PML layers
-            ! Dirichlet conditions executed on GPU
+#ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop
+#endif
             do j = 1, nz
                 vx(1,j)  = 0.0_real64
                 vx(nx,j) = 0.0_real64
@@ -512,7 +538,9 @@ module cpmlfdtd
                 vz(nx,j) = 0.0_real64
             enddo
         
+#ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop
+#endif
             do i = 1, nx
                 vx(i,1)  = 0.0_real64
                 vx(i,nz) = 0.0_real64
@@ -520,19 +548,28 @@ module cpmlfdtd
                 vz(i,nz) = 0.0_real64
             enddo
         
-            ! Compute norm of velocity on GPU using explicit map and reduction
+            ! Compute norm of velocity
             velocnorm = 0.0_real64
+#ifdef SEIDART_OPENMP_GPU
             !$omp target teams loop collapse(2) reduction(max:velocnorm)
+#else
+            !$omp parallel do collapse(2) reduction(max:velocnorm) schedule(static)
+#endif
             do j = 1, nz
                 do i = 1, nx
                     velocnorm = max(velocnorm, sqrt(vx(i,j)**2 + vz(i,j)**2))
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
             
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
         
-            ! Bring velocity data back to host specifically for image generation/I/O
+            ! Bring velocity data back to host for image generation/I/O
+#ifdef SEIDART_OPENMP_GPU
             !$omp target update from(vx, vz)
+#endif
             call write_image2(vx, nx, nz, source, it, 'Vx', SINGLE)
             call write_image2(vz, nx, nz, source, it, 'Vz', SINGLE)
             
@@ -2815,6 +2852,9 @@ module cpmlfdtd
         if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block) 
         block_count = 0
         
+        ! Reset velocnomr before the time loop
+        velocnorm = 0.0_real64
+        
 #ifdef SEIDART_OPENMP_GPU
             !$omp target data &
             !$omp& map(to: aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz) &
@@ -2833,6 +2873,9 @@ module cpmlfdtd
 #ifdef SEIDART_OPENMP_GPU
                 !$omp target teams distribute parallel do collapse(2) &
                 !$omp& private(i, k, dEy_dz)
+#else
+                !$omp parallel do collapse(2) schedule(static) &
+                !$omp& private(i, k, dEy_dz)
 #endif
             do k = 2, nz-2
                 do i = 2, nx-1
@@ -2848,10 +2891,16 @@ module cpmlfdtd
 
                 end do
             end do
+#ifndef SEIDART_OPENMP_GPU
+                !$omp end parallel do
+#endif
 
             ! Hy <- Hy - dt/mu0 * ( dEx/dz - dEz/dx )
 #ifdef SEIDART_OPENMP_GPU
                 !$omp target teams distribute parallel do collapse(2) &
+                !$omp& private(i, k, dEx_dz, dEz_dx)
+#else
+                !$omp parallel do collapse(2) schedule(static) &
                 !$omp& private(i, k, dEx_dz, dEz_dx)
 #endif
             do k = 2, nz-2
@@ -2874,10 +2923,16 @@ module cpmlfdtd
 
                 end do
             end do
+#ifndef SEIDART_OPENMP_GPU
+                !$omp end parallel do
+#endif
 
             ! Hz <- Hz - dt/mu0 * ( dEy/dx - dEx/dy )
 #ifdef SEIDART_OPENMP_GPU
                 !$omp target teams distribute parallel do collapse(2) &
+                !$omp& private(i, k, dEy_dx)
+#else
+                !$omp parallel do collapse(2) schedule(static) &
                 !$omp& private(i, k, dEy_dx)
 #endif
             do k = 2, nz-1
@@ -2894,6 +2949,9 @@ module cpmlfdtd
 
                 end do
             end do
+#ifndef SEIDART_OPENMP_GPU
+                !$omp end parallel do
+#endif
 
             ! -----------------------------------------------------------------
             ! Update electric field E from curl(H) and conductivity tensor
@@ -2901,6 +2959,10 @@ module cpmlfdtd
             ! -----------------------------------------------------------------
 #ifdef SEIDART_OPENMP_GPU
                 !$omp target teams distribute parallel do collapse(2) &
+                !$omp& private(i, k, dHz_dy, dHy_dz, dHz_dx, dHx_dz) &
+                !$omp& private(dHy_dx, dHx_dy, rhs_x, rhs_y, rhs_z)
+#else
+                !$omp parallel do collapse(2) schedule(static) &
                 !$omp& private(i, k, dHz_dy, dHy_dz, dHz_dx, dHx_dz) &
                 !$omp& private(dHy_dx, dHx_dy, rhs_x, rhs_y, rhs_z)
 #endif
@@ -2956,18 +3018,29 @@ module cpmlfdtd
                 end do
             end do
 
+#ifndef SEIDART_OPENMP_GPU
+                !$omp end parallel do
+#endif
+
 #ifdef SEIDART_OPENMP_GPU
                 !$omp target update from(Ex, Ey, Ez, Hx, Hy, Hz)
 #endif
             
             ! add the source (force vector located at a given grid point)
+            ! Executed as a single-point target construct on the GPU so the
+            ! device copy is updated without a full array transfer.
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target
+#endif
             Ex(isource,ksource) = Ex(isource,ksource) + & 
                         srcx(it) * dt / eps11(isource,ksource)
             Ey(isource,ksource) = Ey(isource,ksource) + & 
                         srcy(it) * dt / eps22(isource,ksource) 
             Ez(isource,ksource) = Ez(isource,ksource) + & 
                         srcz(it) * dt / eps33(isource,ksource)
-
+#ifdef SEIDART_OPENMP_GPU
+            !$omp end target
+#endif
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
             Ex(1,:) = 0.0_real64
             Ex(:,1) = 0.0_real64
@@ -3034,8 +3107,7 @@ module cpmlfdtd
             !$omp end target data
 #endif
 
-        if (block_output) call finalize_io(current_block_file)
-        
+        if (block_output) call finalize_io(current_block_file)        
         
         deallocate( eps11, eps12, eps13, eps22, eps23, eps33)
         deallocate( sig11, sig12, sig13, sig22, sig23, sig33)
@@ -3369,12 +3441,36 @@ module cpmlfdtd
         Ey_old = Ey 
         Ez_old = Ez
         
+        ! Reset velocnorm before the time loop
+        velocnorm = 0.0_real64
+
+#ifdef SEIDART_OPENMP_GPU
+        !$omp target data &
+        !$omp& map(to: aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz) &
+        !$omp& map(to: eps11, eps12, eps13, eps22, eps23, eps33) &
+        !$omp& map(to: sig11, sig12, sig13, sig22, sig23, sig33) &
+        !$omp& map(to: kappa, kappa_half, acoef, acoef_half, bcoef, bcoef_half) &
+        !$omp& map(to: srcx, srcy, srcz) &
+        !$omp& map(tofrom: Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old) &
+        !$omp& map(tofrom: memory_dEx_dy, memory_dEy_dx) &
+        !$omp& map(tofrom: memory_dEx_dz, memory_dEz_dx) &
+        !$omp& map(tofrom: memory_dEz_dy, memory_dEy_dz) &
+        !$omp& map(tofrom: memory_dHz_dx, memory_dHx_dz) &
+        !$omp& map(tofrom: memory_dHz_dy, memory_dHy_dz) &
+        !$omp& map(tofrom: memory_dHx_dy, memory_dHy_dx)
+#endif
+
         do it = 1,source%time_steps
             !--------------------------------------------------------
             ! compute magnetic field and update memory variables for C-PML
             !--------------------------------------------------------
             ! Update Hx
-            !$omp parallel do collapse(2) private(i, j, k, dEz_dy, dEy_dz) schedule(static)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(dEz_dy, dEy_dz) map(to: daHx, dbHx)
+#else
+            !$omp parallel do collapse(3) private(i, j, k, dEz_dy, dEy_dz) schedule(static)
+#endif
             do k = 1,nz-1
                 do i = 1,nx-1  
                     do j = 1,ny-1
@@ -3394,10 +3490,17 @@ module cpmlfdtd
                     enddo
                 enddo  
             enddo
+#ifndef SEIDART_OPENMP_GPU
             !$omp end parallel do
+#endif
 
             ! Update Hy
-            !$omp parallel do collapse(2) private(i, j, k, dEx_dz, dEz_dx) schedule(static)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(dEx_dz, dEz_dx) map(to: daHy, dbHy)
+#else
+            !$omp parallel do collapse(3) private(i, j, k, dEx_dz, dEz_dx) schedule(static)
+#endif
             do k = 1,nz-1
                 do i = 1,nx-1      
                     do j = 1,ny-1
@@ -3418,10 +3521,17 @@ module cpmlfdtd
                     enddo
                 enddo  
             enddo
+#ifndef SEIDART_OPENMP_GPU
             !$omp end parallel do
+#endif
 
             ! Update Hz
-            !$omp parallel do collapse(2) private(i, j, k, dEx_dy, dEy_dx) schedule(static)
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(dEx_dy, dEy_dx) map(to: daHz, dbHz)
+#else
+            !$omp parallel do collapse(3) private(i, j, k, dEx_dy, dEy_dx) schedule(static)
+#endif
             do k = 2,nz-1
                 do i = 1,nx-1      
                     do j = 1,ny-1
@@ -3440,14 +3550,22 @@ module cpmlfdtd
                     enddo
                 enddo  
             enddo
+#ifndef SEIDART_OPENMP_GPU
             !$omp end parallel do
+#endif
 
             !--------------------------------------------------------
             ! compute electric field and update memory variables for C-PML
             !--------------------------------------------------------
-            !$omp parallel do collapse(2) private(i, j, k, &
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop collapse(3) &
+            !$omp& private(dHz_dy, dHy_dz, dHz_dx, dHx_dz, dHy_dx, dHx_dy, &
+            !$omp& rhs_x, rhs_y, rhs_z)
+#else
+            !$omp parallel do collapse(3) private(i, j, k, &
             !$omp&    dHz_dy, dHy_dz, dHz_dx, dHx_dz, dHy_dx, dHx_dy, &
             !$omp&    rhs_x, rhs_y, rhs_z) schedule(static)
+#endif
             do k = 2,nz-1 
                 do i = 2,nx-1
                     do j = 2,ny-1 
@@ -3482,7 +3600,9 @@ module cpmlfdtd
                     end do 
                 end do 
             end do 
+#ifndef SEIDART_OPENMP_GPU
             !$omp end parallel do
+#endif
 
             if ( source%source_type == 'pw' ) then
                 t = it * source%dt
@@ -3557,12 +3677,18 @@ module cpmlfdtd
                 endif
             else
                 ! add the source (force vector located at a given grid point)
+#ifdef SEIDART_OPENMP_GPU
+                !$omp target
+#endif
                 Ex(isource,jsource,ksource) = Ex(isource,jsource,ksource) + &
                             srcx(it) * dt / eps11(isource,jsource,ksource)
                 Ey(isource,jsource,ksource) = Ey(isource,jsource,ksource) + &
                             srcy(it) * dt / eps22(isource,jsource,ksource)
                 Ez(isource,jsource,ksource) = Ez(isource,jsource,ksource) + &
                             srcz(it) * dt / eps33(isource,jsource,ksource)
+#ifdef SEIDART_OPENMP_GPU
+                !$omp end target
+#endif
             endif
             
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
@@ -3613,6 +3739,9 @@ module cpmlfdtd
             Ez_old = Ez 
             
             ! check norm of velocity to make sure the solution isn't diverging
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update from(Ex, Ey, Ez)
+#endif
             velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
             ! print *,'Max vals for Ex, Ey, Ez: ', maxval(Ex), maxval(Ey), maxval(Ez)
@@ -3623,7 +3752,10 @@ module cpmlfdtd
             call write_image(Ez, domain, source, it, 'Ez', SINGLE)
 
         enddo   ! end of time loop
-    
+#ifdef SEIDART_OPENMP_GPU
+        !$omp end target data
+#endif
+
         deallocate( eps11, eps12, eps13, eps22, eps23, eps33)
         deallocate( sig11, sig12, sig13, sig22, sig23, sig33)
         deallocate( kappa, alpha, acoef, bcoef, kappa_half)
