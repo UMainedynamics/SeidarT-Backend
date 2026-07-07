@@ -68,7 +68,8 @@ module cpmlfdtd
         logical, intent(in), optional :: SINGLE_OUTPUT
 
         ! Local variables
-        real(real64) :: velocnorm, value_dvx_dx, value_dvx_dz, &
+        real(real64) :: velocnorm = 0.0_real64
+        real(real64) :: value_dvx_dx, value_dvx_dz, &
             value_dvz_dx, value_dvz_dz, value_dsigmaxx_dx, value_dsigmazz_dz, &
             value_dsigmaxz_dx, value_dsigmaxz_dz  
 
@@ -289,7 +290,7 @@ module cpmlfdtd
         !---  beginning of time loop
         !---
         
-         !---
+        !---
         !---  Beginning of OpenMP Target (GPU) Data Region
         !----------------------------------------------------------------------
         ! OpenMP Unified Device Target Data Map
@@ -297,6 +298,7 @@ module cpmlfdtd
         ! Reset velocnorm before the time loop
         velocnorm = 0.0_real64
 
+#ifdef SEIDART_OPENMP_GPU
         !$omp target data map(to: c11, c13, c15, c33, c35, c55, rho) &
         !$omp             map(to: kappa, kappa_half, acoef, acoef_half, bcoef, bcoef_half) &
         !$omp             map(to: gamma_x, gamma_z, gamma_xz) &
@@ -307,6 +309,7 @@ module cpmlfdtd
         !$omp             map(tofrom: memory_dvx_dx2, memory_dvx_dz2, memory_dvz_dx2, memory_dvz_dz2) &
         !$omp             map(tofrom: memory_dsigmaxx_dx, memory_dsigmazz_dz, memory_dsigmaxz_dx, memory_dsigmaxz_dz) &
         !$omp             map(tofrom: velocnorm)
+#endif
                 
         do it = 1,source%time_steps
             ! ------------------------------------------------------------
@@ -354,7 +357,10 @@ module cpmlfdtd
             
 #ifndef SEIDART_OPENMP_GPU
             !$omp end do
-            
+            !$omp end parallel
+
+            !$omp parallel private(i, j, value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz) &
+            !$omp& shared(vx, vz, sigmaxz, memory_dvx_dx2, memory_dvx_dz2, memory_dvz_dz2, memory_dvz_dx2)
             !$omp do collapse(2)
 #else
             !$omp target teams loop collapse(2) private(value_dvx_dx, value_dvx_dz, value_dvz_dx, value_dvz_dz)
@@ -384,6 +390,10 @@ module cpmlfdtd
                                 (1 + gamma_xz(i,j) * dt )
                 enddo
             enddo
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end do
+            !$omp end parallel
+#endif
             
             ! --------------------------------------------------------
             !  compute velocity and update memory variables for C-PML
@@ -551,6 +561,7 @@ module cpmlfdtd
             ! Compute norm of velocity
             velocnorm = 0.0_real64
 #ifdef SEIDART_OPENMP_GPU
+            !$omp target update to(velocnorm)
             !$omp target teams loop collapse(2) reduction(max:velocnorm)
 #else
             !$omp parallel do collapse(2) reduction(max:velocnorm) schedule(static)
@@ -575,7 +586,9 @@ module cpmlfdtd
             
         enddo   ! end of time loop
         
+#ifdef SEIDART_OPENMP_GPU
         !$omp end target data
+#endif
         !---
         !--- End of Target Data Region
         !---
@@ -666,7 +679,7 @@ module cpmlfdtd
 
         integer :: nx, nz, i, k, it, isource, ksource
         real(real64) :: dx, dz, dt
-        real(real64) :: velocnorm
+        real(real64) :: velocnorm = 0.0_real64
         logical :: SINGLE
         integer :: density_code, istat
         character(len=32) :: env_val
@@ -897,7 +910,7 @@ module cpmlfdtd
         call array_averaging2d(rhoxz, density_code, '-i')
         call array_averaging2d(rhozz, density_code, '-j')
 
-! ======================== I/O Setup ========================
+        ! ======================== I/O Setup ========================
         call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
         if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
         block_count = 0
@@ -2016,7 +2029,7 @@ module cpmlfdtd
                     do i = 3,nx-1
                         ! ds1/dx, ds6/dy, ds5,dz
                         rhoxx = scalar_mean(rho(i,j,k), rho(i-1,j,k), density_code)
-                        rhoyx = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhoyx = scalar_mean(rho(i,j,k), rho(i,j+1,k), density_code) 
                         rhozx = scalar_mean(rho(i,j,k), rho(i,j,k-1), density_code) 
                         ! Backward difference half grid
                         dsigmaxx_dx = (27.0_real64*sigmaxx(i,j,k) - 27.0_real64*sigmaxx(i-1,j,k) + sigmaxx(i-2,j,k)) / (24.0_real64*dx)
@@ -2057,7 +2070,7 @@ module cpmlfdtd
                     do i = 2,nx-2
                         ! ds6/dx, ds2/dy, ds4/dz
                         rhoxy = scalar_mean(rho(i,j,k), rho(i+1,j,k), density_code)
-                        rhoyy = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhoyy = scalar_mean(rho(i,j,k), rho(i,j+1,k), density_code) 
                         rhozy = scalar_mean(rho(i,j,k), rho(i,j,k-1), density_code)
                         ! Forward difference half grid
                         dsigmaxy_dx = (-27.0_real64*sigmaxy(i,j,k) + 27.0_real64*sigmaxy(i+1,j,k) - sigmaxy(i+2,j,k)) / (24.0_real64*dx)
@@ -2100,7 +2113,7 @@ module cpmlfdtd
                     do i = 2,nx-2
                         ! ds5/dx, ds4/dy, ds3/dz
                         rhoxz = scalar_mean(rho(i,j,k), rho(i+1,j,k), density_code)
-                        rhoyz = scalar_mean(rho(i,j,k), rho(i,j,k), density_code) 
+                        rhoyz = scalar_mean(rho(i,j,k), rho(i,j+1,k), density_code) 
                         rhozz = scalar_mean(rho(i,j,k), rho(i,j,k+1), density_code)
                         
                         ! Forward difference half grid
@@ -2341,13 +2354,10 @@ module cpmlfdtd
         integer :: isource, jsource, i, j, it
 
         ! Coefficients for the finite difference scheme
-        ! real(real64), allocatable :: caEx(:,:), cbEx(:,:)
-        ! real(real64), allocatable :: caEz(:,:), cbEz(:,:)
         real(real64) :: daHy, dbHy 
         real(real64), allocatable ::det(:,:)
         real(real64), allocatable :: aEx(:,:), bEx(:,:), dEx(:,:), eEx(:,:), &
-                                    aEz(:,:), bEz(:,:), dEz(:,:), eEz(:,:), &
-                                    caEx(:,:), cbEx(:,:), caEz(:,:), cbEz(:,:)
+                                    aEz(:,:), bEz(:,:), dEz(:,:), eEz(:,:)
         real(real64) :: dEx_dz, dEz_dx, dHy_dz, dHy_dx
 
         ! 1D arrays for the damping profiles
@@ -2361,7 +2371,7 @@ module cpmlfdtd
         real(real64), allocatable :: eps11(:,:), eps13(:,:), eps33(:,:), &
                                             sig11(:,:), sig13(:,:), sig33(:,:)
         ! Velocity normalization factor
-        real(real64) :: velocnorm
+        real(real64) :: velocnorm = 0.0_real64
         
         integer :: nx, nz
         real(real64) :: dx, dz, dt
@@ -2379,6 +2389,11 @@ module cpmlfdtd
 
         ! Boolean flag to save as double precision or single precision
         logical :: SINGLE
+
+        ! velocnorm must be explicitly initialized — it is used as a reduction seed
+        ! and as a scalar in the GPU target region (implicitly firstprivate, so the
+        ! device copy must have a defined value before the reduction loop runs).
+        ! Without this, the max-reduction produces undefined results in all build modes.
         
         ! real(real64) :: m11,m12,m21,m22,n11,n12,n21,n22,detM
         ! real(real64) :: rhs1,rhs2, exn, ezn, exnp1, eznp1
@@ -2410,7 +2425,6 @@ module cpmlfdtd
         allocate(sigmax(nx, nz), sigmaz(nx, nz))
         allocate(aEx(nx,nz), bEx(nx,nz), dEx(nx,nz), eEx(nx,nz) )
         allocate(aEz(nx,nz), bEz(nx,nz), dEz(nx,nz), eEz(nx,nz) )
-        allocate(caEx(nx,nz), cbEx(nx,nz), caEz(nx,nz), cbEz(nx,nz))
         allocate(det(nx,nz))
         allocate(memory_dEz_dx(nx, nz), memory_dEx_dz(nx, nz))
         allocate(memory_dHy_dx(nx, nz), memory_dHy_dz(nx, nz))
@@ -2539,13 +2553,6 @@ module cpmlfdtd
         dEz = (epsilon11 * sig13 - epsilon13 * sig11) / det  
         eEz = (epsilon11 * sig33 - epsilon13 * sig13) / det
         
-        caEx(:,:) = ( 1.0_real64 - sig11 * dt / ( 2.0d0 * epsilon11 ) ) / &
-                    ( 1.0_real64 + sig11 * dt / ( 2.0d0 * epsilon11 ) )
-        cbEx(:,:) = (dt / epsilon11 ) / ( 1.0_real64 + sig11 * dt / ( 2.0d0 * epsilon11 ) )
-
-        caEz(:,:) = ( 1.0_real64 - sig33 * dt / ( 2.0d0 * epsilon33 ) ) / &
-                    ( 1.0_real64 + sig33 * dt / ( 2.0d0 * epsilon33 ) )
-        cbEz(:,:) = (dt / epsilon33 ) / ( 1.0_real64 + sig33 * dt / ( 2.0d0 * epsilon33 ) )
         !---
         !---  beginning of time loop
         !---
@@ -2556,12 +2563,17 @@ module cpmlfdtd
         !----------------------------------------------------------------------
         ! OpenMP Unified Device Target Data Map
         !----------------------------------------------------------------------
+        ! Reset velocnorm before the time loop (handles re-entrant or repeated calls)
+        velocnorm = 0.0_real64
+
+#ifdef SEIDART_OPENMP_GPU
         !$omp target data map(to: acoef, bcoef, acoef_half, bcoef_half, kappa, kappa_half) &
         !$omp             map(to: aEz, bEz, aEx, bEx, dEz, eEz, dEx, eEx, epsilon11, epsilon33) &
         !$omp             map(to: srcx, srcz, daHy, dbHy) &
         !$omp             map(tofrom: Ex, Ez, Hy, Ex_old, Ez_old) &
         !$omp             map(tofrom: memory_dEx_dz, memory_dEz_dx, memory_dHy_dx, memory_dHy_dz) &
         !$omp             map(tofrom: velocnorm)
+#endif
         
         do it = 1,source%time_steps
 #ifndef SEIDART_OPENMP_GPU
@@ -2588,6 +2600,7 @@ module cpmlfdtd
                     
                     ! Now update the Magnetic field
                     Hy(i,j) = daHy*Hy(i,j) + dbHy*( dEz_dx - dEx_dz )
+                    ! velocnorm = max(velocnorm, sqrt(Ex(i, j)**2 + Ez(i, j)**2))
                     
                 enddo  
             enddo
@@ -2625,7 +2638,7 @@ module cpmlfdtd
             !----------------------------------------------------------------------------
             if ( source%source_type == 'pw' ) then 
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target update from(Ex, Ez, Hy)
+                !$omp target update from(Ex, Ez, Hy)
 #endif
                 t = it * source%dt
                 if ( active(1) .or. active(2) ) then 
@@ -2669,18 +2682,18 @@ module cpmlfdtd
                     enddo 
                 endif 
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target update to(Ex, Ez, Hy)
+                !$omp target update to(Ex, Ez, Hy)
 #endif
             else
 #ifdef SEIDART_OPENMP_GPU
-            !$omp target
+                !$omp target
 #endif
                 Ex(isource,jsource) = Ex(isource,jsource) + &
                                 srcx(it) * dt / epsilon11(isource,jsource)
                 Ez(isource,jsource) = Ez(isource,jsource) + &
                                 srcz(it) * dt / epsilon33(isource,jsource) 
-#ifdef SEIDART_OPENMP_GPU 
-            !$omp end target
+#ifdef SEIDART_OPENMP_GPU
+                !$omp end target
 #endif
             endif 
 
@@ -2722,9 +2735,10 @@ module cpmlfdtd
 
             ! Norm Tracking on Device via Reduction
             ! velocnorm is mapped tofrom in the target data region so the
-            ! reduction result is returned to the host after each loop iteration.
+            ! reduction result is returned to the host after each iteration.
             velocnorm = 0.0_real64
 #ifdef SEIDART_OPENMP_GPU
+            !$omp target update to(velocnorm)
             !$omp target teams loop collapse(2) reduction(max:velocnorm)
 #else
             !$omp parallel do collapse(2) reduction(max:velocnorm) schedule(static)
@@ -2736,7 +2750,8 @@ module cpmlfdtd
             enddo
 #ifndef SEIDART_OPENMP_GPU
             !$omp end parallel do
-#endif            
+#endif
+            
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
 
             ! Memory extraction strictly targeted for Image Processing
@@ -2746,7 +2761,9 @@ module cpmlfdtd
             call write_image2(Ex, nx, nz, source, it, 'Ex', SINGLE)
             call write_image2(Ez, nx, nz, source, it, 'Ez', SINGLE)
         enddo
+#ifdef SEIDART_OPENMP_GPU
         !$omp end target data
+#endif
         
         deallocate(eps11, eps13,  eps33, sig11, sig13,  sig33, srcx, srcz)
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
@@ -2786,7 +2803,7 @@ module cpmlfdtd
                                         ! sigmax(:,:), sigmay(:,:), sigmaz(:,:)
 
         ! real(real64) :: DT
-        real(real64) :: velocnorm
+        real(real64) :: velocnorm = 0.0_real64
         integer :: isource, ksource, i, k, it
 
         ! Coefficients for the finite difference scheme
@@ -3078,14 +3095,16 @@ module cpmlfdtd
         if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block) 
         block_count = 0
         
-        ! Reset velocnomr before the time loop
+        ! Reset velocnorm before the time loop
         velocnorm = 0.0_real64
-        
+
 #ifdef SEIDART_OPENMP_GPU
             !$omp target data &
             !$omp& map(to: aEx, bEx, cEx, aEy, bEy, cEy, aEz, bEz, cEz) &
             !$omp& map(to: sig11, sig12, sig13, sig22, sig23, sig33) &
             !$omp& map(to: kappa, acoef, bcoef, kappa_half, acoef_half, bcoef_half) &
+            !$omp& map(to: srcx, srcy, srcz) &
+            !$omp& map(to: eps11, eps22, eps33) &
             !$omp& map(tofrom: Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old) &
             !$omp& map(tofrom: memory_dEy_dx, memory_dEx_dz) &
             !$omp& map(tofrom: memory_dEz_dx, memory_dEy_dz) &
@@ -3243,7 +3262,6 @@ module cpmlfdtd
 
                 end do
             end do
-
 #ifndef SEIDART_OPENMP_GPU
                 !$omp end parallel do
 #endif
@@ -3267,36 +3285,37 @@ module cpmlfdtd
 #ifdef SEIDART_OPENMP_GPU
             !$omp end target
 #endif
+
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-            Ex(1,:) = 0.0_real64
-            Ex(:,1) = 0.0_real64
-            Ex(nx,:) = 0.0_real64
-            Ex(:,nz) = 0.0_real64 
+            Ex(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ex(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ex(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ex(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64) 
 
-            Ey(1,:) = 0.0_real64
-            Ey(:,1) = 0.0_real64
-            Ey(nx,:) = 0.0_real64
-            Ey(:,nz) = 0.0_real64
+            Ey(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ey(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ey(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ey(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
             
-            Ez(1,:) = 0.0_real64
-            Ez(:,1) = 0.0_real64
-            Ez(nx,:) = 0.0_real64
-            Ez(:,nz) = 0.0_real64
+            Ez(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ez(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ez(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Ez(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
             
-            Hx(1,:) = 0.0_real64
-            Hx(:,1) = 0.0_real64
-            Hx(nx,:) = 0.0_real64
-            Hx(:,nz) = 0.0_real64
+            Hx(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hx(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hx(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hx(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
 
-            Hy(1,:) = 0.0_real64
-            Hy(:,1) = 0.0_real64
-            Hy(nx,:) = 0.0_real64
-            Hy(:,nz) = 0.0_real64
+            Hy(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hy(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hy(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hy(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
             
-            Hz(1,:) = 0.0_real64
-            Hz(:,1) = 0.0_real64
-            Hz(nx,:) = 0.0_real64
-            Hz(:,nz) = 0.0_real64
+            Hz(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hz(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hz(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            Hz(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
             
             Ex_old = Ex 
             Ey_old = Ey 
@@ -3333,7 +3352,8 @@ module cpmlfdtd
             !$omp end target data
 #endif
 
-        if (block_output) call finalize_io(current_block_file)        
+        if (block_output) call finalize_io(current_block_file)
+        
         
         deallocate( eps11, eps12, eps13, eps22, eps23, eps33)
         deallocate( sig11, sig12, sig13, sig22, sig23, sig33)
@@ -3373,7 +3393,7 @@ module cpmlfdtd
                                         ! sigmax(:,:), sigmay(:,:), sigmaz(:,:)
 
         ! real(real64) :: DT
-        real(real64) :: velocnorm
+        real(real64) :: velocnorm = 0.0_real64
         integer :: isource, jsource, ksource, i, j, k, it
 
         ! Coefficients for the finite difference scheme
@@ -3918,56 +3938,62 @@ module cpmlfdtd
             endif
             
             ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-            Ex(1,:,:) = 0.0_real64
-            Ex(:,1,:) = 0.0_real64
-            Ex(:,:,1) = 0.0_real64
-            Ex(nx,:,:) = 0.0_real64
-            Ex(:,ny,:) = 0.0_real64
-            Ex(:,:,nz) = 0.0_real64 
+            ! Applied on-device via target teams loop so the device copies are zeroed each iteration.
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop
+#endif
+            do k = 1, nz
+                do j = 1, ny
+                    Ex(1,j,k)  = 0.0_real64; Ex(nx,j,k) = 0.0_real64
+                    Ey(1,j,k)  = 0.0_real64; Ey(nx,j,k) = 0.0_real64
+                    Ez(1,j,k)  = 0.0_real64; Ez(nx,j,k) = 0.0_real64
+                    Hx(1,j,k)  = 0.0_real64; Hx(nx,j,k) = 0.0_real64
+                    Hy(1,j,k)  = 0.0_real64; Hy(nx,j,k) = 0.0_real64
+                    Hz(1,j,k)  = 0.0_real64; Hz(nx,j,k) = 0.0_real64
+                enddo
+            enddo
 
-            Ey(1,:,:) = 0.0_real64
-            Ey(:,1,:) = 0.0_real64
-            Ey(:,:,1) = 0.0_real64
-            Ey(nx,:,:) = 0.0_real64
-            Ey(:,ny,:) = 0.0_real64
-            Ey(:,:,nz) = 0.0_real64
-            
-            Ez(1,:,:) = 0.0_real64
-            Ez(:,1,:) = 0.0_real64
-            Ez(:,:,1) = 0.0_real64
-            Ez(nx,:,:) = 0.0_real64
-            Ez(:,ny,:) = 0.0_real64
-            Ez(:,:,nz) = 0.0_real64
-            
-            Hx(1,:,:) = 0.0_real64
-            Hx(:,1,:) = 0.0_real64
-            Hx(:,:,1) = 0.0_real64
-            Hx(nx,:,:) = 0.0_real64
-            Hx(:,ny,:) = 0.0_real64
-            Hx(:,:,nz) = 0.0_real64
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop
+#endif
+            do k = 1, nz
+                do i = 1, nx
+                    Ex(i,1,k)  = 0.0_real64; Ex(i,ny,k) = 0.0_real64
+                    Ey(i,1,k)  = 0.0_real64; Ey(i,ny,k) = 0.0_real64
+                    Ez(i,1,k)  = 0.0_real64; Ez(i,ny,k) = 0.0_real64
+                    Hx(i,1,k)  = 0.0_real64; Hx(i,ny,k) = 0.0_real64
+                    Hy(i,1,k)  = 0.0_real64; Hy(i,ny,k) = 0.0_real64
+                    Hz(i,1,k)  = 0.0_real64; Hz(i,ny,k) = 0.0_real64
+                enddo
+            enddo
 
-            Hy(1,:,:) = 0.0_real64
-            Hy(:,1,:) = 0.0_real64
-            Hy(:,:,1) = 0.0_real64
-            Hy(nx,:,:) = 0.0_real64
-            Hy(:,ny,:) = 0.0_real64
-            Hy(:,:,nz) = 0.0_real64
-            
-            Hz(1,:,:) = 0.0_real64
-            Hz(:,1,:) = 0.0_real64
-            Hz(:,:,1) = 0.0_real64
-            Hz(nx,:,:) = 0.0_real64
-            Hz(:,ny,:) = 0.0_real64
-            Hz(:,:,nz) = 0.0_real64
-            
-            Ex_old = Ex 
-            Ey_old = Ey 
-            Ez_old = Ez 
-            
-            ! check norm of velocity to make sure the solution isn't diverging
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams loop
+#endif
+            do j = 1, ny
+                do i = 1, nx
+                    Ex(i,j,1)  = 0.0_real64; Ex(i,j,nz) = 0.0_real64
+                    Ey(i,j,1)  = 0.0_real64; Ey(i,j,nz) = 0.0_real64
+                    Ez(i,j,1)  = 0.0_real64; Ez(i,j,nz) = 0.0_real64
+                    Hx(i,j,1)  = 0.0_real64; Hx(i,j,nz) = 0.0_real64
+                    Hy(i,j,1)  = 0.0_real64; Hy(i,j,nz) = 0.0_real64
+                    Hz(i,j,1)  = 0.0_real64; Hz(i,j,nz) = 0.0_real64
+                enddo
+            enddo
+
+            ! Update Ex_old on device: fetch current E from device, copy to old fields,
+            ! then push old fields back. Order is critical for GPU correctness.
 #ifdef SEIDART_OPENMP_GPU
             !$omp target update from(Ex, Ey, Ez)
 #endif
+            Ex_old = Ex
+            Ey_old = Ey
+            Ez_old = Ez
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update to(Ex_old, Ey_old, Ez_old)
+#endif
+
+            ! check norm of velocity to make sure the solution isn't diverging
             velocnorm = maxval(sqrt(Ex**2.0d0 + Ey**2.0d0 + Ez**2.0d0) )
             if (velocnorm > stability_threshold) stop 'code became unstable and blew up'
             ! print *,'Max vals for Ex, Ey, Ez: ', maxval(Ex), maxval(Ey), maxval(Ez)
@@ -3981,7 +4007,7 @@ module cpmlfdtd
 #ifdef SEIDART_OPENMP_GPU
         !$omp end target data
 #endif
-
+    
         deallocate( eps11, eps12, eps13, eps22, eps23, eps33)
         deallocate( sig11, sig12, sig13, sig22, sig23, sig33)
         deallocate( kappa, alpha, acoef, bcoef, kappa_half)
