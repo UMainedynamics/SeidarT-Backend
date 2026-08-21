@@ -95,6 +95,10 @@ module cpmlfdtd
         integer :: nx, nz 
         real(real64) :: dx, dz, dt 
         
+        ! Block output
+        logical :: block_output, legacy_output
+        integer :: block_count, steps_per_block, ii, jj
+        character(len=256) :: current_block_file
         ! real(real64) :: p, p0, ehat ! values for plane wave
 
         integer :: i, j, it, isource, jsource
@@ -285,7 +289,12 @@ module cpmlfdtd
         memory_dsigmazz_dz(:,:) = 0.0_real64
         memory_dsigmaxz_dx(:,:) = 0.0_real64
         memory_dsigmaxz_dz(:,:) = 0.0_real64
-
+        
+        ! ======================== I/O Setup ========================
+        call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
+        block_count = 0
+        
         !---
         !---  beginning of time loop
         !---
@@ -581,10 +590,27 @@ module cpmlfdtd
 #ifdef SEIDART_OPENMP_GPU
             !$omp target update from(vx, vz)
 #endif
-            call write_image2(vx, nx, nz, source, it, 'Vx', SINGLE)
-            call write_image2(vz, nx, nz, source, it, 'Vz', SINGLE)
+            ! -------- Output --------
+            if (block_output) then
+                if (current_step_in_block == 0) then
+                    block_count = block_count + 1
+                    ii = (block_count - 1) * steps_per_block + 1
+                    jj = min(block_count * steps_per_block, source%time_steps)
+                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a)") &
+                        'S2.', ii, '-', jj, '.', source%xind, '.', source%zind, '.blk.zst'
+                endif
+                call add_step_to_block_2d(current_block_file, &
+                    real(vx, real64), real(vz, real64) )
+            endif
+
+            if (legacy_output) then
+                call write_image2(real(vx, real64), nx, nz, source, it, 'Vx', SINGLE)
+                call write_image2(real(vz, real64), nx, nz, source, it, 'Vz', SINGLE)
+            endif
             
         enddo   ! end of time loop
+        
+        
         
 #ifdef SEIDART_OPENMP_GPU
         !$omp end target data
@@ -592,6 +618,7 @@ module cpmlfdtd
         !---
         !--- End of Target Data Region
         !---
+        if (block_output) call finalize_io(current_block_file)
         
         deallocate(c11, c13, c15, c33, c35, c55, rho)
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
@@ -1310,11 +1337,10 @@ module cpmlfdtd
                     block_count = block_count + 1
                     ii = (block_count - 1) * steps_per_block + 1
                     jj = min(block_count * steps_per_block, source%time_steps)
-                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a, i0, a)") &
-                        'S25.', ii, '-', jj, '.', source%xind, '.', &
-                        source%yind, '.', source%zind, '.blk.zst'
+                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a)") &
+                        'S25.', ii, '-', jj, '.', source%xind, '.', source%zind, '.blk.zst'
                 endif
-                call add_step_to_block_2d(current_block_file, &
+                call add_step_to_block_25d(current_block_file, &
                     real(vx, real64), real(vy, real64), real(vz, real64))
             endif
 
@@ -2375,7 +2401,12 @@ module cpmlfdtd
         
         integer :: nx, nz
         real(real64) :: dx, dz, dt
-
+        
+        ! Block output
+        logical :: block_output, legacy_output
+        integer :: block_count, steps_per_block, ii, jj
+        character(len=256) :: current_block_file
+        
         ! values for plane wave
         real(real64) :: t, eta, eps_r_min, vbackground
         real(real64) :: p(3), ehat(3), r(3), r0(3), Ev(3), Hv(3) 
@@ -2526,6 +2557,7 @@ module cpmlfdtd
         memory_dHy_dx(:,:) = 0.0_real64
         memory_dHy_dz(:,:) = 0.0_real64
         
+        
         ! ----------------------------------------------------------------------
         ! Compute the coefficients of the FD scheme. First scale the relative 
         ! permittivity and permeabilities to get the absolute values 
@@ -2556,6 +2588,10 @@ module cpmlfdtd
         !---
         !---  beginning of time loop
         !---
+        ! ======================== I/O Setup ========================
+        call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
+        block_count = 0
         
         Ex_old = Ex 
         Ez_old = Ez
@@ -2758,12 +2794,30 @@ module cpmlfdtd
 #ifdef SEIDART_OPENMP_GPU
             !$omp target update from(Ex, Ez)
 #endif
-            call write_image2(Ex, nx, nz, source, it, 'Ex', SINGLE)
-            call write_image2(Ez, nx, nz, source, it, 'Ez', SINGLE)
+            ! -------- Output --------
+            if (block_output) then
+                if (current_step_in_block == 0) then
+                    block_count = block_count + 1
+                    ii = (block_count - 1) * steps_per_block + 1
+                    jj = min(block_count * steps_per_block, source%time_steps)
+                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a)") &
+                        'EM2.', ii, '-', jj, '.', source%xind, '.', source%zind, '.blk.zst'
+                endif
+                call add_step_to_block_2d(current_block_file, &
+                    real(ex, real64), real(ez, real64))
+            endif
+
+            if (legacy_output) then
+                call write_image2(real(ex, real64), nx, nz, source, it, 'Ex', SINGLE)
+                call write_image2(real(ez, real64), nx, nz, source, it, 'Ez', SINGLE)
+            endif
         enddo
+        
 #ifdef SEIDART_OPENMP_GPU
         !$omp end target data
 #endif
+        
+        if (block_output) call finalize_io(current_block_file)
         
         deallocate(eps11, eps13,  eps33, sig11, sig13,  sig33, srcx, srcz)
         deallocate(kappa, alpha, acoef, bcoef, kappa_half, alpha_half, acoef_half, bcoef_half)
@@ -3276,53 +3330,103 @@ module cpmlfdtd
 #ifdef SEIDART_OPENMP_GPU
             !$omp target
 #endif
-            Ex(isource,ksource) = Ex(isource,ksource) + & 
-                        srcx(it) * dt / eps11(isource,ksource)
-            Ey(isource,ksource) = Ey(isource,ksource) + & 
-                        srcy(it) * dt / eps22(isource,ksource) 
-            Ez(isource,ksource) = Ez(isource,ksource) + & 
-                        srcz(it) * dt / eps33(isource,ksource)
+            ! Legacy source injection
+            ! Ex(isource,ksource) = Ex(isource,ksource) + & 
+            !             srcx(it) * dt / eps11(isource,ksource)
+            ! Ey(isource,ksource) = Ey(isource,ksource) + & 
+            !             srcy(it) * dt / eps22(isource,ksource) 
+            ! Ez(isource,ksource) = Ez(isource,ksource) + & 
+            !             srcz(it) * dt / eps33(isource,ksource)
+            
+            ! Source injection using the full inverse consitutive matrix
+            Ex(isource,ksource) = Ex(isource,ksource) + dt * ( &
+                aEx(isource,ksource)*srcx(it) + bEx(isource,ksource)*srcy(it) + cEx(isource,ksource)*srcz(it) )
+
+            Ey(isource,ksource) = Ey(isource,ksource) + dt * ( &
+                aEy(isource,ksource)*srcx(it) + bEy(isource,ksource)*srcy(it) + cEy(isource,ksource)*srcz(it) )
+
+            Ez(isource,ksource) = Ez(isource,ksource) + dt * ( &
+                aEz(isource,ksource)*srcx(it) + bEz(isource,ksource)*srcy(it) + cEz(isource,ksource)*srcz(it) )
 #ifdef SEIDART_OPENMP_GPU
             !$omp end target
 #endif
 
-            ! Dirichlet conditions (rigid boundaries) on the edges or at the bottom of the PML layers
-            Ex(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ex(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ex(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ex(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64) 
-
-            Ey(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ey(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ey(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ey(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            
-            Ez(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ez(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ez(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Ez(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            
-            Hx(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hx(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hx(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hx(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-
-            Hy(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hy(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hy(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hy(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            
-            Hz(1,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hz(:,1) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hz(nx,:) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            Hz(:,nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
-            
-            Ex_old = Ex 
-            Ey_old = Ey 
-            Ez_old = Ez 
-            
+            ! -----------------------------------------------------------------
+            ! Dirichlet Boundary Conditions (Enforced on GPU)
+            ! -----------------------------------------------------------------
 #ifdef SEIDART_OPENMP_GPU
-                !$omp target update to(Ex, Ey, Ez, Hx, Hy, Hz, Ex_old, Ey_old, Ez_old)
+            !$omp target teams distribute parallel do collapse(1) private(i)
+#else
+            !$omp parallel do private(i) schedule(static)
+#endif
+            
+            do i = 1, nx
+                ! Top and Bottom Boundaries (k = 1 and k = nz)
+                Ex(i, 1)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ex(i, nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ey(i, 1)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ey(i, nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ez(i, 1)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ez(i, nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+
+                Hx(i, 1)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hx(i, nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hy(i, 1)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hy(i, nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hz(i, 1)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hz(i, nz) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            end do
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
+
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams distribute parallel do collapse(1) private(k)
+#else
+            !$omp parallel do private(k) schedule(static)
+#endif
+            do k = 1, nz
+                ! Left and Right Boundaries (i = 1 and i = nx)
+                Ex(1, k)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ex(nx, k) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ey(1, k)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ey(nx, k) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ez(1, k)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Ez(nx, k) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+
+                Hx(1, k)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hx(nx, k) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hy(1, k)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hy(nx, k) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hz(1, k)  = cmplx(0.0_real64, 0.0_real64, kind=real64)
+                Hz(nx, k) = cmplx(0.0_real64, 0.0_real64, kind=real64)
+            end do
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
+
+            ! -----------------------------------------------------------------
+            ! Save Previous Electric Field State (on GPU)
+            ! -----------------------------------------------------------------
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target teams distribute parallel do collapse(2) private(i, k)
+#else
+            !$omp parallel do collapse(2) private(i, k) schedule(static)
+#endif
+            do k = 1, nz
+                do i = 1, nx
+                    Ex_old(i, k) = Ex(i, k)
+                    Ey_old(i, k) = Ey(i, k)
+                    Ez_old(i, k) = Ez(i, k)
+                end do
+            end do
+#ifndef SEIDART_OPENMP_GPU
+            !$omp end parallel do
+#endif
+
+            ! Synchronize field state from GPU to Host ONLY for I/O and stability checks
+#ifdef SEIDART_OPENMP_GPU
+            !$omp target update from(Ex, Ey, Ez)
 #endif
             ! check norm of velocity to make sure the solution isn't diverging
             velocnorm = maxval( sqrt( real(Ex*conjg(Ex) + Ey*conjg(Ey) + Ez*conjg(Ez), real64) ) )
@@ -3334,13 +3438,12 @@ module cpmlfdtd
                     block_count = block_count + 1
                     ii = (block_count - 1) * steps_per_block + 1 
                     jj = min(block_count * steps_per_block, source%time_steps)
-                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a, i0, a)") &
-                        'EM25.', ii, '-', jj, '.', source%xind, '.', &
-                        source%yind, '.', source%zind, '.blk.zst'
+                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a)") &
+                        'EM25.', ii, '-', jj, '.', source%xind, '.', source%zind, '.blk.zst'
                 endif
-                call add_step_to_block_2d(current_block_file, real(Ex, real64), real(Ey, real64), real(Ez, real64))                
+                call add_step_to_block_25d(current_block_file, &
+                    real(Ex, real64), real(Ey, real64), real(Ez, real64))                
             endif
-
             
             if (legacy_output) then
                 call write_image2( real(Ex, real64), nx, nz, source, it, 'Ex', SINGLE )

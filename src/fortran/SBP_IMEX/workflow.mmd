@@ -1,0 +1,52 @@
+flowchart TD
+    subgraph PRE ["1. Pre-processing & Domain Setup"]
+        A1["Define Global Cartesian Grid / Block Structure"] --> A2["Map Spatial Material Fields C_ijkl(x), rho(x), psi(x), b(x)"]
+        A2 --> A3["Set Material Zones: Earth, Atmosphere (Infrasound), Voids(Caves)"]
+        A3 --> A4["Initialize SBP Spatial Derivative Operators (D_x, D_y, D_z)"]
+        Ar --> A5["Initialize Outer Boundary SAT Operators (PML/Absorbing Walls)"]
+    end
+    
+    subgraph TIME ["2. Time Integration Loop (IMEX Scheme)"]
+        B1["Start Time Step t_n"] --> B2["Loop over IMEX RK Stages i = 1 ... s"]
+        
+        subgraph STAGE ["Stage i Evaluation"]
+            C1["Compute Spatial Derivatives via SBP Operators:
+            D_x(sigma), D_y(sigma), D_z(sigma), D_x(p), D_x(m)"]
+            
+            C2["Evaluate Non-Stiff Explicit Vector A(Y-j):
+            Wave propagation, advection, spatial stress gradients"]
+            
+            C3["Assemble Stage Explicit RHS Vector R_i"]
+            
+            C4["Point-Block Local Implicit Solve(No Global Matrix Inversion):
+            [I - delta t a_ii^I J_S ] Y_i = R_i
+            Inverts stiff drag b(x) = eta / k and memory variables locally per node"]
+        end
+        
+        B2 --> C1 
+        C4 --> B3["Inject Moving Sources & Fracture Propagation"]
+        
+        subgraph Source ["Source & Rupture Dynamics"]
+            D1["Update Crack-Tip / Moving Source Position x_src(t)"]
+            D2["Apply Equivalent Moment Tensor / Phase-Field Fracture Increment"]
+        end
+        
+        B3 --> D1 
+        D2 --> B4["Complete Stage Update Y_i"]
+        B4 --> B5{"More Stages?"}
+        B5 -- Yes --> B2 
+        B5 -- No --> B6["Advance Field State: Q^(n+1) = Q^n + delta t Sigma (b_j^E A + b_j^I S)"]
+    end 
+    
+    subgraph AMR ["3. Post-Stage & AMR Check (Optional)"]
+        B6 --> E1{"Check AMR Triggers?
+        (Stress Gradients / Crack Location)"}
+        E1 -- Refine/Coarsen --> E2["Adapt Mesh Hierarchy (Quadtree/Octree Block - AMR)"]
+        E2 --> E3["Transfer Field Data & SAT Interface Fluxes Across Blocks"]
+        E1 -- No Change --> E4["Output Waveifield Data: Infrasound Pressure, Seismic v, Rotation omega"]
+        E3 --> E4 
+    end
+    
+    E4 --> F1{"t-n < t_final?"}
+    F1 -- Yes --> B1 
+    F1 -- No --> G1["Simulation Complete"]

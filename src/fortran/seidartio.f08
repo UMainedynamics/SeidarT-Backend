@@ -647,7 +647,8 @@ module seidartio
     !! strips the CPML padding, converts to real32, and stores in the
     !! block_buffer(:,1,:,component,step) slice.
     !! When the block is full, automatically calls write_zstd_block.
-    subroutine add_step_to_block_2d(filename, Ex, Ey, Ez)
+    subroutine add_step_to_block_25d(filename, Ex, Ey, Ez)
+        ! 2D arrays for 2.5D field data
         character(len=*), intent(in) :: filename
         real(c_double), intent(in) :: Ex(:,:)
         real(c_double), intent(in) :: Ey(:,:)
@@ -670,6 +671,32 @@ module seidartio
             real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
                     output_cpml+1:size(Ez,2)-output_cpml), c_float)
 
+        ! if the block is full, write it and reset
+        if (current_step_in_block == total_block_limit) then
+            call write_zstd_block(filename)
+        end if
+    end subroutine add_step_to_block_25d
+    
+    subroutine add_step_to_block_2d(filename, Ex, Ez)
+        ! 2D arrays for 2D field data (Ex, Ez) for the zstd block
+        character(len=*), intent(in) :: filename
+        real(c_double), intent(in) :: Ex(:,:)
+        real(c_double), intent(in) :: Ez(:,:)
+
+        if (.not. allocated(block_buffer)) then
+            print *, 'Error: zstd block I/O has not been initialized'
+            stop
+        end if
+
+        current_step_in_block = current_step_in_block + 1
+
+        block_buffer(:,1,:,1,current_step_in_block) = &
+            real(Ex(output_cpml+1:size(Ex,1)-output_cpml, &
+                    output_cpml+1:size(Ex,2)-output_cpml), c_float)
+        block_buffer(:,1,:,2,current_step_in_block) = &
+            real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
+                    output_cpml+1:size(Ez,2)-output_cpml), c_float)
+        
         ! if the block is full, write it and reset
         if (current_step_in_block == total_block_limit) then
             call write_zstd_block(filename)
