@@ -1,13 +1,14 @@
 module source_module
     use iso_c_binding
     use iso_fortran_env, only: real64
-    use spectral_operators, only: spectral_grid_t
+    use seidart_types
+    use constants
+    
     implicit none
     include 'fftw3.f03'
 
     private
-    public :: source_t, &
-              init_source_weight_drop,   &
+    public :: init_source_weight_drop,   &
               init_source_explosive,     &
               init_source_double_couple, &
               init_source_clvd,          &
@@ -15,120 +16,69 @@ module source_module
               inject_source_explicit_stage, &
               free_source
 
-    type :: source_t
-        ! Source type: 
-        ! 1 = Body Force Vector (AWD)
-        ! 2 = Moment Tensor (Explosive, DC, CLVD)
-        ! 3 = Boundary-Injected Plane Wave (TFSF)
-        integer :: source_type
-        
-        ! Coordinates / Stencil footprint for local point/tensor sources
-        real(real64) :: xs, ys, zs
-        integer :: isrc, jsrc, ksrc
-        integer :: half_span
-        integer :: i1, i2, j1, j2, k1, k2
-        
-        ! Directional Force components (For AWD)
-        real(real64) :: force_vec(3)
-        
-        ! Symmetric Moment Tensor (For Explosive, DC, CLVD)
-        real(real64) :: moment_tensor(6) 
-        
-        ! Plane wave parameters
-        real(real64) :: p_dir(3)        ! Propagation direction unit vector
-        real(real64) :: e_pol(3)        ! Particle polarization unit vector
-        real(real64) :: c_phase         ! Background wave phase velocity (m/s)
-        real(real64) :: r0_ref(3)       ! Reference entry point for t=0 phase
-        integer :: pml_thick            ! Thickness of sponge boundary layer
-        real(real64), allocatable :: time_delay_3d(:,:,:) ! Spatial propagation delay tau(x,y,z)
-        logical, allocatable :: injection_mask(:,:,:)     ! Active TFSF boundary cells
-        
-        ! Synthesized time series and spatial kernel
-        integer :: n_steps
-        real(real64) :: dt
-        real(real64), allocatable :: time_series(:)
-        real(real64), allocatable :: spatial_kernel(:,:,:)
-    end type source_t
-
 contains
 
     ! --------------------------------------------------------------------------
     !> 1. ACCELERATED WEIGHT DROP (AWD)
-    subroutine init_source_weight_drop(src, xs, ys, zs, force_magnitude, &
-                                       impact_azimuth_deg, impact_dip_deg, &
-                                       F_spec, freq_spec, n_spec, &
-                                       n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
-        type(source_t), intent(inout) :: src
-        real(real64), intent(in) :: xs, ys, zs
-        real(real64), intent(in) :: force_magnitude
-        real(real64), intent(in) :: impact_azimuth_deg, impact_dip_deg
+    subroutine init_source_weight_drop(src, domain, F_spec, freq_spec, n_spec, grid)
+        type(Source_Type), intent(inout) :: src
+        type(Domain_Type), intent(in) :: domain
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
-        integer, intent(in) :: n_spec, n_steps
-        real(real64), intent(in) :: dt
+        integer, intent(in) :: n_spec,
         type(spectral_grid_t), intent(inout) :: grid
-        real(real64), intent(in) :: domain_dx, domain_dy, domain_dz
 
-        real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
+        
         real(real64) :: az_rad, dip_rad
 
-        src%xs = xs; src%ys = ys; src%zs = zs
-        src%source_type = 1
-        src%n_steps = n_steps
-        src%dt = dt
+        az_rad  = src%azimuth * DEG2RAD
+        dip_rad = src%dip * DEG2RAD
 
-        az_rad  = impact_azimuth_deg * DEG2RAD
-        dip_rad = impact_dip_deg * DEG2RAD
-
-        src%force_vec(1) = force_magnitude * cos(dip_rad) * sin(az_rad)
-        src%force_vec(2) = force_magnitude * cos(dip_rad) * cos(az_rad)
-        src%force_vec(3) = force_magnitude * sin(dip_rad)
+        src%force_vec(1) = src%amplitude * cos(dip_rad) * sin(az_rad)
+        src%force_vec(2) = src%amplitude * cos(dip_rad) * cos(az_rad)
+        src%force_vec(3) = src%amplitude * sin(dip_rad)
 
         call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
-        call precompute_spatial_kernel(src, grid, domain_dx, domain_dy, domain_dz)
+        call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_weight_drop
 
     ! --------------------------------------------------------------------------
     !> 2. EXPLOSIVE (ISOTROPIC MOMENT TENSOR)
-    subroutine init_source_explosive(src, xs, ys, zs, M0, &
+    subroutine init_source_explosive(src, M0, &
                                      F_spec, freq_spec, n_spec, &
                                      n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
-        type(source_t), intent(inout) :: src
-        real(real64), intent(in) :: xs, ys, zs
+        type(Source_Type), intent(inout) :: src
+        type(Domain_Type), intent(in) :: domain
+        
         real(real64), intent(in) :: M0
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
         integer, intent(in) :: n_spec, n_steps
         real(real64), intent(in) :: dt
         type(spectral_grid_t), intent(inout) :: grid
-        real(real64), intent(in) :: domain_dx, domain_dy, domain_dz
-
-        src%xs = xs; src%ys = ys; src%zs = zs
-        src%source_type = 2
-        src%n_steps = n_steps
-        src%dt = dt
-
+        
+        
         src%moment_tensor = 0.0_real64
         src%moment_tensor(1) = M0
         src%moment_tensor(2) = M0
         src%moment_tensor(3) = M0
 
         call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
-        call precompute_spatial_kernel(src, grid, domain_dx, domain_dy, domain_dz)
+        call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_explosive
 
     ! --------------------------------------------------------------------------
     !> 3. DOUBLE COUPLE (FAULT RUPTURE)
-    subroutine init_source_double_couple(src, xs, ys, zs, M0, strike_deg, dip_deg, rake_deg, &
+    subroutine init_source_double_couple(src, domain, M0, strike_deg, dip_deg, rake_deg, &
                                          F_spec, freq_spec, n_spec, &
                                          n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
-        type(source_t), intent(inout) :: src
-        real(real64), intent(in) :: xs, ys, zs
+        type(Source_Type), intent(inout) :: src
+        type(Domain_Type)
         real(real64), intent(in) :: M0
         real(real64), intent(in) :: strike_deg, dip_deg, rake_deg
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
-        integer, intent(in) :: n_spec, n_steps
+        integer, intent(in) :: n_spec
         real(real64), intent(in) :: dt
         type(spectral_grid_t), intent(inout) :: grid
         real(real64), intent(in) :: domain_dx, domain_dy, domain_dz
@@ -138,11 +88,6 @@ contains
         real(real64) :: s_phi, c_phi, s_2phi, c_2phi
         real(real64) :: s_del, c_del, s_2del, c_2del
         real(real64) :: s_lam, c_lam
-
-        src%xs = xs; src%ys = ys; src%zs = zs
-        src%source_type = 2
-        src%n_steps = n_steps
-        src%dt = dt
 
         phi = strike_deg * DEG2RAD
         del = dip_deg    * DEG2RAD
@@ -167,7 +112,7 @@ contains
 
     ! --------------------------------------------------------------------------
     !> 4. COMPENSATED LINEAR VECTOR DIPOLE (CLVD)
-    subroutine init_source_clvd(src, xs, ys, zs, M0, axis_azimuth_deg, axis_plunge_deg, &
+    subroutine init_source_clvd(src, domain, M0, axis_azimuth_deg, axis_plunge_deg, &
                                 F_spec, freq_spec, n_spec, &
                                 n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
         type(source_t), intent(inout) :: src
@@ -359,10 +304,10 @@ contains
 
     ! --------------------------------------------------------------------------
     !> Builds compact 3D spatial subgrid kernel using exact k-space phase shifts
-    subroutine precompute_spatial_kernel(src, grid, dx, dy, dz)
+    subroutine precompute_spatial_kernel(src, grid, domain)
         type(source_t), intent(inout) :: src
         type(spectral_grid_t), intent(inout) :: grid
-        real(real64), intent(in) :: dx, dy, dz
+        real(Domain_Type), intent(in) :: domain
 
         real(real64), allocatable :: full_spatial(:,:,:)
         complex(real64), parameter :: imag_unit = (0.0_real64, 1.0_real64)
@@ -370,7 +315,7 @@ contains
         integer :: i, j, k, di, dj, dk
 
         src%half_span = 4
-        allocate(full_spatial(grid%nx, grid%ny, grid%nz))
+        allocate(full_spatial(domain%nx, domain%ny, domain%nz))
         allocate(src%spatial_kernel(-src%half_span:src%half_span, &
                                     -src%half_span:src%half_span, &
                                     -src%half_span:src%half_span))
@@ -382,9 +327,9 @@ contains
         v_cell = dx * dy * dz
 
         !$omp parallel do collapse(3) private(i,j,k,phase)
-        do k = 1, grid%nz
-            do j = 1, grid%ny
-                do i = 1, grid%nkx
+        do k = 1, domain%nz
+            do j = 1, domain%ny
+                do i = 1, domain%nkx
                     phase = -(grid%kx(i)*src%xs + grid%ky(j)*src%ys + grid%kz(k)*src%zs)
                     grid%F_hat(i, j, k) = (exp(imag_unit * phase) / v_cell) * grid%inv_n_total
                 end do
@@ -419,7 +364,7 @@ contains
     ! --------------------------------------------------------------------------
     !> Injects source amplitude into explicit stage RHS tensor T at stage time
     subroutine inject_source_explicit_stage(src, nx, ny, nz, T_stage, it, stage_time_frac, density_s)
-        type(source_t), intent(in) :: src
+        type(Source_Type), intent(in) :: src
         integer, intent(in) :: nx, ny, nz
         real(real64), intent(inout) :: T_stage(21, nx, ny, nz)
         integer, intent(in) :: it
@@ -431,52 +376,13 @@ contains
         integer :: idx_floor, idx_ceil, i, j, k, di, dj, dk
 
         t_curr = (real(it - 1, real64) + stage_time_frac) * src%dt
-
-        ! ---------------------------------------------------------------------
-        ! CASE 1 & 2: Local Point Sources (AWD & Moment Tensors)
-        ! ---------------------------------------------------------------------
-        if (src%source_type == 1 .or. src%source_type == 2) then
-            t_idx = t_curr / src%dt
-            idx_floor = int(t_idx) + 1
-            idx_ceil  = min(src%n_steps, idx_floor + 1)
-            frac = t_idx - real(idx_floor - 1, real64)
-
-            if (idx_floor >= 1 .and. idx_floor <= src%n_steps) then
-                s_val = (1.0_real64 - frac) * src%time_series(idx_floor) + frac * src%time_series(idx_ceil)
-            else
-                return
-            end if
-
-            do k = src%k1, src%k2
-                dk = k - src%ksrc
-                do j = src%j1, src%j2
-                    dj = j - src%jsrc
-                    do i = src%i1, src%i2
-                        di = i - src%isrc
-                        w_ker = src%spatial_kernel(di, dj, dk)
-
-                        if (src%source_type == 1) then
-                            ! Force -> Solid Accelerations (1:3)
-                            T_stage(1, i, j, k) = T_stage(1, i, j, k) + (s_val * src%force_vec(1) * w_ker) / density_s(i, j, k)
-                            T_stage(2, i, j, k) = T_stage(2, i, j, k) + (s_val * src%force_vec(2) * w_ker) / density_s(i, j, k)
-                            T_stage(3, i, j, k) = T_stage(3, i, j, k) + (s_val * src%force_vec(3) * w_ker) / density_s(i, j, k)
-                        else
-                            ! Moment Tensor -> Stress Rates (7:12)
-                            T_stage(7,  i, j, k) = T_stage(7,  i, j, k) + (s_val * src%moment_tensor(1) * w_ker)
-                            T_stage(8,  i, j, k) = T_stage(8,  i, j, k) + (s_val * src%moment_tensor(2) * w_ker)
-                            T_stage(9,  i, j, k) = T_stage(9,  i, j, k) + (s_val * src%moment_tensor(3) * w_ker)
-                            T_stage(10, i, j, k) = T_stage(10, i, j, k) + (s_val * src%moment_tensor(4) * w_ker)
-                            T_stage(11, i, j, k) = T_stage(11, i, j, k) + (s_val * src%moment_tensor(5) * w_ker)
-                            T_stage(12, i, j, k) = T_stage(12, i, j, k) + (s_val * src%moment_tensor(6) * w_ker)
-                        end if
-                    end do
-                end do
-            end do
-
-        ! ---------------------------------------------------------------------
-        ! CASE 3: Incident Boundary Plane Wave (TFSF Injection)
-        ! ---------------------------------------------------------------------
-        else if (src%source_type == 3) then
+        
+        if (src%source_type == "pw") then
+            
+        ! ---------------------------------------------
+        ! Incident Boundary Plane Wave (TFSF Injection)
+        ! ---------------------------------------------
+    
             !$omp parallel do collapse(3) private(i,j,k,t_delayed,t_idx,idx_floor,idx_ceil,frac,s_val,rho_val,z_impedance)
             do k = 1, nz
                 do j = 1, ny
@@ -520,6 +426,47 @@ contains
                 end do
             end do
             !$omp end parallel do
+        else
+            ! ------------------------------------------
+            ! Local Point Sources (AWD & Moment Tensors)
+            ! ------------------------------------------
+            t_idx = t_curr / src%dt
+            idx_floor = int(t_idx) + 1
+            idx_ceil  = min(src%n_steps, idx_floor + 1)
+            frac = t_idx - real(idx_floor - 1, real64)
+
+            if (idx_floor >= 1 .and. idx_floor <= src%n_steps) then
+                s_val = (1.0_real64 - frac) * src%time_series(idx_floor) + frac * src%time_series(idx_ceil)
+            else
+                return
+            end if
+
+            do k = src%k1, src%k2
+                dk = k - src%ksrc
+                do j = src%j1, src%j2
+                    dj = j - src%jsrc
+                    do i = src%i1, src%i2
+                        di = i - src%isrc
+                        w_ker = src%spatial_kernel(di, dj, dk)
+
+                        if (src%source_type == "ac") then
+                            ! Force -> Solid Accelerations (1:3)
+                            T_stage(1, i, j, k) = T_stage(1, i, j, k) + (s_val * src%force_vec(1) * w_ker) / density_s(i, j, k)
+                            T_stage(2, i, j, k) = T_stage(2, i, j, k) + (s_val * src%force_vec(2) * w_ker) / density_s(i, j, k)
+                            T_stage(3, i, j, k) = T_stage(3, i, j, k) + (s_val * src%force_vec(3) * w_ker) / density_s(i, j, k)
+                        else
+                            ! Moment Tensor -> Stress Rates (7:12)
+                            T_stage(7,  i, j, k) = T_stage(7,  i, j, k) + (s_val * src%moment_tensor(1) * w_ker)
+                            T_stage(8,  i, j, k) = T_stage(8,  i, j, k) + (s_val * src%moment_tensor(2) * w_ker)
+                            T_stage(9,  i, j, k) = T_stage(9,  i, j, k) + (s_val * src%moment_tensor(3) * w_ker)
+                            T_stage(10, i, j, k) = T_stage(10, i, j, k) + (s_val * src%moment_tensor(4) * w_ker)
+                            T_stage(11, i, j, k) = T_stage(11, i, j, k) + (s_val * src%moment_tensor(5) * w_ker)
+                            T_stage(12, i, j, k) = T_stage(12, i, j, k) + (s_val * src%moment_tensor(6) * w_ker)
+                        end if
+                    end do
+                end do
+            end do
+
         end if
 
     end subroutine inject_source_explicit_stage
