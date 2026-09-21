@@ -38,50 +38,40 @@ contains
         src%force_vec(2) = src%amplitude * cos(dip_rad) * cos(az_rad)
         src%force_vec(3) = src%amplitude * sin(dip_rad)
 
-        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
+        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
         call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_weight_drop
 
     ! --------------------------------------------------------------------------
     !> 2. EXPLOSIVE (ISOTROPIC MOMENT TENSOR)
-    subroutine init_source_explosive(src, M0, &
-                                     F_spec, freq_spec, n_spec, &
-                                     n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
+    subroutine init_source_explosive(src,F_spec, freq_spec, n_spec, grid, domain)
         type(Source_Type), intent(inout) :: src
         type(Domain_Type), intent(in) :: domain
         
-        real(real64), intent(in) :: M0
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
-        integer, intent(in) :: n_spec, n_steps
-        real(real64), intent(in) :: dt
+        integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
         
         
         src%moment_tensor = 0.0_real64
-        src%moment_tensor(1) = M0
-        src%moment_tensor(2) = M0
-        src%moment_tensor(3) = M0
+        src%moment_tensor(1) = src%amplitude
+        src%moment_tensor(2) = src%amplitude
+        src%moment_tensor(3) = src%amplitude
 
-        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
+        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
         call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_explosive
 
     ! --------------------------------------------------------------------------
     !> 3. DOUBLE COUPLE (FAULT RUPTURE)
-    subroutine init_source_double_couple(src, domain, M0, strike_deg, dip_deg, rake_deg, &
-                                         F_spec, freq_spec, n_spec, &
-                                         n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
+    subroutine init_source_double_couple(src, domain, F_spec, freq_spec, n_spec, grid)
         type(Source_Type), intent(inout) :: src
-        type(Domain_Type)
-        real(real64), intent(in) :: M0
-        real(real64), intent(in) :: strike_deg, dip_deg, rake_deg
+        type(Domain_Type), intent(in) :: domain
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
         integer, intent(in) :: n_spec
-        real(real64), intent(in) :: dt
         type(spectral_grid_t), intent(inout) :: grid
-        real(real64), intent(in) :: domain_dx, domain_dy, domain_dz
 
         real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
         real(real64) :: phi, del, lam
@@ -89,9 +79,9 @@ contains
         real(real64) :: s_del, c_del, s_2del, c_2del
         real(real64) :: s_lam, c_lam
 
-        phi = strike_deg * DEG2RAD
-        del = dip_deg    * DEG2RAD
-        lam = rake_deg   * DEG2RAD
+        phi = src%strike * DEG2RAD
+        del = src%dip    * DEG2RAD
+        lam = src%rake   * DEG2RAD
 
         s_phi = sin(phi); c_phi = cos(phi)
         s_2phi = sin(2.0_real64 * phi); c_2phi = cos(2.0_real64 * phi)
@@ -99,57 +89,48 @@ contains
         s_2del = sin(2.0_real64 * del); c_2del = cos(2.0_real64 * del)
         s_lam = sin(lam); c_lam = cos(lam)
 
-        src%moment_tensor(1) = -M0 * (s_del * c_lam * s_2phi + s_2del * s_lam * s_phi**2)
-        src%moment_tensor(2) =  M0 * (s_del * c_lam * s_2phi - s_2del * s_lam * c_phi**2)
-        src%moment_tensor(3) =  M0 * (s_2del * s_lam)
-        src%moment_tensor(4) = -M0 * (c_del * c_lam * s_phi - c_2del * s_lam * c_phi)
-        src%moment_tensor(5) = -M0 * (c_del * c_lam * c_phi + c_2del * s_lam * s_phi)
-        src%moment_tensor(6) =  M0 * (s_del * c_lam * c_2phi + 0.5_real64 * s_2del * s_lam * s_2phi)
+        src%moment_tensor(1) = -src%amplitude * (s_del * c_lam * s_2phi + s_2del * s_lam * s_phi**2)
+        src%moment_tensor(2) =  src%amplitude * (s_del * c_lam * s_2phi - s_2del * s_lam * c_phi**2)
+        src%moment_tensor(3) =  src%amplitude * (s_2del * s_lam)
+        src%moment_tensor(4) = -src%amplitude * (c_del * c_lam * s_phi - c_2del * s_lam * c_phi)
+        src%moment_tensor(5) = -src%amplitude * (c_del * c_lam * c_phi + c_2del * s_lam * s_phi)
+        src%moment_tensor(6) =  src%amplitude * (s_del * c_lam * c_2phi + 0.5_real64 * s_2del * s_lam * s_2phi)
 
-        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
-        call precompute_spatial_kernel(src, grid, domain_dx, domain_dy, domain_dz)
+        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
+        call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_double_couple
 
     ! --------------------------------------------------------------------------
     !> 4. COMPENSATED LINEAR VECTOR DIPOLE (CLVD)
-    subroutine init_source_clvd(src, domain, M0, axis_azimuth_deg, axis_plunge_deg, &
-                                F_spec, freq_spec, n_spec, &
-                                n_steps, dt, grid, domain_dx, domain_dy, domain_dz)
-        type(source_t), intent(inout) :: src
-        real(real64), intent(in) :: xs, ys, zs
-        real(real64), intent(in) :: M0
+    subroutine init_source_clvd(src, domain, F_spec, freq_spec, n_spec, grid)
+        type(Source_Type), intent(inout) :: src
+        type(Domain_Type), intent(in) :: domain
         real(real64), intent(in) :: axis_azimuth_deg, axis_plunge_deg
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
-        integer, intent(in) :: n_spec, n_steps
-        real(real64), intent(in) :: dt
+        integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
-        real(real64), intent(in) :: domain_dx, domain_dy, domain_dz
 
-        real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
         real(real64) :: az_rad, pl_rad, ex, ey, ez
 
-        src%xs = xs; src%ys = ys; src%zs = zs
-        src%source_type = 2
-        src%n_steps = n_steps
-        src%dt = dt
+        
 
-        az_rad = axis_azimuth_deg * DEG2RAD
-        pl_rad = axis_plunge_deg  * DEG2RAD
+        az_rad = src%azimuth * DEG2RAD
+        pl_rad = src%plunge  * DEG2RAD
 
         ex = cos(pl_rad) * sin(az_rad)
         ey = cos(pl_rad) * cos(az_rad)
         ez = sin(pl_rad)
 
-        src%moment_tensor(1) = M0 * (3.0_real64 * ex * ex - 1.0_real64)
-        src%moment_tensor(2) = M0 * (3.0_real64 * ey * ey - 1.0_real64)
-        src%moment_tensor(3) = M0 * (3.0_real64 * ez * ez - 1.0_real64)
-        src%moment_tensor(4) = M0 * (3.0_real64 * ey * ez)
-        src%moment_tensor(5) = M0 * (3.0_real64 * ex * ez)
-        src%moment_tensor(6) = M0 * (3.0_real64 * ex * ey)
+        src%moment_tensor(1) = src%amplitude * (3.0_real64 * ex * ex - 1.0_real64)
+        src%moment_tensor(2) = src%amplitude * (3.0_real64 * ey * ey - 1.0_real64)
+        src%moment_tensor(3) = src%amplitude * (3.0_real64 * ez * ez - 1.0_real64)
+        src%moment_tensor(4) = src%amplitude * (3.0_real64 * ey * ez)
+        src%moment_tensor(5) = src%amplitude * (3.0_real64 * ex * ez)
+        src%moment_tensor(6) = src%amplitude * (3.0_real64 * ex * ey)
 
-        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
-        call precompute_spatial_kernel(src, grid, domain_dx, domain_dy, domain_dz)
+        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
+        call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_clvd
 
     ! --------------------------------------------------------------------------
@@ -158,33 +139,26 @@ contains
     !> prop_azimuth_deg: 0=North (+y), 90=East (+x)
     !> prop_dip_deg: 0=Horizontal, 90=Directly downward (+z)
     !> pol_type: 'P', 'SV', 'SH'
-    subroutine init_source_plane_wave(src, nx, ny, nz, dx, dy, dz, cpml_nodes, &
+    subroutine init_source_plane_wave(src, domain, &
                                       c_background, prop_azimuth_deg, prop_dip_deg, pol_type, &
-                                      F_spec, freq_spec, n_spec, n_steps, dt)
-        type(source_t), intent(inout) :: src
-        integer, intent(in) :: nx, ny, nz, cpml_nodes
-        real(real64), intent(in) :: dx, dy, dz, c_background
+                                      F_spec, freq_spec, n_spec)
+        type(Source_Type), intent(inout) :: src
+        type(Domain_Type), intent(in) :: domain
+        real(real64), intent(in) :: c_background
         real(real64), intent(in) :: prop_azimuth_deg, prop_dip_deg
         character(len=*), intent(in) :: pol_type
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
-        integer, intent(in) :: n_spec, n_steps
-        real(real64), intent(in) :: dt
-
+        integer, intent(in) :: n_spec
         real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
         real(real64) :: az_rad, dip_rad
         real(real64) :: px, py, pz, sv_x, sv_y, sv_z, sh_x, sh_y, sh_z
         real(real64) :: rx, ry, rz, dot_val
         integer :: i, j, k, i_min, i_max, j_min, j_max, k_min, k_max
 
-        src%source_type = 3
-        src%n_steps = n_steps
-        src%dt = dt
-        src%c_phase = c_background
-        src%pml_thick = cpml_nodes
 
-        az_rad  = prop_azimuth_deg * DEG2RAD
-        dip_rad = prop_dip_deg     * DEG2RAD
+        az_rad  = src%azimuth * DEG2RAD
+        dip_rad = src%dip     * DEG2RAD
 
         ! Direction unit vector p (x=East, y=North, z=Down)
         px = cos(dip_rad) * sin(az_rad)
@@ -211,25 +185,25 @@ contains
         end select
 
         ! Reference plane entry corner
-        src%r0_ref(1) = merge(real(cpml_nodes+1, real64)*dx, real(nx-cpml_nodes, real64)*dx, px >= 0.0_real64)
-        src%r0_ref(2) = merge(real(cpml_nodes+1, real64)*dy, real(ny-cpml_nodes, real64)*dy, py >= 0.0_real64)
-        src%r0_ref(3) = merge(real(cpml_nodes+1, real64)*dz, real(nz-cpml_nodes, real64)*dz, pz >= 0.0_real64)
+        src%r0_ref(1) = merge(real(domain%npml+1, real64)*domain%dx, real(domain%nx-domain%npml, real64)*domain%dx, px >= 0.0_real64)
+        src%r0_ref(2) = merge(real(domain%npml+1, real64)*domain%dy, real(domain%ny-domain%npml, real64)*domain%dy, py >= 0.0_real64)
+        src%r0_ref(3) = merge(real(domain%npml+1, real64)*domain%dz, real(domain%nz-domain%npml, real64)*domain%dz, pz >= 0.0_real64)
 
-        allocate(src%time_delay_3d(nx, ny, nz))
-        allocate(src%injection_mask(nx, ny, nz))
+        allocate(src%time_delay_3d(domain%nx, domain%ny, domain%nz))
+        allocate(src%injection_mask(domain%nx, domain%ny, domain%nz))
         src%injection_mask = .false.
 
-        i_min = cpml_nodes + 2; i_max = nx - cpml_nodes - 1
-        j_min = cpml_nodes + 2; j_max = ny - cpml_nodes - 1
-        k_min = cpml_nodes + 2; k_max = nz - cpml_nodes - 1
+        i_min = domain%npml + 2; i_max = domain%nx - domain%npml - 1
+        j_min = domain%npml + 2; j_max = domain%ny - domain%npml - 1
+        k_min = domain%npml + 2; k_max = domain%nz - domain%npml - 1
 
         ! Mark TFSF boundary faces
-        do k = 1, nz
-            rz = real(k - 1, real64) * dz
-            do j = 1, ny
-                ry = real(j - 1, real64) * dy
-                do i = 1, nx
-                    rx = real(i - 1, real64) * dx
+        do k = 1, domain%nz
+            rz = real(k - 1, real64) * domain%dz
+            do j = 1, domain%ny
+                ry = real(j - 1, real64) * domain%dy
+                do i = 1, domain%nx
+                    rx = real(i - 1, real64) * domain%dx
 
                     ! Compute geometric phase travel-time delay
                     dot_val = (rx - src%r0_ref(1))*px + (ry - src%r0_ref(2))*py + (rz - src%r0_ref(3))*pz
@@ -248,29 +222,28 @@ contains
             end do
         end do
 
-        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, n_steps, dt, src%time_series)
+        call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
 
     end subroutine init_source_plane_wave
 
     ! --------------------------------------------------------------------------
     !> Transforms 1D frequency spectrum to real time domain
-    subroutine synthesize_from_spectrum(F_in, freq_in, n_in, n_steps, dt, s_time)
+    subroutine synthesize_from_spectrum(F_in, freq_in, n_in, src)
+        type(Source_Type), intent(inout) :: src
         complex(real64), intent(in)  :: F_in(n_in)
         real(real64), intent(in)     :: freq_in(n_in)
-        integer, intent(in)          :: n_in, n_steps
-        real(real64), intent(in)     :: dt
-        real(real64), allocatable, intent(out) :: s_time(:)
-
+        integer, intent(in)          :: n_in 
+        
         complex(real64), allocatable :: H_unif(:)
         type(C_PTR) :: plan_1d
         real(real64) :: df_target, target_freq, f_frac, norm_factor
         integer :: n_freq, k, j
 
-        if (allocated(s_time)) deallocate(s_time)
-        allocate(s_time(n_steps))
+        if (allocated(src%time_series)) deallocate(src%time_series)
+        allocate(src%time_series(src%time_steps))
 
-        n_freq = n_steps / 2 + 1
-        df_target = 1.0_real64 / (real(n_steps, real64) * dt)
+        n_freq = src%time_steps / 2 + 1
+        df_target = 1.0_real64 / (real(src%time_steps, real64) * src%dt)
         allocate(H_unif(n_freq))
         H_unif = cmplx(0.0_real64, 0.0_real64, kind=real64)
 
@@ -292,11 +265,11 @@ contains
             end if
         end do
 
-        norm_factor = 1.0_real64 / real(n_steps, real64)
+        norm_factor = 1.0_real64 / real(src%time_steps, real64)
         H_unif = H_unif * norm_factor
 
-        plan_1d = fftw_plan_dft_c2r_1d(n_steps, H_unif, s_time, FFTW_ESTIMATE)
-        call fftw_execute_dft_c2r(plan_1d, H_unif, s_time)
+        plan_1d = fftw_plan_dft_c2r_1d(src%time_steps, H_unif, src%time_series, FFTW_ESTIMATE)
+        call fftw_execute_dft_c2r(plan_1d, H_unif, src%time_series)
         call fftw_destroy_plan(plan_1d)
 
         deallocate(H_unif)
@@ -305,9 +278,9 @@ contains
     ! --------------------------------------------------------------------------
     !> Builds compact 3D spatial subgrid kernel using exact k-space phase shifts
     subroutine precompute_spatial_kernel(src, grid, domain)
-        type(source_t), intent(inout) :: src
+        type(Source_Type), intent(inout) :: src
         type(spectral_grid_t), intent(inout) :: grid
-        real(Domain_Type), intent(in) :: domain
+        type(Domain_Type), intent(in) :: domain
 
         real(real64), allocatable :: full_spatial(:,:,:)
         complex(real64), parameter :: imag_unit = (0.0_real64, 1.0_real64)
@@ -320,17 +293,13 @@ contains
                                     -src%half_span:src%half_span, &
                                     -src%half_span:src%half_span))
 
-        src%isrc = nint(src%xs / dx) + 1
-        src%jsrc = nint(src%ys / dy) + 1
-        src%ksrc = nint(src%zs / dz) + 1
-
-        v_cell = dx * dy * dz
+        v_cell = domain%dx * domain%dy * domain%dz
 
         !$omp parallel do collapse(3) private(i,j,k,phase)
         do k = 1, domain%nz
             do j = 1, domain%ny
-                do i = 1, domain%nkx
-                    phase = -(grid%kx(i)*src%xs + grid%ky(j)*src%ys + grid%kz(k)*src%zs)
+                do i = 1, grid%nkx
+                    phase = -(grid%kx(i)*src%x + grid%ky(j)*src%y + grid%kz(k)*src%z)
                     grid%F_hat(i, j, k) = (exp(imag_unit * phase) / v_cell) * grid%inv_n_total
                 end do
             end do
@@ -339,20 +308,20 @@ contains
 
         call fftw_execute_dft_c2r(grid%plan_bwd_x, grid%F_hat, full_spatial)
 
-        src%i1 = max(1, src%isrc - src%half_span)
-        src%i2 = min(grid%nx, src%isrc + src%half_span)
-        src%j1 = max(1, src%jsrc - src%half_span)
-        src%j2 = min(grid%ny, src%jsrc + src%half_span)
-        src%k1 = max(1, src%ksrc - src%half_span)
-        src%k2 = min(grid%nz, src%ksrc + src%half_span)
+        src%i1 = max(1, src%xind - src%half_span)
+        src%i2 = min(domain%nx, src%xind + src%half_span)
+        src%j1 = max(1, src%yind - src%half_span)
+        src%j2 = min(domain%ny, src%yind + src%half_span)
+        src%k1 = max(1, src%zind - src%half_span)
+        src%k2 = min(domain%nz, src%zind + src%half_span)
 
         src%spatial_kernel = 0.0_real64
         do k = src%k1, src%k2
-            dk = k - src%ksrc
+            dk = k - src%zind
             do j = src%j1, src%j2
-                dj = j - src%jsrc
+                dj = j - src%yind
                 do i = src%i1, src%i2
-                    di = i - src%isrc
+                    di = i - src%xind
                     src%spatial_kernel(di, dj, dk) = full_spatial(i, j, k)
                 end do
             end do
@@ -393,10 +362,10 @@ contains
                             if (t_delayed >= 0.0_real64) then
                                 t_idx = t_delayed / src%dt
                                 idx_floor = int(t_idx) + 1
-                                idx_ceil  = min(src%n_steps, idx_floor + 1)
+                                idx_ceil  = min(src%time_steps, idx_floor + 1)
                                 frac = t_idx - real(idx_floor - 1, real64)
 
-                                if (idx_floor >= 1 .and. idx_floor <= src%n_steps) then
+                                if (idx_floor >= 1 .and. idx_floor <= src%time_steps) then
                                     s_val = (1.0_real64 - frac) * src%time_series(idx_floor) + frac * src%time_series(idx_ceil)
                                 else
                                     s_val = 0.0_real64
@@ -432,21 +401,21 @@ contains
             ! ------------------------------------------
             t_idx = t_curr / src%dt
             idx_floor = int(t_idx) + 1
-            idx_ceil  = min(src%n_steps, idx_floor + 1)
+            idx_ceil  = min(src%time_steps, idx_floor + 1)
             frac = t_idx - real(idx_floor - 1, real64)
 
-            if (idx_floor >= 1 .and. idx_floor <= src%n_steps) then
+            if (idx_floor >= 1 .and. idx_floor <= src%time_steps) then
                 s_val = (1.0_real64 - frac) * src%time_series(idx_floor) + frac * src%time_series(idx_ceil)
             else
                 return
             end if
 
             do k = src%k1, src%k2
-                dk = k - src%ksrc
+                dk = k - src%zind
                 do j = src%j1, src%j2
-                    dj = j - src%jsrc
+                    dj = j - src%yind
                     do i = src%i1, src%i2
-                        di = i - src%isrc
+                        di = i - src%xind
                         w_ker = src%spatial_kernel(di, dj, dk)
 
                         if (src%source_type == "ac") then
@@ -473,7 +442,7 @@ contains
 
     ! --------------------------------------------------------------------------
     subroutine free_source(src)
-        type(source_t), intent(inout) :: src
+        type(Source_Type), intent(inout) :: src
         if (allocated(src%time_series))     deallocate(src%time_series)
         if (allocated(src%spatial_kernel))  deallocate(src%spatial_kernel)
         if (allocated(src%time_delay_3d))   deallocate(src%time_delay_3d)

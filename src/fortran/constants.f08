@@ -10,5 +10,7 @@ module constants
     real(real64), parameter :: eps0 = 8.85418782d-12
     real(real64), parameter :: mu = 1.d0
     real(real64), parameter :: STABILITY_THRESHOLD = 1.d+25
+    complex(real64), parameter :: imag_unit = (0.0_real64, 1.0_real64)
+    real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
 
 end module constants

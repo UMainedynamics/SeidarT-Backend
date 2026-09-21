@@ -14,7 +14,7 @@ module seidart_types
         real(real64) :: dim 
         integer :: nx, ny, nz
         real(real64) :: dx, dy, dz 
-        integer :: cpml, nmats 
+        integer :: npml, nmats 
         character(len=:), allocatable :: image_file 
         ! character(len=256) :: image_file 
     end type Domain_Type
@@ -25,18 +25,36 @@ module seidart_types
         integer :: time_steps
         real(real64) :: x, y, z
         integer :: xind, yind, zind
+        integer :: i1, i2, j1, j2, k1, k2
         real(real64) :: source_frequency
-        real(real64) :: x_z_rotation, x_y_rotation, y_z_rotation
+        real(real64) :: dip, azimuth, strike, rake, plunge
         real(real64) :: amplitude
+        integer :: half_span
         character(len=:), allocatable :: source_type
         character(len=:), allocatable :: source_wavelet
+        real(real64), allocatable :: time_series(:)
+        real(real64), allocatable :: spatial_kernel(:,:,:)
+        ! Directional Force components (For AWD)
+        real(real64) :: force_vec(3)
+        
+        ! Symmetric Moment Tensor (For Explosive, DC, CLVD)
+        real(real64) :: moment_tensor(6) 
+        
+        ! Plane wave parameters
+        real(real64) :: p_dir(3)        ! Propagation direction unit vector
+        real(real64) :: e_pol(3)        ! Particle polarization unit vector
+        real(real64) :: c_phase         ! Background wave phase velocity (m/s)
+        real(real64) :: r0_ref(3)       ! Reference entry point for t=0 phase
+        integer :: pml_thick            ! Thickness of sponge boundary layer
+        real(real64), allocatable :: time_delay_3d(:,:,:) ! Spatial propagation delay tau(x,y,z)
+        logical, allocatable :: injection_mask(:,:,:)     ! Active TFSF boundary cells
     end type Source_Type
     
     ! Seismic attenuation properties
     type :: Attenuation_Type
         integer :: id
         character(len=:), allocatable :: name
-        real(real64) :: alpha_x, alpha_y, alpha_z
+        real(real64) :: alpha_x, alpha_xy, alpha_xz, alpha_y, alpha_yz, alpha_z
         real(real64) :: reference_frequency
     end type Attenuation_Type
     
@@ -65,5 +83,18 @@ module seidart_types
         real(real64) :: s11, s12, s13
         real(real64) :: s22, s23, s33
     end type Conductivity_Type
+    
+        type :: spectral_grid_t 
+        real(real64) :: inv_n_total 
+        real(real64), allocatable :: kx(:), ky(:), kz(:)
+        type(c_ptr) :: plan_fwd = c_null_ptr 
+        type(c_ptr) :: plan_bwd_x = c_null_ptr 
+        type(c_ptr) :: plan_bwd_y = c_null_ptr 
+        type(c_ptr) :: plan_bwd_z = c_null_ptr
+        complex(real64), allocatable :: F_hat(:,:,:)
+        complex(real64), allocatable :: dFx_hat(:,:,:), dFy_hat(:,:,:), &
+                                        dFz_hat(:,:,:)
+    end type spectral_grid_t
+    
     
 end module seidart_types
