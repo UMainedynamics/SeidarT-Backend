@@ -15,6 +15,7 @@ module seidart_types
         integer :: nx, ny, nz
         real(real64) :: dx, dy, dz 
         integer :: npml, nmats 
+        character(len=:), allocatable :: numerical_model
         character(len=:), allocatable :: image_file 
         ! character(len=256) :: image_file 
     end type Domain_Type

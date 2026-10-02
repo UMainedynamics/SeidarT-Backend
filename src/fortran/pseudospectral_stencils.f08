@@ -1,7 +1,7 @@
 module pseudospectral_stencils
     use iso_fortran_env, only: real64
     implicit none
-    public :: explicit_constitutive_kernel, implicit_drag_kernel
+    public :: explicit_constitutive_kernel3_rk4, implicit_drag_kernel3
     
     contains
     
@@ -32,7 +32,7 @@ module pseudospectral_stencils
         real(real64), intent(in)  :: gamma_visco(6, nx, ny, nz)
         real(real64), intent(in)  :: density_s(nx, ny, nz), density_f(nx, ny, nz)
         real(real64), intent(in)  :: phi(nx, ny, nz), lwc(nx, ny, nz)
-        real(real64), intent(in)  :: bulk_mod_fluid
+        real(real64), intent(in)  :: bulk_mod_fluid(nx, ny, nz)
         real(real64), intent(out) :: fluid_pressure_dot(nx, ny, nz)
         real(real64), intent(out) :: T(21, nx, ny, nz)
         
@@ -99,7 +99,7 @@ module pseudospectral_stencils
                     T(6,i,j,k) = - dp_dz(i,j,k) / eff_rho_f
                     
                     ! Fluid Pressure Rate; Volumetric Divergence 
-                    fluid_pressure_dot(i,j,k) = - ( bulk_mod_fluid / max(phi(i,j,k), 1.0e-5_real64) ) * &
+                    fluid_pressure_dot(i,j,k) = - ( bulk_mod_fluid(i,j,k) / max(phi(i,j,k), 1.0e-5_real64) ) * &
                                                 (exx + eyy + ezz)
                 end do
             end do
@@ -256,8 +256,8 @@ module pseudospectral_stencils
         real(real64) :: curl_e_x, curl_e_y, curl_e_z
 
 #ifdef SEIDART_OPENMP_GPU
-    !$omp target teams loop collapse(3) &
-    !$omp& private(rhs_x, rhs_y, rhs_z, curl_e_x, curl_e_y, curl_e_z)
+    !$omp target teams distribute parallel do collapse(3) &
+    !$omp& private(i, j, k, rhs_x, rhs_y, rhs_z, curl_e_x, curl_e_y, curl_e_z)
 #else
     !$omp parallel do collapse(3) schedule(static) &
     !$omp& private(i, j, k, rhs_x, rhs_y, rhs_z, curl_e_x, curl_e_y, curl_e_z)
@@ -484,7 +484,7 @@ module pseudospectral_stencils
     !$omp end parallel do
 #endif
 
-end subroutine implicit_em_conduction
+    end subroutine implicit_em_conduction
 
     ! --------------------------------------------------------------------------
     subroutine electrokinetic_current_kernel( &
@@ -498,12 +498,8 @@ end subroutine implicit_em_conduction
 
         real(real64), intent(in) :: vsx(nx,ny,nz), vsy(nx,ny,nz), vsz(nx,ny,nz)
         real(real64), intent(in) :: vfx(nx,ny,nz), vfy(nx,ny,nz), vfz(nx,ny,nz)
-
         real(real64), intent(in) :: lek(6,nx,ny,nz)
-
-        real(real64), intent(out) :: jekx(nx,ny,nz)
-        real(real64), intent(out) :: jeky(nx,ny,nz)
-        real(real64), intent(out) :: jekz(nx,ny,nz)
+        real(real64), intent(out) :: jekx(nx,ny,nz), jeky(nx,ny,nz), jekz(nx,ny,nz)
 
         integer :: i, j, k
         real(real64) :: wx, wy, wz
@@ -540,6 +536,6 @@ end subroutine implicit_em_conduction
     !$omp end parallel do
 #endif
 
-end subroutine electrokinetic_current_kernel
+    end subroutine electrokinetic_current_kernel
     
 end module pseudospectral_stencils

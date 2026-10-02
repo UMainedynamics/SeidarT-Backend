@@ -59,6 +59,7 @@ module seidartio
 
         ! Parse the domain data
         call json%get('Domain.dim', domain%dim)
+        call json%get('Domain.numerical_model', domain%numerical_model)
         call json%get('Domain.nx', domain%nx)
         call json%get('Domain.ny', domain%ny)
         call json%get('Domain.nz', domain%nz)
@@ -67,7 +68,6 @@ module seidartio
         call json%get('Domain.dz', domain%dz)
         call json%get('Domain.cpml', domain%npml)
         call json%get('Domain.nmats', domain%nmats)
-        ! call json%get('Domain.image_file', domain%image_file)
         call json%get('Domain.image_file', temp_string)
         domain%image_file = trim(adjustl(temp_string))
         
@@ -84,7 +84,7 @@ module seidartio
         call json%get('Seismic.Source.rake', seismic_source%rake)
         call json%get('Seismic.Source.plunge', seismic_source%plunge)
         call json%get('Seismic.Source.azimuth', seismic_source%azimuth)
-        call json%get('Seismic.Source.amplitude', seismic_source%magnitude)
+        call json%get('Seismic.Source.amplitude', seismic_source%amplitude)
         ! call json%get('Seismic.Source.source_type', seismic_source%source_type)
         call json%get('Seismic.Source.dt', seismic_source%dt)
         call json%get('Seismic.Source.time_steps', seismic_source%time_steps)
@@ -201,6 +201,41 @@ module seidartio
     end subroutine write_array
     
     ! --------------------------------------------------------------------------
+    subroutine load_spectrum(filename_freq, filename_spec, freq_spec, F_spec, n_spec)
+        character(len=*), intent(in) :: filename_freq, filename_spec
+        real(real64), allocatable, intent(out) :: freq_spec(:)
+        complex(real64), allocatable, intent(out) :: F_spec(:)
+        integer, intent(out) :: n_spec
+        
+        integer :: unit_freq, unit_spec, io_error, i
+        real(real64) :: r_part, i_part 
+        
+        open(newunit = unit_freq, file = trim(filename_freq), status = 'old', action = 'read')
+        n_spec = 0 
+        do
+            read(unit_freq, *, iostat=io_error) 
+            if (io_error /= 0) exit
+                n_spec = n_spec + 1
+        end do
+        
+        rewind(unit_freq)
+        
+        allocate(freq_spec(n_spec))
+        allocate(F_spec(n_spec))
+        
+        open(newunit = unit_spec, file = trim(filename_spec), status = 'old', action = 'read')
+        do i = 1,n_spec
+            read(unit_freq, *) freq_spec(i)
+            read(unit_spec, *) r_part, i_part
+            F_spec(i) = cmplx(r_part, i_part, kind=real64)
+        end do
+        
+        close(unit_freq)
+        close(unit_spec)
+        
+    end subroutine load_spectrum
+            
+    ! --------------------------------------------------------------------------
     subroutine material_rw(filename, image_data, readfile)
 
         implicit none
@@ -316,11 +351,11 @@ module seidartio
         if (domain%dim == 2) then
             WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a4)" ) &
                     channel, '.', it, '.', source%xind, '.', source%zind, '.dat'
-        else if (domain%dim == 2.5) then
+        else if (domain%dim == 2.5 .or. domain%dim == 3) then
             WRITE (filename, "(a2, a1, i6.6, a1, i0, a1, i0, a1, i0, a4)" ) &
                     channel, '.', it, '.', source%xind, '.', source%yind, '.', source%zind, '.dat'
         else
-            print *, "Error: src array must have 2 or 3 elements."
+            print *, "Error: domain%dim must be 2, 2.5, or 3."
             stop
         end if
 
@@ -388,7 +423,7 @@ module seidartio
         end if
         
         if (SINGLE) then
-            write(unit_number) sngl(image_data)
+            write(unit_number) real(image_data, kind=real32)
         else
             write(unit_number) image_data 
         end if 
@@ -417,7 +452,7 @@ module seidartio
         open(newunit = unit_number, form = 'unformatted', file = trim(filename) )
         
         if (SINGLE) then
-            write(unit_number) sngl(image_data)
+            write(unit_number) real(image_data, kind=real32)
         else
             write(unit_number) image_data 
         end if 
@@ -491,7 +526,7 @@ module seidartio
     end subroutine init_io  
     
     ! --------------------------------------------------------------------------
-    subroutine add_step_to_block(filename, Ex, Ey, Ez) 
+    subroutine add_step_to_block3d(filename, Ex, Ey, Ez) 
         character(len=*), intent(in) :: filename
         real(c_double), intent(in) :: Ex(:,:,:)
         real(c_double), intent(in) :: Ey(:,:,:)
@@ -521,7 +556,7 @@ module seidartio
         if (current_step_in_block == total_block_limit) then
             call write_zstd_block(filename)
         end if
-    end subroutine add_step_to_block 
+    end subroutine add_step_to_block3d 
     
     ! --------------------------------------------------------------------------
     subroutine write_zstd_block(filename) 
@@ -677,6 +712,33 @@ module seidartio
             call write_zstd_block(filename)
         end if
     end subroutine add_step_to_block_25d
+
+    ! --------------------------------------------------------------------------
+    ! subroutine add_step_to_block_2d(filename, Ex, Ez)
+    !     character(len=*), intent(in) :: filename
+    !     real(c_double), intent(in) :: Ex(:,:)
+    !     real(c_double), intent(in) :: Ez(:,:)
+
+    !     if (.not. allocated(block_buffer)) then
+    !         print *, 'Error: zstd block I/O has not been initialized'
+    !         stop
+    !     end if
+
+    !     current_step_in_block = current_step_in_block + 1
+
+    !     block_buffer(:,1,:,1,current_step_in_block) = &
+    !         real(Ex(output_cpml+1:size(Ex,1)-output_cpml, &
+    !                 output_cpml+1:size(Ex,2)-output_cpml), c_float)
+    !     block_buffer(:,1,:,2,current_step_in_block) = &
+    !         real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
+    !                 output_cpml+1:size(Ez,2)-output_cpml), c_float)
+    !     ! Zero-fill component 3 to prevent writing uninitialized memory
+    !     block_buffer(:,1,:,3,current_step_in_block) = 0.0_c_float
+        
+    !     if (current_step_in_block == total_block_limit) then
+    !         call write_zstd_block(filename)
+    !     end if
+    ! end subroutine add_step_to_block_2d
     
     subroutine add_step_to_block_2d(filename, Ex, Ez)
         ! 2D arrays for 2D field data (Ex, Ez) for the zstd block
@@ -697,6 +759,9 @@ module seidartio
         block_buffer(:,1,:,2,current_step_in_block) = &
             real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
                     output_cpml+1:size(Ez,2)-output_cpml), c_float)
+        
+        ! Zero-fill component 3 to prevent uninitialized memory compression
+        block_buffer(:,1,:,3,current_step_in_block) = 0.0_c_float
         
         ! if the block is full, write it and reset
         if (current_step_in_block == total_block_limit) then
@@ -792,25 +857,26 @@ module seidartio
         end if
         
         ! check for steps per block override 
-        call get_environment_variable("FDTD_STEPS_PER_BLOCK", env_val, status = stat) 
+        call get_environment_variable("FDTD_STEPS_PER_BLOCK", env_val, status = stat)
         if (stat == 0) then
             read(env_val, *) steps_per_block
-        else 
-            ! auto calculate with target ~2GB buffer 
-            ! bytes = interior cells * 3 components * 4 bytes per real32 
-            bytes_per_step = real(output_nx, 8) * output_ny * output_nz * 3 * 4 
-            
-            ! steps = 2GB (2^31 bytes) / bytes_per_step 
+        else
+            ! Auto-calculate with target ~2GB buffer
+            ! bytes = interior cells * 3 components * 4 bytes per real32
+            bytes_per_step = real(output_nx, 8) * real(output_ny, 8) * real(output_nz, 8) * 3.0_8 * 4.0_8
+            ! steps = 2GB (2^31 bytes) / bytes_per_step
             steps_per_block = max(1, int(2147483648.0_8 / bytes_per_step))
-            if (steps_per_block > 500 ) steps_per_block = 500 
+            if (steps_per_block > 500) steps_per_block = 500
         endif
-        
-        print*, "---- I/O Configuration ----"
+
+        print*, "---- I/O Configuration (3D) ----"
         print*, "Block output: ", block_output
         print*, "Legacy output: ", legacy_output
-        print*, "Block output dimensions: ", output_nx, output_ny, output_nz
-        print*, "Block output precision: real32"
-        print*, "Steps per block: ", steps_per_block
+        if (block_output) then
+            print*, "Block output dimensions: ", output_nx, output_ny, output_nz
+            print*, "Block output precision: real32"
+            print*, "Steps per block: ", steps_per_block
+        end if
         
     end subroutine setup_io_params
     

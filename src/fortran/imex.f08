@@ -5,6 +5,7 @@ module imex
     use spectral_operators
     use pseudospectral_stencils
     use absorbing_boundary
+    use source_module
     
     use seidartio
     use seidart_types
@@ -15,7 +16,7 @@ module imex
     include 'fftw3.f03'
     
     private
-    public :: load_coefficients, ars_coefficients, biot_poroviscoelasticity3, biot_electrokinetic3
+    public :: load_coefficients, ars_coefficients, biot_poroviscoelasticity3!, biot_electrokinetic3
     
 contains
     
@@ -37,13 +38,15 @@ contains
     ! --------------------------------------------------------------------------
     subroutine load_coefficients(nx, ny, nz, &
                                  C, drag_tensor, gamma_visco, &
-                                 density_s, density_f, tau_relax, lwc, phi)
+                                 density_s, density_f, tau_relax, &
+                                 bulk_mod_fluid, lwc, phi)
         integer, intent(in) :: nx, ny, nz
         real(real64), intent(out) :: C(21, nx, ny, nz)
         real(real64), intent(out) :: drag_tensor(6, nx, ny, nz), &
                                      gamma_visco(6, nx, ny, nz), &
                                      tau_relax(6, nx, ny, nz)
         real(real64), intent(out) :: density_s(nx, ny, nz), density_f(nx, ny, nz), &
+                                     bulk_mod_fluid(nx, ny, nz), &
                                      lwc(nx, ny, nz), phi(nx, ny, nz)
         
         ! Load stiffness coefficients (Upper-triangular Voigt packing)
@@ -97,6 +100,7 @@ contains
         call material_rw3('density_fluid.dat',        density_f, .TRUE.)
         call material_rw3('porosity.dat',             phi,       .TRUE.)
         call material_rw3('liquid_water_content.dat', lwc,       .TRUE.)
+        call material_rw3('bulk_modulus_fluid.dat',     bulk_mod_fluid, .TRUE.)
         
     end subroutine load_coefficients
     
@@ -142,15 +146,17 @@ contains
     end subroutine ars_coefficients
     
     ! -------------------------------------------------------------------------
-    subroutine biot_poroviscoelasticity3(domain, source, method, F_spec, freq_spec, n_spec)
+    subroutine biot_poroviscoelasticity3(domain, source, method)
         implicit none 
         
         ! Input arguments 
         type(Domain_Type), intent(in) :: domain 
         type(Source_Type), intent(in) :: source
         character(len=*), intent(in)  :: method 
-        integer, intent(in) :: n_spec
-        real(real64), intent(in) :: F_spec(n_spec), freq_spec(n_spec)
+        
+        integer :: n_spec
+        complex(real64), allocatable :: F_spec(:) ! 1D array holding the fourier coefficients (amplitude and phase) of the source wavelet in the frequency domain
+        real(real64), allocatable :: freq_spec(:) ! 1D array containing the exact frequency values in (Hz) corresponding to each element in the F_spec
         
         type(spectral_grid_t) :: grid
         type(sponge_layer_t)  :: sponge
@@ -169,7 +175,8 @@ contains
         real(real64), allocatable :: C(:,:,:,:), gamma_visco(:,:,:,:), &
                                      drag_tensor(:,:,:,:), tau_relax(:,:,:,:)
         real(real64), allocatable :: fluid_pressure(:,:,:), fluid_pressure_dot(:,:,:), &
-                                     density_s(:,:,:), density_f(:,:,:), lwc(:,:,:), phi(:,:,:)
+                                     density_s(:,:,:), density_f(:,:,:), &
+                                     bulk_mod_fluid(:,:,:), lwc(:,:,:), phi(:,:,:)
         
         ! Spatial gradient work arrays
         real(real64), allocatable :: dvx_dx(:,:,:), dvx_dy(:,:,:), dvx_dz(:,:,:)
@@ -183,15 +190,6 @@ contains
         real(real64), allocatable :: dsxy_dx(:,:,:), dsxy_dy(:,:,:), dsxy_dz(:,:,:)
         real(real64), allocatable :: dp_dx(:,:,:),   dp_dy(:,:,:),   dp_dz(:,:,:)
 
-        ! Plane wave source variables
-        real(real64) :: XMIN, XMAX, XMID, YMIN, YMAX, YMID, ZMIN, ZMAX, ZMID
-        real(real64) :: XLOC, YLOC, ZLOC, cbackground
-        real(real64) :: r0(3), p(3), ehat(3)
-        logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, k_min, k_max
-        real(real64), allocatable :: eig_array(:,:,:)
-        real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
-        real(real64), allocatable :: srcxx(:), srcyy(:), srczz(:), srcyz(:), srcxz(:), srcxy(:)
         
         ! -------------------------------------------------------------------------
         nx = domain%nx
@@ -210,7 +208,7 @@ contains
         allocate(drag_tensor(6, nx, ny, nz), tau_relax(6, nx, ny, nz))
         allocate(fluid_pressure(nx, ny, nz), fluid_pressure_dot(nx, ny, nz))
         allocate(density_s(nx, ny, nz), density_f(nx, ny, nz))
-        allocate(lwc(nx, ny, nz), phi(nx, ny, nz))
+        allocate(bulk_mod_fluid(nx, ny, nz), lwc(nx, ny, nz), phi(nx, ny, nz))
         
         ! Derivative allocations
         allocate(dvx_dx(nx,ny,nz), dvx_dy(nx,ny,nz), dvx_dz(nx,ny,nz))
@@ -224,35 +222,39 @@ contains
         allocate(dsxy_dx(nx,ny,nz), dsxy_dy(nx,ny,nz), dsxy_dz(nx,ny,nz))
         allocate(dp_dx(nx,ny,nz),   dp_dy(nx,ny,nz),   dp_dz(nx,ny,nz))
         
-        allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
-        allocate(srcxx(source%time_steps), srcyy(source%time_steps), srczz(source%time_steps))
-        allocate(srcyz(source%time_steps), srcxz(source%time_steps), srcxy(source%time_steps))
-        allocate(eig_array(nx, ny, nz))
         
         ! Initialize FFTW grid
         call init_spectral_grid(grid, nx, ny, nz, domain%dx, domain%dy, domain%dz)
         
         ! Load material parameters
         call load_coefficients(nx, ny, nz, C, drag_tensor, gamma_visco, &
-                               density_s, density_f, tau_relax, lwc, phi)
+                               density_s, density_f, tau_relax, bulk_mod_fluid, lwc, phi)
         
         Q = 0.0_real64
         fluid_pressure = 0.0_real64
+        fluid_pressure_dot = 0.0_real64
         
         ! ------------------------------------------------------------------------
+        ! Load spectrum directly inside solver initialization
+        call load_spectrum('freq_spectrum.dat', 'F_spectrum.dat', freq_spec, F_spec, n_spec)
+        
         ! Initialize the source 
-select case (trim(source%source_type))
-        case('ac')
-            call init_source_weight_drop(source, domain, F_spec, freq_spec, n_spec, grid)
-        case('tnt')
-            call init_source_explosive(source, F_spec, freq_spec, n_spec, grid, domain)     
-        case('dc')
-            call init_source_double_couple(source, domain, F_spec, freq_spec, n_spec, grid) 
-        case('clvd')
-            call init_source_clvd(source, domain, F_spec, freq_spec, n_spec, grid)          
-        case('pw')
-            call init_source_plane_wave(source, domain, 1500.0_real64, 'P', F_spec, freq_spec, n_spec)
+        select case (trim(source%source_type))
+            case('ac')
+                call init_source_weight_drop(source, domain, F_spec, freq_spec, n_spec, grid)
+            case('tnt')
+                call init_source_explosive(source, F_spec, freq_spec, n_spec, grid, domain)     
+            case('dc')
+                call init_source_double_couple(source, domain, F_spec, freq_spec, n_spec, grid) 
+            case('clvd')
+                call init_source_clvd(source, domain, F_spec, freq_spec, n_spec, grid)          
+            case('pw')
+                call init_source_plane_wave(source, domain, 1500.0_real64, 'P', F_spec, freq_spec, n_spec)
         end select
+        
+        ! Clean up temporary spectrum memory once wavelet initialization completes
+        if (allocated(freq_spec)) deallocate(freq_spec)
+        if (allocated(F_spec)) deallocate(F_spec)
         
         ! ------------------------------------------------------------------------
         ! Initialize absorbing boundary
@@ -309,7 +311,7 @@ select case (trim(source%source_type))
                                                   dp_dx,   dp_dy,   dp_dz, &
                                                   C, gamma_visco, &
                                                   density_s, density_f, phi, lwc, &
-                                                  domain%bulk_mod_fluid, &
+                                                  bulk_mod_fluid, &
                                                   fluid_pressure_dot, T(:,:,:,:,stage))
                 
                 call inject_source_explicit_stage(source, nx, ny, nz, T(:,:,:,:,stage), it, c_vec(stage), density_s)
@@ -345,203 +347,204 @@ select case (trim(source%source_type))
     end subroutine biot_poroviscoelasticity3
     
     ! -------------------------------------------------------------------------
-    subroutine biot_electrokinetic3(domain, source, method)
-        implicit none 
+    ! subroutine biot_electrokinetic3(domain, source, method)
+    !     implicit none 
         
-        ! Input arguments 
-        type(Domain_Type), intent(in) :: domain 
-        type(Source_Type), intent(in) :: source
-        character(len=*), intent(in)  :: method 
+    !     ! Input arguments 
+    !     type(Domain_Type), intent(in) :: domain 
+    !     type(Source_Type), intent(in) :: source
+    !     character(len=*), intent(in)  :: method 
         
-        type(spectral_grid_t) :: grid
-        type(sponge_layer_t)  :: sponge
+    !     integer :: n_spec
+    !     complex(real64), allocatable :: F_spec(:) ! 1D array holding the fourier coefficients (amplitude and phase) of the source wavelet in the frequency domain
+    !     real(real64), allocatable :: freq_spec(:) ! 1D array containing the exact frequency values in (Hz) corresponding to each element in the F_spec
+    !     type(spectral_grid_t) :: grid
+    !     type(sponge_layer_t)  :: sponge
                 
-        ! Tableau allocations populated by ars_coefficients
-        real(real64), allocatable :: A_exp(:,:), A_imp(:,:)
-        real(real64), allocatable :: b_exp(:), b_imp(:), c_vec(:)
+    !     ! Tableau allocations populated by ars_coefficients
+    !     real(real64), allocatable :: A_exp(:,:), A_imp(:,:)
+    !     real(real64), allocatable :: b_exp(:), b_imp(:), c_vec(:)
         
-        ! Local variables
-        integer :: nx, ny, nz, it, s, stage, num_stages
-        real(real64) :: dt 
+    !     ! Local variables
+    !     integer :: nx, ny, nz, it, s, stage, num_stages
+    !     real(real64) :: dt 
         
-        real(real64), allocatable :: Q(:,:,:,:), Q_star(:,:,:,:), Q_stage(:,:,:,:)
-        real(real64), allocatable :: T(:,:,:,:,:), H(:,:,:,:,:)
+    !     real(real64), allocatable :: Q(:,:,:,:), Q_star(:,:,:,:), Q_stage(:,:,:,:)
+    !     real(real64), allocatable :: T(:,:,:,:,:), H(:,:,:,:,:)
         
-        real(real64), allocatable :: C(:,:,:,:), gamma_visco(:,:,:,:), &
-                                     drag_tensor(:,:,:,:), tau_relax(:,:,:,:)
-        real(real64), allocatable :: fluid_pressure(:,:,:), fluid_pressure_dot(:,:,:), &
-                                     density_s(:,:,:), density_f(:,:,:), lwc(:,:,:), phi(:,:,:)
+    !     real(real64), allocatable :: C(:,:,:,:), gamma_visco(:,:,:,:), &
+    !                                  drag_tensor(:,:,:,:), tau_relax(:,:,:,:)
+    !     real(real64), allocatable :: fluid_pressure(:,:,:), fluid_pressure_dot(:,:,:), &
+    !                                  density_s(:,:,:), density_f(:,:,:), lwc(:,:,:), phi(:,:,:)
         
-        ! Spatial gradient work arrays
-        real(real64), allocatable :: dvx_dx(:,:,:), dvx_dy(:,:,:), dvx_dz(:,:,:)
-        real(real64), allocatable :: dvy_dx(:,:,:), dvy_dy(:,:,:), dvy_dz(:,:,:)
-        real(real64), allocatable :: dvz_dx(:,:,:), dvz_dy(:,:,:), dvz_dz(:,:,:)
-        real(real64), allocatable :: dsxx_dx(:,:,:), dsxx_dy(:,:,:), dsxx_dz(:,:,:)
-        real(real64), allocatable :: dsyy_dx(:,:,:), dsyy_dy(:,:,:), dsyy_dz(:,:,:)
-        real(real64), allocatable :: dszz_dx(:,:,:), dszz_dy(:,:,:), dszz_dz(:,:,:)
-        real(real64), allocatable :: dsyz_dx(:,:,:), dsyz_dy(:,:,:), dsyz_dz(:,:,:)
-        real(real64), allocatable :: dsxz_dx(:,:,:), dsxz_dy(:,:,:), dsxz_dz(:,:,:)
-        real(real64), allocatable :: dsxy_dx(:,:,:), dsxy_dy(:,:,:), dsxy_dz(:,:,:)
-        real(real64), allocatable :: dp_dx(:,:,:),   dp_dy(:,:,:),   dp_dz(:,:,:)
+    !     ! Spatial gradient work arrays
+    !     real(real64), allocatable :: dvx_dx(:,:,:), dvx_dy(:,:,:), dvx_dz(:,:,:)
+    !     real(real64), allocatable :: dvy_dx(:,:,:), dvy_dy(:,:,:), dvy_dz(:,:,:)
+    !     real(real64), allocatable :: dvz_dx(:,:,:), dvz_dy(:,:,:), dvz_dz(:,:,:)
+    !     real(real64), allocatable :: dsxx_dx(:,:,:), dsxx_dy(:,:,:), dsxx_dz(:,:,:)
+    !     real(real64), allocatable :: dsyy_dx(:,:,:), dsyy_dy(:,:,:), dsyy_dz(:,:,:)
+    !     real(real64), allocatable :: dszz_dx(:,:,:), dszz_dy(:,:,:), dszz_dz(:,:,:)
+    !     real(real64), allocatable :: dsyz_dx(:,:,:), dsyz_dy(:,:,:), dsyz_dz(:,:,:)
+    !     real(real64), allocatable :: dsxz_dx(:,:,:), dsxz_dy(:,:,:), dsxz_dz(:,:,:)
+    !     real(real64), allocatable :: dsxy_dx(:,:,:), dsxy_dy(:,:,:), dsxy_dz(:,:,:)
+    !     real(real64), allocatable :: dp_dx(:,:,:),   dp_dy(:,:,:),   dp_dz(:,:,:)
 
-        ! Plane wave source variables
-        real(real64) :: XMIN, XMAX, XMID, YMIN, YMAX, YMID, ZMIN, ZMAX, ZMID
-        real(real64) :: XLOC, YLOC, ZLOC, cbackground
-        real(real64) :: r0(3), p(3), ehat(3)
-        logical :: active(6)
-        integer :: i_min, i_max, j_min, j_max, k_min, k_max
-        real(real64), allocatable :: eig_array(:,:,:)
-        real(real64), allocatable :: srcx(:), srcy(:), srcz(:)
-        real(real64), allocatable :: srcxx(:), srcyy(:), srczz(:), srcyz(:), srcxz(:), srcxy(:)
+    !     ! Plane wave source variables
+    !     real(real64) :: XMIN, XMAX, XMID, YMIN, YMAX, YMID, ZMIN, ZMAX, ZMID
+    !     real(real64) :: XLOC, YLOC, ZLOC, cbackground
+    !     real(real64) :: r0(3), p(3), ehat(3)
+    !     logical :: active(6)
+    !     integer :: i_min, i_max, j_min, j_max, k_min, k_max
         
-        ! -------------------------------------------------------------------------
-        nx = domain%nx
-        ny = domain%ny
-        nz = domain%nz
-        dt = source%dt
+    !     ! -------------------------------------------------------------------------
+    !     nx = domain%nx
+    !     ny = domain%ny
+    !     nz = domain%nz
+    !     dt = source%dt
         
-        call ars_coefficients(method, num_stages, A_exp, A_imp, b_exp, b_imp, c_vec)
+    !     call ars_coefficients(method, num_stages, A_exp, A_imp, b_exp, b_imp, c_vec)
         
-        ! Allocations 
-        allocate(Q(21, nx, ny, nz), Q_star(21, nx, ny, nz), Q_stage(21, nx, ny, nz))
-        allocate(T(21, nx, ny, nz, num_stages), H(21, nx, ny, nz, num_stages))
+    !     ! Allocations 
+    !     allocate(Q(21, nx, ny, nz), Q_star(21, nx, ny, nz), Q_stage(21, nx, ny, nz))
+    !     allocate(T(21, nx, ny, nz, num_stages), H(21, nx, ny, nz, num_stages))
         
-        allocate(C(21, nx, ny, nz))
-        allocate(gamma_visco(6, nx, ny, nz))
-        allocate(drag_tensor(6, nx, ny, nz), tau_relax(6, nx, ny, nz))
-        allocate(fluid_pressure(nx, ny, nz), fluid_pressure_dot(nx, ny, nz))
-        allocate(density_s(nx, ny, nz), density_f(nx, ny, nz))
-        allocate(lwc(nx, ny, nz), phi(nx, ny, nz))
+    !     allocate(C(21, nx, ny, nz))
+    !     allocate(gamma_visco(6, nx, ny, nz))
+    !     allocate(drag_tensor(6, nx, ny, nz), tau_relax(6, nx, ny, nz))
+    !     allocate(fluid_pressure(nx, ny, nz), fluid_pressure_dot(nx, ny, nz))
+    !     allocate(density_s(nx, ny, nz), density_f(nx, ny, nz))
+    !     allocate(lwc(nx, ny, nz), phi(nx, ny, nz))
         
-        ! Derivative allocations
-        allocate(dvx_dx(nx,ny,nz), dvx_dy(nx,ny,nz), dvx_dz(nx,ny,nz))
-        allocate(dvy_dx(nx,ny,nz), dvy_dy(nx,ny,nz), dvy_dz(nx,ny,nz))
-        allocate(dvz_dx(nx,ny,nz), dvz_dy(nx,ny,nz), dvz_dz(nx,ny,nz))
-        allocate(dsxx_dx(nx,ny,nz), dsxx_dy(nx,ny,nz), dsxx_dz(nx,ny,nz))
-        allocate(dsyy_dx(nx,ny,nz), dsyy_dy(nx,ny,nz), dsyy_dz(nx,ny,nz))
-        allocate(dszz_dx(nx,ny,nz), dszz_dy(nx,ny,nz), dszz_dz(nx,ny,nz))
-        allocate(dsyz_dx(nx,ny,nz), dsyz_dy(nx,ny,nz), dsyz_dz(nx,ny,nz))
-        allocate(dsxz_dx(nx,ny,nz), dsxz_dy(nx,ny,nz), dsxz_dz(nx,ny,nz))
-        allocate(dsxy_dx(nx,ny,nz), dsxy_dy(nx,ny,nz), dsxy_dz(nx,ny,nz))
-        allocate(dp_dx(nx,ny,nz),   dp_dy(nx,ny,nz),   dp_dz(nx,ny,nz))
+    !     ! Derivative allocations
+    !     allocate(dvx_dx(nx,ny,nz), dvx_dy(nx,ny,nz), dvx_dz(nx,ny,nz))
+    !     allocate(dvy_dx(nx,ny,nz), dvy_dy(nx,ny,nz), dvy_dz(nx,ny,nz))
+    !     allocate(dvz_dx(nx,ny,nz), dvz_dy(nx,ny,nz), dvz_dz(nx,ny,nz))
+    !     allocate(dsxx_dx(nx,ny,nz), dsxx_dy(nx,ny,nz), dsxx_dz(nx,ny,nz))
+    !     allocate(dsyy_dx(nx,ny,nz), dsyy_dy(nx,ny,nz), dsyy_dz(nx,ny,nz))
+    !     allocate(dszz_dx(nx,ny,nz), dszz_dy(nx,ny,nz), dszz_dz(nx,ny,nz))
+    !     allocate(dsyz_dx(nx,ny,nz), dsyz_dy(nx,ny,nz), dsyz_dz(nx,ny,nz))
+    !     allocate(dsxz_dx(nx,ny,nz), dsxz_dy(nx,ny,nz), dsxz_dz(nx,ny,nz))
+    !     allocate(dsxy_dx(nx,ny,nz), dsxy_dy(nx,ny,nz), dsxy_dz(nx,ny,nz))
+    !     allocate(dp_dx(nx,ny,nz),   dp_dy(nx,ny,nz),   dp_dz(nx,ny,nz))
         
-        allocate(srcx(source%time_steps), srcy(source%time_steps), srcz(source%time_steps))
-        allocate(srcxx(source%time_steps), srcyy(source%time_steps), srczz(source%time_steps))
-        allocate(srcyz(source%time_steps), srcxz(source%time_steps), srcxy(source%time_steps))
-        allocate(eig_array(nx, ny, nz))
+    !     ! Initialize FFTW grid
+    !     call init_spectral_grid(grid, nx, ny, nz, domain%dx, domain%dy, domain%dz)
         
-        ! Initialize FFTW grid
-        call init_spectral_grid(grid, nx, ny, nz, domain%dx, domain%dy, domain%dz)
+    !     ! Load material parameters
+    !     call load_coefficients(nx, ny, nz, C, drag_tensor, gamma_visco, &
+    !                            density_s, density_f, tau_relax, bulk_mod_fluid, lwc, phi)
         
-        ! Load material parameters
-        call load_coefficients(nx, ny, nz, C, drag_tensor, gamma_visco, &
-                               density_s, density_f, tau_relax, lwc, phi)
+    !     Q = 0.0_real64
+    !     fluid_pressure = 0.0_real64
         
-        Q = 0.0_real64
-        fluid_pressure = 0.0_real64
+    !     ! ------------------------------------------------------------------------
+    !     ! Load spectrum directly inside solver initialization
+    !     call load_spectrum('freq_spectrum.dat', 'F_spectrum.dat', freq_spec, F_spec, n_spec)
         
-        ! ------------------------------------------------------------------------
-        ! Initialize the source 
-        select case (trim(source%type))
-        case('ac')
-            init_source_weight_drop(src, domain, F_spec, freq_spec, n_spec, grid)
-        case('tnt')
-            init_source_explosive(src, F_spec, freq_spec, n_spec, grid, domain)     
-        case('dc')
-            init_source_double_couple(src, domain, F_spec, freq_spec, n_spec, grid) 
-        case('clvd')
-            init_source_clvd(src, domain, F_spec, freq_spec, n_spec, grid)          
-        case('pw')
-            init_source_plane_wave(src, domain, c_background, prop_azimuth_deg, prop_dip_deg, pol_type, F_spec, freq_spec, n_spec)
-        end select 
+    !     ! Initialize the source 
+    !     select case (trim(source%source_type))
+    !     case('ac')
+    !         call init_source_weight_drop(source, domain, F_spec, freq_spec, n_spec, grid)
+    !     case('tnt')
+    !         call init_source_explosive(source, F_spec, freq_spec, n_spec, grid, domain)     
+    !     case('dc')
+    !         call init_source_double_couple(source, domain, F_spec, freq_spec, n_spec, grid) 
+    !     case('clvd')
+    !         call init_source_clvd(source, domain, F_spec, freq_spec, n_spec, grid)          
+    !     case('pw')
+    !         call init_source_plane_wave(source, domain, 1500.0_real64, 'P', F_spec, freq_spec, n_spec)
+    !     end select 
         
-        ! ------------------------------------------------------------------------
-        ! Initialize absorbing boundary
-        call init_sponge_layer(sponge, nx, ny, nz, domain%npml, 0.025_real64)
+    !     ! Clean up temporary spectrum memory once wavelet initialization completes
+    !     if (allocated(freq_spec)) deallocate(freq_spec)
+    !     if (allocated(F_spec)) deallocate(F_spec)
+    !     ! ------------------------------------------------------------------------
+    !     ! Initialize absorbing boundary
+    !     call init_sponge_layer(sponge, nx, ny, nz, domain%npml, 0.025_real64)
         
-        ! ------------------------------------------------------------------------
-        ! ----- IMEX Time Loop -----
-        do it = 1, source%time_steps
+    !     ! ------------------------------------------------------------------------
+    !     ! ----- IMEX Time Loop -----
+    !     do it = 1, source%time_steps
     
-            do stage = 1, num_stages
+    !         do stage = 1, num_stages
                 
-                ! 1. Assemble intermediate explicit state
-                Q_star = Q 
-                do s = 1, stage - 1
-                    if (abs(A_exp(stage, s)) > 1.0e-14_real64) then 
-                        Q_star = Q_star + (dt * A_exp(stage, s)) * T(:,:,:,:,s) 
-                    end if
-                    if (abs(A_imp(stage, s)) > 1.0e-14_real64) then 
-                        Q_star = Q_star + (dt * A_imp(stage, s)) * H(:,:,:,:,s)
-                    end if 
-                end do 
+    !             ! 1. Assemble intermediate explicit state
+    !             Q_star = Q 
+    !             do s = 1, stage - 1
+    !                 if (abs(A_exp(stage, s)) > 1.0e-14_real64) then 
+    !                     Q_star = Q_star + (dt * A_exp(stage, s)) * T(:,:,:,:,s) 
+    !                 end if
+    !                 if (abs(A_imp(stage, s)) > 1.0e-14_real64) then 
+    !                     Q_star = Q_star + (dt * A_imp(stage, s)) * H(:,:,:,:,s)
+    !                 end if 
+    !             end do 
                 
-                ! 2. Solve local implicit stage for Q_stage 
-                if (abs(A_imp(stage, stage)) > 1.0e-14_real64) then 
-                    call implicit_drag_kernel(nx, ny, nz, Q_star, Q_stage, &
-                                              drag_tensor, tau_relax, &
-                                              density_s, density_f, lwc, &
-                                              dt * A_imp(stage, stage))
-                else
-                    Q_stage = Q_star 
-                end if
+    !             ! 2. Solve local implicit stage for Q_stage 
+    !             if (abs(A_imp(stage, stage)) > 1.0e-14_real64) then 
+    !                 call implicit_drag_kernel3(nx, ny, nz, Q_star, Q_stage, &
+    !                                           drag_tensor, tau_relax, &
+    !                                           density_s, density_f, lwc, &
+    !                                           dt * A_imp(stage, stage))
+    !             else
+    !                 Q_stage = Q_star 
+    !             end if
                 
-                ! 3. Compute spatial gradients via FFTW
-                call grad3d(grid, Q_stage(1,:,:,:), dvx_dx,  dvx_dy,  dvx_dz)
-                call grad3d(grid, Q_stage(2,:,:,:), dvy_dx,  dvy_dy,  dvy_dz)
-                call grad3d(grid, Q_stage(3,:,:,:), dvz_dx,  dvz_dy,  dvz_dz)
-                call grad3d(grid, Q_stage(7,:,:,:), dsxx_dx, dsxx_dy, dsxx_dz)
-                call grad3d(grid, Q_stage(8,:,:,:), dsyy_dx, dsyy_dy, dsyy_dz)
-                call grad3d(grid, Q_stage(9,:,:,:), dszz_dx, dszz_dy, dszz_dz)
-                call grad3d(grid, Q_stage(10,:,:,:), dsyz_dx, dsyz_dy, dsyz_dz)
-                call grad3d(grid, Q_stage(11,:,:,:), dsxz_dx, dsxz_dy, dsxz_dz)
-                call grad3d(grid, Q_stage(12,:,:,:), dsxy_dx, dsxy_dy, dsxy_dz)
-                call grad3d(grid, fluid_pressure,   dp_dx,   dp_dy,   dp_dz)
+    !             ! 3. Compute spatial gradients via FFTW
+    !             call grad3d(grid, Q_stage(1,:,:,:), dvx_dx,  dvx_dy,  dvx_dz)
+    !             call grad3d(grid, Q_stage(2,:,:,:), dvy_dx,  dvy_dy,  dvy_dz)
+    !             call grad3d(grid, Q_stage(3,:,:,:), dvz_dx,  dvz_dy,  dvz_dz)
+    !             call grad3d(grid, Q_stage(7,:,:,:), dsxx_dx, dsxx_dy, dsxx_dz)
+    !             call grad3d(grid, Q_stage(8,:,:,:), dsyy_dx, dsyy_dy, dsyy_dz)
+    !             call grad3d(grid, Q_stage(9,:,:,:), dszz_dx, dszz_dy, dszz_dz)
+    !             call grad3d(grid, Q_stage(10,:,:,:), dsyz_dx, dsyz_dy, dsyz_dz)
+    !             call grad3d(grid, Q_stage(11,:,:,:), dsxz_dx, dsxz_dy, dsxz_dz)
+    !             call grad3d(grid, Q_stage(12,:,:,:), dsxy_dx, dsxy_dy, dsxy_dz)
+    !             call grad3d(grid, fluid_pressure,   dp_dx,   dp_dy,   dp_dz)
                 
-                ! 4. Evaluate explicit spatial RHS (T)
-                call explicit_constitutive_kernel_rk4(nx, ny, nz, Q_stage, &
-                                                  dvx_dx, dvx_dy, dvx_dz, &
-                                                  dvy_dx, dvy_dy, dvy_dz, &
-                                                  dvz_dx, dvz_dy, dvz_dz, &
-                                                  dsxx_dx, dsyy_dy, dszz_dz, &
-                                                  dsyz_dy, dsyz_dz, &
-                                                  dsxz_dx, dsxz_dz, &
-                                                  dsxy_dx, dsxy_dy, &
-                                                  dp_dx,   dp_dy,   dp_dz, &
-                                                  C, gamma_visco, &
-                                                  density_s, density_f, phi, lwc, &
-                                                  domain%bulk_mod_fluid, &
-                                                  fluid_pressure_dot, T(:,:,:,:,stage))
+    !             ! 4. Evaluate explicit spatial RHS (T)
+    !             call explicit_constitutive_kernel3_rk4(nx, ny, nz, Q_stage, &
+    !                                               dvx_dx, dvx_dy, dvx_dz, &
+    !                                               dvy_dx, dvy_dy, dvy_dz, &
+    !                                               dvz_dx, dvz_dy, dvz_dz, &
+    !                                               dsxx_dx, dsyy_dy, dszz_dz, &
+    !                                               dsyz_dy, dsyz_dz, &
+    !                                               dsxz_dx, dsxz_dz, &
+    !                                               dsxy_dx, dsxy_dy, &
+    !                                               dp_dx,   dp_dy,   dp_dz, &
+    !                                               C, gamma_visco, &
+    !                                               density_s, density_f, phi, lwc, &
+    !                                               bulk_mod_fluid, &
+    !                                               fluid_pressure_dot, T(:,:,:,:,stage))
                 
-                ! 5. Evaluate stiff evaluation H
-                if (abs(A_imp(stage, stage)) > 1.0e-14_real64) then 
-                    H(:,:,:,:,stage) = (Q_stage - Q_star) / (dt * A_imp(stage, stage))
-                else
-                    H(:,:,:,:,stage) = 0.0_real64
-                end if
-            end do
+    !             ! 5. Evaluate stiff evaluation H
+    !             if (abs(A_imp(stage, stage)) > 1.0e-14_real64) then 
+    !                 H(:,:,:,:,stage) = (Q_stage - Q_star) / (dt * A_imp(stage, stage))
+    !             else
+    !                 H(:,:,:,:,stage) = 0.0_real64
+    !             end if
+    !         end do
             
-            ! Advance solution to next time step
-            do s = 1, num_stages
-                if (abs(b_exp(s)) > 1.0e-14_real64) then 
-                    Q = Q + (dt * b_exp(s)) * T(:,:,:,:,s)
-                end if 
-                if (abs(b_imp(s)) > 1.0e-14_real64) then 
-                    Q = Q + (dt * b_imp(s)) * H(:,:,:,:,s)
-                end if 
-            end do
+    !         ! Advance solution to next time step
+    !         do s = 1, num_stages
+    !             if (abs(b_exp(s)) > 1.0e-14_real64) then 
+    !                 Q = Q + (dt * b_exp(s)) * T(:,:,:,:,s)
+    !             end if 
+    !             if (abs(b_imp(s)) > 1.0e-14_real64) then 
+    !                 Q = Q + (dt * b_imp(s)) * H(:,:,:,:,s)
+    !             end if 
+    !         end do
             
-            fluid_pressure = fluid_pressure + dt * fluid_pressure_dot 
+    !         fluid_pressure = fluid_pressure + dt * fluid_pressure_dot 
             
-            ! Attenuate waves at absorbing boundary
-            call apply_sponge_damping(sponge, Q, fluid_pressure)
+    !         ! Attenuate waves at absorbing boundary
+    !         call apply_sponge_damping(sponge, domain, Q, fluid_pressure)
             
-        end do
+    !     end do
         
-        call free_spectral_grid(grid)
-        call free_sponge_layer(sponge)
+    !     call free_spectral_grid(grid)
+    !     call free_sponge_layer(sponge)
         
-    end subroutine biot_electrokinetic3
+    ! end subroutine biot_electrokinetic3
     
     
 end module imex

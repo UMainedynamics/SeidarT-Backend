@@ -23,6 +23,7 @@ program main
     character(len=256) :: arg
     character(len=256) :: input_json_file 
     logical :: seismic
+    logical :: biot
     integer :: argc, i
     character(len=256) :: key, value, density_method
     
@@ -55,8 +56,16 @@ program main
         case ('seismic')
             if (value == 'true') then
                 seismic = .true.
+                biot = .false.
             else if (value == 'false') then
                 seismic = .false.
+            end if
+        case ('biot')
+            if (value == 'true') then
+                biot = .true.
+                seismic = .false.
+            else if (value == 'false') then
+                biot = .false.
             end if
         case ('density_method')
             density_method = adjustl(value)
@@ -80,10 +89,6 @@ program main
         stop
     end select
     
-    ! --------------------------------------------------------------------------
-    ! Get going 
-    
-
     
     !----------------------------------------------------------------------
     ! dispatch to the correct solver
@@ -92,6 +97,9 @@ program main
         if (seismic) then
             print *, "Running 3D seismic model with", seismic_source%time_steps, "time steps"
             call seismic3(domain, seismic_source, density_method, .TRUE.)
+        else if (biot) then
+            print *, "Running 3D poroviscoelastic model with", seismic_source%time_steps, "time steps"
+            call biot_poroviscoelasticity3(domain, seismic_source, density_method, .TRUE.)
         else
             print *, "Running 3D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag3(domain, electromagnetic_source, .TRUE.)
@@ -102,6 +110,9 @@ program main
         if (seismic) then
             print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
             call seismic25(domain, seismic_source)
+        else if (biot) then
+            print *, "Running 2.5D poroviscoelastic model with", seismic_source%time_steps, "time steps"
+            call biot_poroviscoelasticity25(domain, seismic_source)
         else
             print *, "Running 2.5D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag25(domain, electromagnetic_source)
@@ -111,6 +122,9 @@ program main
         if (seismic) then
             print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
             call seismic2(domain, seismic_source, density_method, .TRUE.)
+        else if (biot) then
+            print *, "Running 2D poroviscoelastic model with", seismic_source%time_steps, "time steps"
+            call biot_poroviscoelasticity2(domain, seismic_source, density_method, .TRUE.)
         else
             print *, "Running 2D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag2(domain, electromagnetic_source, .TRUE.)

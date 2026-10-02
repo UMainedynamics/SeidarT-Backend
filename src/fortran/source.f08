@@ -25,7 +25,7 @@ contains
         type(Domain_Type), intent(in) :: domain
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
-        integer, intent(in) :: n_spec,
+        integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
 
         
@@ -73,7 +73,6 @@ contains
         integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
 
-        real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
         real(real64) :: phi, del, lam
         real(real64) :: s_phi, c_phi, s_2phi, c_2phi
         real(real64) :: s_del, c_del, s_2del, c_2del
@@ -105,7 +104,6 @@ contains
     subroutine init_source_clvd(src, domain, F_spec, freq_spec, n_spec, grid)
         type(Source_Type), intent(inout) :: src
         type(Domain_Type), intent(in) :: domain
-        real(real64), intent(in) :: axis_azimuth_deg, axis_plunge_deg
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
         integer, intent(in) :: n_spec
@@ -140,17 +138,15 @@ contains
     !> prop_dip_deg: 0=Horizontal, 90=Directly downward (+z)
     !> pol_type: 'P', 'SV', 'SH'
     subroutine init_source_plane_wave(src, domain, &
-                                      c_background, prop_azimuth_deg, prop_dip_deg, pol_type, &
+                                      c_background, pol_type, &
                                       F_spec, freq_spec, n_spec)
         type(Source_Type), intent(inout) :: src
         type(Domain_Type), intent(in) :: domain
         real(real64), intent(in) :: c_background
-        real(real64), intent(in) :: prop_azimuth_deg, prop_dip_deg
         character(len=*), intent(in) :: pol_type
         complex(real64), intent(in) :: F_spec(n_spec)
         real(real64), intent(in) :: freq_spec(n_spec)
         integer, intent(in) :: n_spec
-        real(real64), parameter :: DEG2RAD = 3.14159265358979323846_real64 / 180.0_real64
         real(real64) :: az_rad, dip_rad
         real(real64) :: px, py, pz, sv_x, sv_y, sv_z, sh_x, sh_y, sh_z
         real(real64) :: rx, ry, rz, dot_val
@@ -168,20 +164,20 @@ contains
 
         ! Polarization vectors
         select case (trim(pol_type))
-        case ('P', 'COMPRESSIONAL', 'ACOUSTIC')
-            src%e_pol = src%p_dir
-        case ('SH', 'SHEAR_HORIZONTAL')
-            sh_x =  cos(az_rad)
-            sh_y = -sin(az_rad)
-            sh_z =  0.0_real64
-            src%e_pol = (/ sh_x, sh_y, sh_z /)
-        case ('SV', 'SHEAR_VERTICAL')
-            sv_x = -sin(dip_rad) * sin(az_rad)
-            sv_y = -sin(dip_rad) * cos(az_rad)
-            sv_z =  cos(dip_rad)
-            src%e_pol = (/ sv_x, sv_y, sv_z /)
-        case default
-            src%e_pol = src%p_dir
+            case ('P', 'COMPRESSIONAL', 'ACOUSTIC')
+                src%e_pol = src%p_dir
+            case ('SH', 'SHEAR_HORIZONTAL')
+                sh_x =  cos(az_rad)
+                sh_y = -sin(az_rad)
+                sh_z =  0.0_real64
+                src%e_pol = (/ sh_x, sh_y, sh_z /)
+            case ('SV', 'SHEAR_VERTICAL')
+                sv_x = -sin(dip_rad) * sin(az_rad)
+                sv_y = -sin(dip_rad) * cos(az_rad)
+                sv_z =  cos(dip_rad)
+                src%e_pol = (/ sv_x, sv_y, sv_z /)
+            case default
+                src%e_pol = src%p_dir
         end select
 
         ! Reference plane entry corner
