@@ -17,6 +17,91 @@ module pseudospectralfdtd
     private
     public :: seismic2_pseudospectral_rk4, seismic3_pseudospectral_rk4, seismic25_pseudospectral_rk4
     
+    ! =========================================================================
+    subroutine load_elastic_coefficients2(nx, nz, C, gamma, rho)
+        integer, intent(in) :: nx, nz
+        real(real64), intent(out) :: C(21, nx, nz)
+        real(real64), intent(out) :: gamma(6, nx, nz)
+        real(real64), intent(out) :: rho(nx, nz)
+        
+        ! Load stiffness coefficients (Upper-triangular Voigt packing)
+        call material_rw2('c11.dat', C(1,:,:), .TRUE.)
+        call material_rw2('c12.dat', C(2,:,:), .TRUE.)
+        call material_rw2('c13.dat', C(3,:,:), .TRUE.)
+        call material_rw2('c14.dat', C(4,:,:), .TRUE.)
+        call material_rw2('c15.dat', C(5,:,:), .TRUE.)
+        call material_rw2('c16.dat', C(6,:,:), .TRUE.)
+        call material_rw2('c22.dat', C(7,:,:), .TRUE.)
+        call material_rw2('c23.dat', C(8,:,:), .TRUE.)
+        call material_rw2('c24.dat', C(9,:,:), .TRUE.)
+        call material_rw2('c25.dat', C(10,:,:), .TRUE.)
+        call material_rw2('c26.dat', C(11,:,:), .TRUE.)
+        call material_rw2('c33.dat', C(12,:,:), .TRUE.)
+        call material_rw2('c34.dat', C(13,:,:), .TRUE.)
+        call material_rw2('c35.dat', C(14,:,:), .TRUE.)
+        call material_rw2('c36.dat', C(15,:,:), .TRUE.)
+        call material_rw2('c44.dat', C(16,:,:), .TRUE.)
+        call material_rw2('c45.dat', C(17,:,:), .TRUE.)
+        call material_rw2('c46.dat', C(18,:,:), .TRUE.)
+        call material_rw2('c55.dat', C(19,:,:), .TRUE.)
+        call material_rw2('c56.dat', C(20,:,:), .TRUE.)
+        call material_rw2('c66.dat', C(21,:,:), .TRUE.)
+        
+        ! Load viscoelastic coefficients
+        call material_rw2('gamma_x.dat',  gamma(1,:,:), .TRUE.)
+        call material_rw2('gamma_y.dat',  gamma(2,:,:), .TRUE.)
+        call material_rw2('gamma_z.dat',  gamma(3,:,:), .TRUE.)
+        call material_rw2('gamma_yz.dat', gamma(4,:,:), .TRUE.)
+        call material_rw2('gamma_xz.dat', gamma(5,:,:), .TRUE.)
+        call material_rw2('gamma_xy.dat', gamma(6,:,:), .TRUE.)
+        
+        call material_rw2('density.dat', rho, .TRUE.)        
+    end subroutine load_elastic_coefficients2
+    
+    ! ------------------------------------------------------------------------
+    subroutine load_elastic_coefficients3(nx, ny, nz, C, gamma, rho)
+        integer, intent(in) :: nx, ny, nz
+        real(real64), intent(out) :: C(21, nx, ny, nz)
+        real(real64), intent(out) :: gamma(6, nx, ny, nz)
+        real(real64), intent(out) :: rho(nx, ny, nz)
+        integer, intent(out) :: dim(3)
+        
+        ! Load stiffness coefficients (Upper-triangular Voigt packing)
+        call material_rw3('c11.dat', C(1,:,:,:), .TRUE.)
+        call material_rw3('c12.dat', C(2,:,:,:), .TRUE.)
+        call material_rw3('c13.dat', C(3,:,:,:), .TRUE.)
+        call material_rw3('c14.dat', C(4,:,:,:), .TRUE.)
+        call material_rw3('c15.dat', C(5,:,:,:), .TRUE.)
+        call material_rw3('c16.dat', C(6,:,:,:), .TRUE.)
+        call material_rw3('c22.dat', C(7,:,:,:), .TRUE.)
+        call material_rw3('c23.dat', C(8,:,:,:), .TRUE.)
+        call material_rw3('c24.dat', C(9,:,:,:), .TRUE.)
+        call material_rw3('c25.dat', C(10,:,:,:), .TRUE.)
+        call material_rw3('c26.dat', C(11,:,:,:), .TRUE.)
+        call material_rw3('c33.dat', C(12,:,:,:), .TRUE.)
+        call material_rw3('c34.dat', C(13,:,:,:), .TRUE.)
+        call material_rw3('c35.dat', C(14,:,:,:), .TRUE.)
+        call material_rw3('c36.dat', C(15,:,:,:), .TRUE.)
+        call material_rw3('c44.dat', C(16,:,:,:), .TRUE.)
+        call material_rw3('c45.dat', C(17,:,:,:), .TRUE.)
+        call material_rw3('c46.dat', C(18,:,:,:), .TRUE.)
+        call material_rw3('c55.dat', C(19,:,:,:), .TRUE.)
+        call material_rw3('c56.dat', C(20,:,:,:), .TRUE.)
+        call material_rw3('c66.dat', C(21,:,:,:), .TRUE.)
+        
+        ! Load viscoelastic coefficients
+        call material_rw3('gamma_x.dat',  gamma(1,:,:,:), .TRUE.)
+        call material_rw3('gamma_y.dat',  gamma(2,:,:,:), .TRUE.)
+        call material_rw3('gamma_z.dat',  gamma(3,:,:,:), .TRUE.)
+        call material_rw3('gamma_yz.dat', gamma(4,:,:,:), .TRUE.)
+        call material_rw3('gamma_xz.dat', gamma(5,:,:,:), .TRUE.)
+        call material_rw3('gamma_xy.dat', gamma(6,:,:,:), .TRUE.)
+        
+        call material_rw3('density.dat', rho, .TRUE.)        
+    end subroutine load_elastic_coefficients3
+    
+    
+    ! ----------------------------------------------------------------------
     subroutine seismic2_pseudospectral_rk4(domain, source, density_method, verbose)
         type(Domain), intent(in) :: domain
         type(Source), intent(in) :: source
@@ -42,9 +127,12 @@ module pseudospectralfdtd
         
         ! -------------------------------------------------------------------------
         nx = domain%nx
-        ny = domain%ny
         nz = domain%nz
+        dx = domain%dx
+        dz = domain%dz
         dt = source%dt
+        
+        call init_spectral_grid(grid, nx, 1, nz, dx, 1.0_real64, dz)
         
         ! Allocations
         allocate(Q(5, nx, nz), Q_stage(5, nx, nz), k1(5, nx, nz), k2(5, nx, nz), k3(5, nx, nz), k4(5, nx, nz))
