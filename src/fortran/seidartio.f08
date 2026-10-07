@@ -7,7 +7,7 @@ module seidartio
     
     implicit none 
     
-    public :: parse_json
+    public :: parse_json, material_rw, material_rw2, material_rw3, read_geometry, loadsource, write_array
     
     real(c_float), allocatable, save, target :: block_buffer(:,:,:,:,:)
     integer, save :: total_block_limit = 0
@@ -35,6 +35,12 @@ module seidartio
             integer(c_size_t), value :: code
         end function ZSTD_isError
     end interface
+    
+    ! Define generic interface
+    ! interface material_rw
+    !     module procedure material_rw2
+    !     module procedure material_rw3
+    ! end interface material_rw
     
     ! private :: 
     ! ---------------------------- Declarations --------------------------------

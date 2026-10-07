@@ -4,7 +4,13 @@ module spectral_operators
     use iso_fortran_env, only: real64
     implicit none
     include 'fftw3.f03'
-    public :: spectral_grid_t, init_spectral_grid, free_spectral_grid, grad3d 
+    public :: spectral_grid_t, init_spectral_grid, free_spectral_grid
+    public :: grad, grad2d, grad3d 
+    
+    interface grad
+        module procedure grad2d
+        module procedure grad3d
+    end interface grad
     
     ! -------------------------------------------------------------------------
     type :: spectral_grid_t 
@@ -68,6 +74,38 @@ module spectral_operators
     end subroutine init_spectral_grid
 
     ! -------------------------------------------------------------------------
+    subroutine grad2d(grid, F, dF_dx, dF_dz)
+        
+        type(spectral_grid_t), intent(inout) :: grid 
+        real(real64), intent(inout) :: F(grid%nx, grid%nz)
+        real(real64), intent(out)   :: dF_dx(grid%nx, grid%nz)
+        real(real64), intent(out)   :: dF_dz(grid%nx, grid%nz)
+        
+        complex(real64), parameter :: imag_unit = (0.0_real64, 1.0_real64)
+        integer :: i, k
+        
+        ! 1. Forward FFT (2D real array F mapped into 3D grid%F_hat)
+        call fftw_execute_dft_r2c(grid%plan_fwd, F, grid%F_hat)
+        
+        ! 2. Compute spectral derivatives with y index fixed to 1
+        !$omp parallel do collapse(2) private(i, k) 
+        do k = 1, grid%nz
+            do i = 1, grid%nkx
+                grid%dFx_hat(i, 1, k) = (imag_unit * grid%kx(i) * &
+                        grid%inv_n_total) * grid%F_hat(i, 1, k)
+                grid%dFz_hat(i, 1, k) = (imag_unit * grid%kz(k) * &
+                        grid%inv_n_total) * grid%F_hat(i, 1, k)
+            end do
+        end do
+        !$omp end parallel do
+        
+        ! 3. Backward FFT to real space (2D output arrays)
+        call fftw_execute_dft_c2r(grid%plan_bwd_x, grid%dFx_hat, dF_dx)
+        call fftw_execute_dft_c2r(grid%plan_bwd_z, grid%dFz_hat, dF_dz)
+        
+    end subroutine grad2d
+    
+    ! -------------------------------------------------------------------------
     subroutine grad3d(grid, F, dF_dx, dF_dy, dF_dz)
         type(spectral_grid_t), intent(inout) :: grid 
         real(real64), intent(inout) :: F(grid%nx, grid%ny, grid%nz)
@@ -101,6 +139,7 @@ module spectral_operators
         
     end subroutine grad3d
     
+    ! -------------------------------------------------------------------------
     subroutine free_spectral_grid(grid)
         type(spectral_grid_t), intent(inout) :: grid
         if (c_associated(grid%plan_fwd))   call fftw_destroy_plan(grid%plan_fwd)

@@ -96,7 +96,11 @@ program main
 
         if (seismic) then
             print *, "Running 3D seismic model with", seismic_source%time_steps, "time steps"
-            call seismic3(domain, seismic_source, density_method, .TRUE.)
+            if (domain%numerical_model == 'sgfdtd')
+                call seismic3(domain, seismic_source, density_method, .TRUE.)
+            else
+                call seismic3_pseudospectral_rk4(domain, seismic_source, density_method, .TRUE.)
+            end if
         else if (biot) then
             print *, "Running 3D poroviscoelastic model with", seismic_source%time_steps, "time steps"
             call biot_poroviscoelasticity3(domain, seismic_source, density_method, .TRUE.)
@@ -109,6 +113,11 @@ program main
 
         if (seismic) then
             print *, "Running 2.5D seismic model with", seismic_source%time_steps, "time steps"
+            if (domain%numerical_model == 'sgfdtd') then
+                call seismic25(domain, seismic_source)
+            else
+                call seismic25_pseudospectral_rk4(domain, seismic_source)
+            end if
             call seismic25(domain, seismic_source)
         else if (biot) then
             print *, "Running 2.5D poroviscoelastic model with", seismic_source%time_steps, "time steps"
@@ -121,7 +130,11 @@ program main
 
         if (seismic) then
             print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
-            call seismic2(domain, seismic_source, density_method, .TRUE.)
+            if (domain%numerical_model == 'sgfdtd')
+                call seismic2(domain, seismic_source, density_method, .TRUE.)
+            else
+                call seismic2_pseudospectral_rk4(domain, seismic_source, density_method, .TRUE.)
+            end if
         else if (biot) then
             print *, "Running 2D poroviscoelastic model with", seismic_source%time_steps, "time steps"
             call biot_poroviscoelasticity2(domain, seismic_source, density_method, .TRUE.)

@@ -6,6 +6,56 @@ module pseudospectral_stencils
     contains
     
     ! --------------------------------------------------------------------------
+    subroutine elastic_kernel2_rk4(nx, nz, Q, &
+                                dvx_dx, dvx_dz, &
+                                dvz_dx, dvz_dz, &
+                                dsxx_dx, dszz_dz, &
+                                dsxz_dx, dsxz_dz, &
+                                C, gamma_visco, density_s )
+        
+        integer, intent(in) :: nx, nz
+        real(real64), intent(in)  :: Q(6, nx, nz)
+        real(real64), intent(in)  :: dvx_dx(nx,nz), dvx_dz(nx,nz)
+        real(real64), intent(in)  :: dvz_dx(nx,nz), dvz_dz(nx,nz)
+        real(real64), intent(in)  :: dsxx_dx(nx,nz), dszz_dz(nx,nz)
+        real(real64), intent(in)  :: dsxz_dx(nx,nz), dsxz_dz(nx,nz)
+        real(real64), intent(in)  :: C(6, nx, nz)
+        real(real64), intent(in)  :: gamma_visco(3, nx, nz)
+        real(real64), intent(in)  :: density_s(nx, nz)
+        
+        ! Local variables 
+        integer :: i, k 
+        real(real64) :: exx, ezz, exz, gxz, inv_rho
+        
+    #ifdef SEIDART_OPENMP_GPU
+    !$omp target teams distribute parallel do collapse(2) &
+    !$omp& private(i, k, exx, ezz, gxz, inv_rho)
+#else
+    !$omp parallel do collapse(2) schedule(static) &
+    !$omp& private(i, k, exx, ezz, gxz, inv_rho)
+#endif
+    
+        do k = 1, nz 
+            do i = 1,nx
+                T(1, i, k) = (dsxx_dx(i,k) + dsxz_dz(i,k)) / density_s(i,k)
+                T(2, i, k) = (dsxz_dx(i,k) + dszz_dz(i,k)) / density_s(i,k)
+                
+                exx = dvx_dx(i,k)
+                ezz = dvz_dz(i,k)
+                gxz = dvx_dz(i,k) + dvz_dx(i,k)
+                
+                T(3, i, k) = ( c11(i,k) * exx + c13(i,k) * ezz + c15(i,k) * gxz ) - gamma_x(i,k) * Q(3, i,k)
+                T(4, i, k) = ( c13(i,k) * exx + c33(i,k) * ezz + c35(i,k) * gxz ) - gamma_z(i,k) * Q(4, i,k)
+                T(5, i, k) = ( c15(i,k) * exx + c35(i,k) * ezz + c55(i,k) * gxz ) - gamma_xz(i,k) * Q(5, i,k)
+            end do 
+        end do
+#ifndef SEIDART_OPENMP_GPU
+        !$omp end parallel do
+#endif
+        
+    end subroutine elastic_kernel2_rk4
+    
+    ! --------------------------------------------------------------------------
     subroutine explicit_constitutive_kernel3_rk4(nx, ny, nz, Q, &
                                             dvx_dx, dvx_dy, dvx_dz, &
                                             dvy_dx, dvy_dy, dvy_dz, &
