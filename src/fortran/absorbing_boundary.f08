@@ -2,7 +2,8 @@ module absorbing_boundary
     
     use iso_fortran_env, only: real64
     implicit none
-    public :: sponge_layer_t, init_sponge_layer, free_sponge_layer, apply_sponge_damping
+    public :: sponge_layer_t, init_sponge_layer3, free_sponge_layer, 
+    public :: apply_sponge_damping3d, apply_sponge_damping_2d
 
     type :: sponge_layer_t
         integer :: nx, ny, nz
@@ -61,8 +62,29 @@ module absorbing_boundary
     end subroutine init_sponge_layer
     
     ! --------------------------------------------------------------------------
+    ! 2D adaptation of sponge damping
+    subroutine apply_sponge_damping_2d(sp, dom, Q_vec)
+        type(sponge_layer_t), intent(in) :: sp
+        type(Domain_Type), intent(in)   :: dom
+        real(real64), intent(inout)     :: Q_vec(5, dom%nx, dom%nz)
+        integer :: i, k, v
+        real(real64) :: w
+
+        do k = 1, dom%nz
+            do i = 1, dom%nx
+                w = sp%damping_mask(i, 1, k)
+                if (w < 0.999999_real64) then
+                    do v = 1, 5
+                        Q_vec(v, i, k) = Q_vec(v, i, k) * w
+                    end do
+                end if
+            end do
+        end do
+    end subroutine apply_sponge_damping_2d
+    ! --------------------------------------------------------------------------
+    
     ! Multiplies state vector and fluid pressure by damping mask at end of time step
-    subroutine apply_sponge_damping(sponge, domain, Q, fluid_pressure)
+    subroutine apply_sponge_damping3d(sponge, domain, Q, fluid_pressure)
         type(sponge_layer_t), intent(in) :: sponge
         type(Domain_Type), intent(in) :: domain
         real(real64), intent(inout) :: Q(21, domain%nx, domain%ny, domain%nz)
@@ -92,7 +114,7 @@ module absorbing_boundary
                 end do
             end do
         end do
-    end subroutine apply_sponge_damping
+    end subroutine apply_sponge_damping3d
 
     ! --------------------------------------------------------------------------
     ! Destructor to release heap memory allocated for the sponge mask

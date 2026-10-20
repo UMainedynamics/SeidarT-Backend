@@ -325,10 +325,48 @@ contains
 
         deallocate(full_spatial)
     end subroutine precompute_spatial_kernel
+    
+    ! --------------------------------------------------------------------------
+    ! 2D adaptation of source injection for explicit stage tensor
+    subroutine inject_source_explicit_stage_2d(src, nx, nz, T_stage, it, stage_frac, rho_s)
+        type(Source_Type), intent(in) :: src
+        integer, intent(in)           :: nx, nz
+        real(real64), intent(inout)   :: T_stage(5, nx, nz)
+        integer, intent(in)           :: it
+        real(real64), intent(in)      :: stage_frac
+        real(real64), intent(in)      :: rho_s(nx, nz)
 
+        real(real64) :: s_val, t_curr, t_idx, frac
+        integer :: idx_floor, idx_ceil, isrc, ksrc
+
+        t_curr = (real(it - 1, real64) + stage_frac) * src%dt
+        t_idx  = t_curr / src%dt
+        idx_floor = int(t_idx) + 1
+        idx_ceil  = min(src%time_steps, idx_floor + 1)
+        frac      = t_idx - real(idx_floor - 1, real64)
+
+        if (idx_floor >= 1 .and. idx_floor <= src%time_steps) then
+            s_val = (1.0_real64 - frac) * src%time_series(idx_floor) + frac * src%time_series(idx_ceil)
+        else
+            return
+        end if
+
+        isrc = src%xind + domain%npml
+        ksrc = src%zind + domain%npml
+
+        if (src%source_type == "ac") then
+            T_stage(1, isrc, ksrc) = T_stage(1, isrc, ksrc) + (s_val * src%force_vec(1)) / rho_s(isrc, ksrc)
+            T_stage(2, isrc, ksrc) = T_stage(2, isrc, ksrc) + (s_val * src%force_vec(3)) / rho_s(isrc, ksrc)
+        else
+            T_stage(3, isrc, ksrc) = T_stage(3, isrc, ksrc) + s_val * src%moment_tensor(1)
+            T_stage(4, isrc, ksrc) = T_stage(4, isrc, ksrc) + s_val * src%moment_tensor(3)
+            T_stage(5, isrc, ksrc) = T_stage(5, isrc, ksrc) + s_val * src%moment_tensor(5)
+        end if
+    end subroutine inject_source_explicit_stage_2d
+    
     ! --------------------------------------------------------------------------
     !> Injects source amplitude into explicit stage RHS tensor T at stage time
-    subroutine inject_source_explicit_stage(src, nx, ny, nz, T_stage, it, stage_time_frac, density_s)
+    subroutine inject_source_explicit_stage3d(src, nx, ny, nz, T_stage, it, stage_time_frac, density_s)
         type(Source_Type), intent(in) :: src
         integer, intent(in) :: nx, ny, nz
         real(real64), intent(inout) :: T_stage(21, nx, ny, nz)
