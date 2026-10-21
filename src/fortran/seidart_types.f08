@@ -85,7 +85,7 @@ module seidart_types
         real(real64) :: s22, s23, s33
     end type Conductivity_Type
     
-        type :: spectral_grid_t 
+    type :: spectral_grid_t 
         real(real64) :: inv_n_total 
         real(real64), allocatable :: kx(:), ky(:), kz(:)
         type(c_ptr) :: plan_fwd = c_null_ptr 
