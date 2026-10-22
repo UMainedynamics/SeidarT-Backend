@@ -1,5 +1,6 @@
 module seidart_types
     use iso_fortran_env, only: real64
+    use iso_c_binding, only: c_ptr, c_null_ptr  ! <-- ADD THIS IMPORT
     
     implicit none 
     
@@ -87,6 +88,7 @@ module seidart_types
     
     type :: spectral_grid_t 
         real(real64) :: inv_n_total 
+        integer :: nkx, nky, nkz
         real(real64), allocatable :: kx(:), ky(:), kz(:)
         type(c_ptr) :: plan_fwd = c_null_ptr 
         type(c_ptr) :: plan_bwd_x = c_null_ptr 

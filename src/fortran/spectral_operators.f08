@@ -2,10 +2,13 @@ module spectral_operators
 
     use iso_c_binding
     use iso_fortran_env, only: real64
+    use seidart_types, only: spectral_grid_t
+
+    
     implicit none
     include 'fftw3.f03'
     public :: spectral_grid_t, init_spectral_grid, free_spectral_grid
-    public :: grad, grad2d, grad3d 
+    public :: grad, grad2d, grad3d, grad2d_complex 
     
     interface grad
         module procedure grad2d
@@ -13,19 +16,6 @@ module spectral_operators
     end interface grad
     
     ! -------------------------------------------------------------------------
-    type :: spectral_grid_t 
-        integer :: nx, ny, nz, nkx
-        real(real64) :: inv_n_total 
-        real(real64), allocatable :: kx(:), ky(:), kz(:)
-        type(c_ptr) :: plan_fwd = c_null_ptr 
-        type(c_ptr) :: plan_bwd_x = c_null_ptr 
-        type(c_ptr) :: plan_bwd_y = c_null_ptr 
-        type(c_ptr) :: plan_bwd_z = c_null_ptr
-        complex(real64), allocatable :: F_hat(:,:,:)
-        complex(real64), allocatable :: dFx_hat(:,:,:), dFy_hat(:,:,:), &
-                                        dFz_hat(:,:,:)
-    end type spectral_grid_t
-    
     contains
     
     subroutine init_spectral_grid(grid, nx, ny, nz, dx, dy, dz)
@@ -104,6 +94,33 @@ module spectral_operators
         call fftw_execute_dft_c2r(grid%plan_bwd_z, grid%dFz_hat, dF_dz)
         
     end subroutine grad2d
+    
+    ! -------------------------------------------------------------------------
+    subroutine grad2d_complex(grid, F, dF_dx, dF_dz)
+
+        type(spectral_grid_t), intent(inout) :: grid
+
+        complex(real64), intent(in) :: F(grid%nx, grid%nz)
+        complex(real64), intent(out) :: dF_dx(grid%nx, grid%nz)
+        complex(real64), intent(out) :: dF_dz(grid%nx, grid%nz)
+
+        real(real64) :: work(grid%nx, grid%nz)
+        real(real64) :: gx(grid%nx, grid%nz)
+        real(real64) :: gz(grid%nx, grid%nz)
+
+        work = real(F, kind=real64)
+        call grad2d(grid, work, gx, gz)
+
+        dF_dx = cmplx(gx, 0.0_real64, kind=real64)
+        dF_dz = cmplx(gz, 0.0_real64, kind=real64)
+
+        work = aimag(F)
+        call grad2d(grid, work, gx, gz)
+
+        dF_dx = dF_dx + cmplx(0.0_real64, gx, kind=real64)
+        dF_dz = dF_dz + cmplx(0.0_real64, gz, kind=real64)
+
+    end subroutine grad2d_complex
     
     ! -------------------------------------------------------------------------
     subroutine grad3d(grid, F, dF_dx, dF_dy, dF_dz)

@@ -1,8 +1,9 @@
 module source_module
-    use iso_c_binding
+    use, intrinsic :: iso_c_binding
     use iso_fortran_env, only: real64
     use seidart_types
     use constants
+    use fftw3
     
     implicit none
     include 'fftw3.f03'
@@ -13,7 +14,8 @@ module source_module
               init_source_double_couple, &
               init_source_clvd,          &
               init_source_plane_wave,    &
-              inject_source_explicit_stage, &
+              inject_source_explicit_stage2, &
+              inject_source_explicit_stage3, &
               free_source
 
 contains
@@ -27,17 +29,16 @@ contains
         real(real64), intent(in) :: freq_spec(n_spec)
         integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
-
         
         real(real64) :: az_rad, dip_rad
-
+        
         az_rad  = src%azimuth * DEG2RAD
         dip_rad = src%dip * DEG2RAD
-
+        
         src%force_vec(1) = src%amplitude * cos(dip_rad) * sin(az_rad)
         src%force_vec(2) = src%amplitude * cos(dip_rad) * cos(az_rad)
         src%force_vec(3) = src%amplitude * sin(dip_rad)
-
+        
         call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
         call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_weight_drop
@@ -53,12 +54,11 @@ contains
         integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
         
-        
         src%moment_tensor = 0.0_real64
         src%moment_tensor(1) = src%amplitude
         src%moment_tensor(2) = src%amplitude
         src%moment_tensor(3) = src%amplitude
-
+        
         call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
         call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_explosive
@@ -72,29 +72,29 @@ contains
         real(real64), intent(in) :: freq_spec(n_spec)
         integer, intent(in) :: n_spec
         type(spectral_grid_t), intent(inout) :: grid
-
+        
         real(real64) :: phi, del, lam
         real(real64) :: s_phi, c_phi, s_2phi, c_2phi
         real(real64) :: s_del, c_del, s_2del, c_2del
         real(real64) :: s_lam, c_lam
-
+        
         phi = src%strike * DEG2RAD
         del = src%dip    * DEG2RAD
         lam = src%rake   * DEG2RAD
-
+        
         s_phi = sin(phi); c_phi = cos(phi)
         s_2phi = sin(2.0_real64 * phi); c_2phi = cos(2.0_real64 * phi)
         s_del = sin(del); c_del = cos(del)
         s_2del = sin(2.0_real64 * del); c_2del = cos(2.0_real64 * del)
         s_lam = sin(lam); c_lam = cos(lam)
-
+        
         src%moment_tensor(1) = -src%amplitude * (s_del * c_lam * s_2phi + s_2del * s_lam * s_phi**2)
         src%moment_tensor(2) =  src%amplitude * (s_del * c_lam * s_2phi - s_2del * s_lam * c_phi**2)
         src%moment_tensor(3) =  src%amplitude * (s_2del * s_lam)
         src%moment_tensor(4) = -src%amplitude * (c_del * c_lam * s_phi - c_2del * s_lam * c_phi)
         src%moment_tensor(5) = -src%amplitude * (c_del * c_lam * c_phi + c_2del * s_lam * s_phi)
         src%moment_tensor(6) =  src%amplitude * (s_del * c_lam * c_2phi + 0.5_real64 * s_2del * s_lam * s_2phi)
-
+        
         call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
         call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_double_couple
@@ -110,23 +110,21 @@ contains
         type(spectral_grid_t), intent(inout) :: grid
 
         real(real64) :: az_rad, pl_rad, ex, ey, ez
-
         
-
         az_rad = src%azimuth * DEG2RAD
         pl_rad = src%plunge  * DEG2RAD
-
+        
         ex = cos(pl_rad) * sin(az_rad)
         ey = cos(pl_rad) * cos(az_rad)
         ez = sin(pl_rad)
-
+        
         src%moment_tensor(1) = src%amplitude * (3.0_real64 * ex * ex - 1.0_real64)
         src%moment_tensor(2) = src%amplitude * (3.0_real64 * ey * ey - 1.0_real64)
         src%moment_tensor(3) = src%amplitude * (3.0_real64 * ez * ez - 1.0_real64)
         src%moment_tensor(4) = src%amplitude * (3.0_real64 * ey * ez)
         src%moment_tensor(5) = src%amplitude * (3.0_real64 * ex * ez)
         src%moment_tensor(6) = src%amplitude * (3.0_real64 * ex * ey)
-
+        
         call synthesize_from_spectrum(F_spec, freq_spec, n_spec, src)
         call precompute_spatial_kernel(src, grid, domain)
     end subroutine init_source_clvd
@@ -328,13 +326,13 @@ contains
     
     ! --------------------------------------------------------------------------
     ! 2D adaptation of source injection for explicit stage tensor
-    subroutine inject_source_explicit_stage_2d(src, nx, nz, T_stage, it, stage_frac, rho_s)
+    subroutine inject_source_explicit_stage2(src, domain, T_stage, it, stage_frac, rho_s)
         type(Source_Type), intent(in) :: src
-        integer, intent(in)           :: nx, nz
-        real(real64), intent(inout)   :: T_stage(5, nx, nz)
+        type(Domain_Type), intent(in) :: domain
+        real(real64), intent(inout)   :: T_stage(5, domain%nx, domain%nz)
         integer, intent(in)           :: it
         real(real64), intent(in)      :: stage_frac
-        real(real64), intent(in)      :: rho_s(nx, nz)
+        real(real64), intent(in)      :: rho_s(domain%nx, domain%nz)
 
         real(real64) :: s_val, t_curr, t_idx, frac
         integer :: idx_floor, idx_ceil, isrc, ksrc
@@ -362,11 +360,11 @@ contains
             T_stage(4, isrc, ksrc) = T_stage(4, isrc, ksrc) + s_val * src%moment_tensor(3)
             T_stage(5, isrc, ksrc) = T_stage(5, isrc, ksrc) + s_val * src%moment_tensor(5)
         end if
-    end subroutine inject_source_explicit_stage_2d
+    end subroutine inject_source_explicit_stage2
     
     ! --------------------------------------------------------------------------
     !> Injects source amplitude into explicit stage RHS tensor T at stage time
-    subroutine inject_source_explicit_stage3d(src, nx, ny, nz, T_stage, it, stage_time_frac, density_s)
+    subroutine inject_source_explicit_stage3(src, nx, ny, nz, T_stage, it, stage_time_frac, density_s)
         type(Source_Type), intent(in) :: src
         integer, intent(in) :: nx, ny, nz
         real(real64), intent(inout) :: T_stage(21, nx, ny, nz)
@@ -472,7 +470,7 @@ contains
 
         end if
 
-    end subroutine inject_source_explicit_stage
+    end subroutine inject_source_explicit_stage3
 
     ! --------------------------------------------------------------------------
     subroutine free_source(src)

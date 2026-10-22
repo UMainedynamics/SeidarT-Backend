@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # -----------------------------------------------------------------------------
 user_defined_builddir=false
@@ -119,7 +120,7 @@ echo "Using GFortran from $FC"
 #                                           -finit-real=snan -finit-integer=0 \
 #                                           -Wall"
 # else
-LIBFLAGS="-ljsonfortran -llapack -lblas -lzstd"
+LIBFLAGS="-ljsonfortran -llapack -lblas -lzstd -lfftw3"
 FFLAGS="-cpp -I${INCLUDE_PATH} -L${LIB_PATH} -O3 -march=native -funroll-loops -ffast-math -ffp-contract=fast -fomit-frame-pointer -fPIC -Wall"
 # fi 
 
@@ -160,6 +161,10 @@ SOURCES="$SRC_DIR/constants.f08 \
          $SRC_DIR/plane_wave_source.f08 \
          $SRC_DIR/tensor_operations.f08 \
          $SRC_DIR/cpmlfdtd.f08 \
+         $SRC_DIR/pseudospectral_stencils.f08 \
+         $SRC_DIR/absorbing_boundary.f08 \
+         $SRC_DIR/source.f08 \
+         $SRC_DIR/imex.f08 \
          $SRC_DIR/main.f08"
 EXECUTABLE="seidartfdtd-$os-$arch"
 
@@ -172,8 +177,10 @@ echo "Compiling the SeidarT CPML FDTD executable..."
 
 # -------
 mkdir -p build
+rm -f build/*.o build/*.mod build/*.smod
+
 # Define the base flags (removed -cpp if you wish, but needed for #ifdefs)
-BASE_FLAGS="$FFLAGS $ICONV -Jbuild"
+BASE_FLAGS="$FFLAGS $ICONV -Jbuild -Ibuild"
 
 echo "Step 1: Compiling Base Modules..."
 $FC $BASE_FLAGS -c src/fortran/constants.f08 -o build/constants.o
@@ -184,14 +191,23 @@ $FC $BASE_FLAGS -c src/fortran/seidartio.f08 -o build/seidartio.o
 $FC $BASE_FLAGS -c src/fortran/averaging.f08 -o build/averaging.o
 $FC $BASE_FLAGS -c src/fortran/tensor_operations.f08 -o build/tensor_operations.o
 
-echo "Step 3: Compiling Solver and Physics..."
+echo "Step 3: Compiling Solver and Physics Modules..."
+$FC $BASE_FLAGS -c src/fortran/spectral_operators.f08 -o build/spectral_operators.o
 $FC $BASE_FLAGS -c src/fortran/plane_wave_source.f08 -o build/plane_wave_source.o
 $FC $BASE_FLAGS -c src/fortran/cpmlfdtd.f08 -o build/cpmlfdtd.o
+$FC $BASE_FLAGS -c src/fortran/pseudospectral_stencils.f08 -o build/pseudospectral_stencils.o
+$FC $BASE_FLAGS -c src/fortran/absorbing_boundary.f08 -o build/absorbing_boundary.o
+$FC $BASE_FLAGS -c src/fortran/source.f08 -o build/source.o
+$FC $BASE_FLAGS -c src/fortran/pseudospectralfdtd.f08 -o build/pseudospectralfdtd.o
+$FC $BASE_FLAGS -c src/fortran/imex.f08 -o build/imex.o
+
+echo "Step 4: Compiling Main Executable Entry Point..."
 $FC $BASE_FLAGS -c src/fortran/main.f08 -o build/main.o
 
-echo "Step 4: Linking everything..."
-$FC build/*.o -o "$EXECUTABLE" \
-    $FFLAGS -L"$LIB_PATH" $LIBFLAGS > compile_output.txt 2>&1
+echo "Step 5: Linking everything..."
+# $FC build/*.o -o "$EXECUTABLE" \
+#     $FFLAGS -L"$LIB_PATH" $LIBFLAGS > compile_output.txt 2>&1
+$FC build/*.o $FFLAGS -L"$LIB_PATH" $LIBFLAGS -o "$EXECUTABLE" > compile_output.txt 2>&1
 
 # ------
 

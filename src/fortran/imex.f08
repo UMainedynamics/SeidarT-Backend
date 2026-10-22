@@ -1,5 +1,5 @@
 module imex
-    use iso_c_binding
+    use, intrinsic :: iso_c_binding
     use iso_fortran_env, only: real64
     
     use spectral_operators
@@ -12,13 +12,15 @@ module imex
     use constants 
     use omp_lib
     
+    use pseudospectral_stencils
+    
+    ! use fftw3
+    
     implicit none
     include 'fftw3.f03'
     
     private
     public :: load_coefficients, ars_coefficients, biot_poroviscoelasticity3!, biot_electrokinetic3
-    
-contains
     
     type :: biot_state_t
         real(real64), allocatable :: q(:,:,:,:)
@@ -34,6 +36,9 @@ contains
         type(biot_state_t) :: biot
         type(em_state_t)   :: em
     end type seismoelectric_state_t
+    
+    contains
+    
 
     ! --------------------------------------------------------------------------
     subroutine load_coefficients(nx, ny, nz, &

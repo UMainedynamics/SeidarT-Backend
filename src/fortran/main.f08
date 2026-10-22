@@ -12,6 +12,13 @@ program main
     use seidartio 
     use cpmlfdtd 
     use seidart_types 
+    use imex, only: biot_poroviscoelasticity3 &
+                    ! biot_poroviscoelasticity25, &
+                    ! biot_poroviscoelasticity2
+    
+    use pseudospectralfdtd, only:   seismic2_pseudospectral_rk4, &
+                                    seismic25_pseudospectral_rk4, &
+                                    seismic3_pseudospectral_rk4
     
     implicit none 
     
@@ -75,9 +82,9 @@ program main
         end if
     end do
 
-    domain%nx = domain%nx + 2*domain%cpml
-    domain%ny = domain%ny + 2*domain%cpml
-    domain%nz = domain%nz + 2*domain%cpml
+    domain%nx = domain%nx + 2*domain%npml
+    domain%ny = domain%ny + 2*domain%npml
+    domain%nz = domain%nz + 2*domain%npml
 
     ! Validate density_method
     select case (trim(density_method))
@@ -96,14 +103,14 @@ program main
 
         if (seismic) then
             print *, "Running 3D seismic model with", seismic_source%time_steps, "time steps"
-            if (domain%numerical_model == 'sgfdtd')
+            if (domain%numerical_model == 'sgfdtd') then
                 call seismic3(domain, seismic_source, density_method, .TRUE.)
             else
-                call seismic3_pseudospectral_rk4(domain, seismic_source, density_method, .TRUE.)
+                call seismic3_pseudospectral_rk4(domain, seismic_source, SINGLE_OUTPUT=.true.)
             end if
         else if (biot) then
             print *, "Running 3D poroviscoelastic model with", seismic_source%time_steps, "time steps"
-            call biot_poroviscoelasticity3(domain, seismic_source, density_method, .TRUE.)
+            call biot_poroviscoelasticity3(domain, seismic_source, 'ARS222')
         else
             print *, "Running 3D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag3(domain, electromagnetic_source, .TRUE.)
@@ -121,6 +128,7 @@ program main
             call seismic25(domain, seismic_source)
         else if (biot) then
             print *, "Running 2.5D poroviscoelastic model with", seismic_source%time_steps, "time steps"
+            error stop '2.5D Biot solver is not implemented.'
             call biot_poroviscoelasticity25(domain, seismic_source)
         else
             print *, "Running 2.5D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
@@ -130,13 +138,14 @@ program main
 
         if (seismic) then
             print *, "Running 2D seismic model with", seismic_source%time_steps, "time steps"
-            if (domain%numerical_model == 'sgfdtd')
+            if (domain%numerical_model == 'sgfdtd') then
                 call seismic2(domain, seismic_source, density_method, .TRUE.)
             else
-                call seismic2_pseudospectral_rk4(domain, seismic_source, density_method, .TRUE.)
+                call seismic2_pseudospectral_rk4(domain, seismic_source, SINGLE_OUTPUT=.true.)
             end if
         else if (biot) then
             print *, "Running 2D poroviscoelastic model with", seismic_source%time_steps, "time steps"
+            error stop '2D Biot solver is not implemented.'
             call biot_poroviscoelasticity2(domain, seismic_source, density_method, .TRUE.)
         else
             print *, "Running 2D electromagnetic model with", electromagnetic_source%time_steps, "time steps"

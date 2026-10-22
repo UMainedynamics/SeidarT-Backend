@@ -1,8 +1,11 @@
 module absorbing_boundary
     
     use iso_fortran_env, only: real64
+    use seidart_types
     implicit none
-    public :: sponge_layer_t, init_sponge_layer3, free_sponge_layer, 
+    
+    
+    public :: sponge_layer_t, init_sponge_layer2,init_sponge_layer3, free_sponge_layer
     public :: apply_sponge_damping3d, apply_sponge_damping_2d
 
     type :: sponge_layer_t
@@ -14,20 +17,73 @@ module absorbing_boundary
     contains
     
     ! --------------------------------------------------------------------------
-    subroutine init_sponge_layer(sponge, domain, alpha)
+    subroutine init_sponge_layer2(sponge, domain, alpha)
         type(sponge_layer_t), intent(inout) :: sponge
-        type(Domain_Type), intent(in) :: domain
-        real(real64), intent(in) :: alpha
+        type(Domain_Type), intent(in)       :: domain
+        real(real64), intent(in)           :: alpha
+        
+        real(real64), allocatable :: wx(:), wz(:)
+        real(real64) :: dist
+        integer :: i, k
+        
+        sponge%nx = domain%nx
+        sponge%ny = 1
+        sponge%nz = domain%nz
+        sponge%npml = domain%npml
+
+        if (allocated(sponge%damping_mask)) deallocate(sponge%damping_mask)
+        ! Allocate a 2D slice in memory (ny = 1)
+        allocate(sponge%damping_mask(domain%nx, 1, domain%nz))
+        allocate(wx(domain%nx), wz(domain%nz))
+
+        ! Precompute X-direction damping profile
+        wx = 1.0_real64
+        do i = 1, domain%npml
+            dist = real(domain%npml - i + 1, real64)
+            wx(i) = exp(-(alpha * dist / real(domain%npml, real64))**2)
+            wx(domain%nx - i + 1) = wx(i)
+        end do
+
+        ! Precompute Z-direction damping profile
+        wz = 1.0_real64
+        do k = 1, domain%npml
+            dist = real(domain%npml - k + 1, real64)
+            wz(k) = exp(-(alpha * dist / real(domain%npml, real64))**2)
+            wz(domain%nz - k + 1) = wz(k)
+        end do
+
+        ! Build 2D damping mask
+        do k = 1, domain%nz
+            do i = 1, domain%nx
+                sponge%damping_mask(i, 1, k) = wx(i) * wz(k)
+            end do
+        end do
+
+        deallocate(wx, wz)
+    end subroutine init_sponge_layer2
+    
+    ! --------------------------------------------------------------------------
+    subroutine init_sponge_layer3(sponge, domain, alpha)
+        type(sponge_layer_t), intent(inout) :: sponge
+        type(Domain_Type), intent(in)       :: domain
+        real(real64), intent(in)           :: alpha
         
         real(real64), allocatable :: wx(:), wy(:), wz(:)
         real(real64) :: dist
         integer :: i, j, k
         
+        ! Store domain dimensions and boundary width
+        sponge%nx = domain%nx
+        sponge%ny = domain%ny
+        sponge%nz = domain%nz
+        sponge%npml = domain%npml
+
+        ! Allocate memory for 3D mask and temporary 1D profile vectors
         if (allocated(sponge%damping_mask)) deallocate(sponge%damping_mask)
         allocate(sponge%damping_mask(domain%nx, domain%ny, domain%nz))
         allocate(wx(domain%nx), wy(domain%ny), wz(domain%nz))
 
-        ! 1. Precompute 1D damping profiles (1.0 in interior, exp decay in layer)
+        ! 1. Precompute 1D damping profiles (1.0 in interior, quadratic exponential decay in sponge boundary)
         wx = 1.0_real64
         do i = 1, domain%npml
             dist = real(domain%npml - i + 1, real64)
@@ -36,7 +92,12 @@ module absorbing_boundary
         end do
 
         wy = 1.0_real64
+        do j = 1, domain%ny
+            if (domain%ny == 1) exit ! Guard for 2D setups where ny = 1
+        end do
+        wy = 1.0_real64
         do j = 1, domain%npml
+            if (domain%ny <= 1) exit
             dist = real(domain%npml - j + 1, real64)
             wy(j) = exp(-(alpha * dist / real(domain%npml, real64))**2)
             wy(domain%ny - j + 1) = wy(j)
@@ -49,7 +110,7 @@ module absorbing_boundary
             wz(domain%nz - k + 1) = wz(k)
         end do
 
-        ! 2. Tensor product to build 3D damping mask
+        ! 2. Compute 3D tensor product mask
         do k = 1, domain%nz
             do j = 1, domain%ny
                 do i = 1, domain%nx
@@ -59,8 +120,7 @@ module absorbing_boundary
         end do
 
         deallocate(wx, wy, wz)
-    end subroutine init_sponge_layer
-    
+    end subroutine init_sponge_layer3
     ! --------------------------------------------------------------------------
     ! 2D adaptation of sponge damping
     subroutine apply_sponge_damping_2d(sp, dom, Q_vec)

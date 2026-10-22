@@ -180,8 +180,8 @@ module cpmlfdtd
         
         ! ------------------------ Assign some constants -----------------------
         
-        isource = source%xind + domain%cpml
-        jsource = source%zind + domain%cpml
+        isource = source%xind + domain%npml
+        jsource = source%zind + domain%npml
     
         ! ================================ LOAD SOURCE =========================
         srcxx(:) = 0.0_real64
@@ -191,16 +191,16 @@ module cpmlfdtd
         srcz(:) = 0.0_real64
         
         if ( is_plane_wave_source(source%source_type) ) then 
-            XMIN = domain%dx * (1 + domain%cpml)
-            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMIN = domain%dx * (1 + domain%npml)
+            XMAX = domain%dx * (domain%nx - domain%npml)
             XMID = 0.50_real64 * (XMIN + XMAX)
-            ZMIN = domain%dz * (1 + domain%cpml)
-            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMIN = domain%dz * (1 + domain%npml)
+            ZMAX = domain%dz * (domain%nz - domain%npml)
             ZMID = 0.50_real64 * (ZMIN + ZMAX)
 
-            call direction_polarization_vector( source%x_z_rotation, &
-                                                source%x_y_rotation, &
-                                                source%y_z_rotation, &
+            call direction_polarization_vector( source%dip, &
+                                                source%strike, &
+                                                source%plunge, &
                                                 p, ehat)
             call select_injection_faces(p, active)
 
@@ -224,10 +224,10 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
 
-            i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml - 1
-            j_min = domain%cpml + 2
-            j_max = domain%nz - domain%cpml - 1
+            i_min = domain%npml + 2
+            i_max = domain%nx - domain%npml - 1
+            j_min = domain%npml + 2
+            j_max = domain%nz - domain%npml - 1
 
             call array_eigenvalues4_2(c11, c13, c15, c33, c35, c55, &
                                       eig_array, nx, nz)
@@ -291,8 +291,8 @@ module cpmlfdtd
         memory_dsigmaxz_dz(:,:) = 0.0_real64
         
         ! ======================== I/O Setup ========================
-        call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
-        if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
+        call setup_io_params_2d(nx, nz, domain%npml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io_2d(nx, nz, domain%npml, steps_per_block)
         block_count = 0
         
         !---
@@ -482,9 +482,9 @@ module cpmlfdtd
                         r = (/ XLOC, 0.0_real64, ip * domain%dz /)
                         call boundary_seismic_field(r, r0, t, &
                                         source%source_frequency, &
-                                        source%x_z_rotation, &
-                                        source%x_y_rotation, &
-                                        source%y_z_rotation, &
+                                        source%dip, &
+                                        source%strike, &
+                                        source%plunge, &
                                         cbackground, source%amplitude, &
                                         source%source_wavelet, &
                                         Vvec, strain_vec, source%source_type)
@@ -507,9 +507,9 @@ module cpmlfdtd
                         r = (/ ip * domain%dx, 0.0_real64, ZLOC /)
                         call boundary_seismic_field(r, r0, t, &
                                         source%source_frequency, &
-                                        source%x_z_rotation, &
-                                        source%x_y_rotation, &
-                                        source%y_z_rotation, &
+                                        source%dip, &
+                                        source%strike, &
+                                        source%plunge, &
                                         cbackground, source%amplitude, &
                                         source%source_wavelet, &
                                         Vvec, strain_vec, source%source_type)
@@ -722,7 +722,9 @@ module cpmlfdtd
         real(real64), allocatable :: eig_array(:,:,:)
         logical :: active(6)
         integer :: i_min, i_max, k_min, k_max
-        real(real64) :: XMIN, XMAX, XMID, ZMIN, ZMAX, ZMID, XLOC, ZLOC
+        real(real64) :: XMIN=0.0_real64, XMAX=0.0_real64, XMID=0.0_real64 
+        real(real64) :: ZMIN=0.0_real64, ZMAX=0.0_real64, ZMID=0.0_real64 
+        real(real64) :: XLOC=0.0_real64, ZLOC=0.0_real64
         real(real64) :: tmp_sxx, tmp_syy, tmp_szz, tmp_syz, tmp_sxz, tmp_sxy
 
         ! ======================== Read environment variables ========================
@@ -831,8 +833,8 @@ module cpmlfdtd
         call material_rw2('gamma_xy.dat', gamma_xy, .TRUE.)
 
         ! ======================== Constants ========================
-        isource = source%xind + domain%cpml
-        ksource = source%zind + domain%cpml
+        isource = source%xind + domain%npml
+        ksource = source%zind + domain%npml
 
         ! ======================== Load Source ========================
         srcxx = 0.0_real64; srcxy = 0.0_real64; srcxz = 0.0_real64
@@ -840,16 +842,16 @@ module cpmlfdtd
         srcx = 0.0_real64;  srcy = 0.0_real64;  srcz = 0.0_real64
 
         if ( is_plane_wave_source(source%source_type) ) then
-            XMIN = domain%dx * (1 + domain%cpml)
-            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMIN = domain%dx * (1 + domain%npml)
+            XMAX = domain%dx * (domain%nx - domain%npml)
             XMID = 0.50_real64 * (XMIN + XMAX)
-            ZMIN = domain%dz * (1 + domain%cpml)
-            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMIN = domain%dz * (1 + domain%npml)
+            ZMAX = domain%dz * (domain%nz - domain%npml)
             ZMID = 0.50_real64 * (ZMIN + ZMAX)
 
-            call direction_polarization_vector( source%x_z_rotation, &
-                                                source%x_y_rotation, &
-                                                source%y_z_rotation, &
+            call direction_polarization_vector( source%dip, &
+                                                source%strike, &
+                                                source%plunge, &
                                                 p, ehat)
             call select_injection_faces(p, active)
 
@@ -861,10 +863,10 @@ module cpmlfdtd
             if ( active(5) ) then; r0(3) = ZMIN; ZLOC = ZMIN; endif
             if ( active(6) ) then; r0(3) = ZMAX; ZLOC = ZMAX; endif
 
-            i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml - 1
-            k_min = domain%cpml + 2
-            k_max = domain%nz - domain%cpml - 1
+            i_min = domain%npml + 2
+            i_max = domain%nx - domain%npml - 1
+            k_min = domain%npml + 2
+            k_max = domain%nz - domain%npml - 1
 
             call array_eigenvalues4_25(c11, c12, c13, c14, c15, c16, &
                                        c22, c23, c24, c25, c26, &
@@ -938,8 +940,8 @@ module cpmlfdtd
         call array_averaging2d(rhozz, density_code, '-j')
 
         ! ======================== I/O Setup ========================
-        call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
-        if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
+        call setup_io_params_2d(nx, nz, domain%npml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io_2d(nx, nz, domain%npml, steps_per_block)
         block_count = 0
         ! ======================== Time Loop ========================
         velocnorm = 0.0_real64
@@ -1252,8 +1254,8 @@ module cpmlfdtd
                     do jj = k_min, k_max
                         r = (/ XLOC, 0.0_real64, jj * domain%dz /)
                         call boundary_seismic_field(r, r0, it*dt, &
-                            source%source_frequency, source%x_z_rotation, &
-                            source%x_y_rotation, source%y_z_rotation, &
+                            source%source_frequency, source%dip, &
+                            source%strike, source%plunge, &
                             cbackground, source%amplitude, &
                             source%source_wavelet, Vvec, strain_vec, source%source_type)
                         vx(ii,jj) = vx(ii,jj) + Vvec(1)
@@ -1280,8 +1282,8 @@ module cpmlfdtd
                     do ii = i_min, i_max
                         r = (/ ii * domain%dx, 0.0_real64, ZLOC /)
                         call boundary_seismic_field(r, r0, it*dt, &
-                            source%source_frequency, source%x_z_rotation, &
-                            source%x_y_rotation, source%y_z_rotation, &
+                            source%source_frequency, source%dip, &
+                            source%strike, source%plunge, &
                             cbackground, source%amplitude, &
                             source%source_wavelet, Vvec, strain_vec, source%source_type)
                         vx(ii,jj) = vx(ii,jj) + Vvec(1)
@@ -1569,9 +1571,9 @@ module cpmlfdtd
         call material_rw3('gamma_xy.dat', gamma_xy, .TRUE.)
     
         ! ------------------------ Assign some constants -----------------------
-        isource = source%xind + domain%cpml
-        jsource = source%yind + domain%cpml
-        ksource = source%zind + domain%cpml
+        isource = source%xind + domain%npml
+        jsource = source%yind + domain%npml
+        ksource = source%zind + domain%npml
 
         ! ================================ LOAD SOURCE ================================
         srcxx(:) = 0.0_real64
@@ -1585,19 +1587,19 @@ module cpmlfdtd
         srcz(:) = 0.0_real64
         
         if ( is_plane_wave_source(source%source_type) ) then
-            XMIN = domain%dx * (1 + domain%cpml)
-            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMIN = domain%dx * (1 + domain%npml)
+            XMAX = domain%dx * (domain%nx - domain%npml)
             XMID = 0.50_real64 * (XMIN + XMAX)
-            YMIN = domain%dy * (1 + domain%cpml)
-            YMAX = domain%dy * (domain%ny - domain%cpml)
+            YMIN = domain%dy * (1 + domain%npml)
+            YMAX = domain%dy * (domain%ny - domain%npml)
             YMID = 0.50_real64 * (YMIN + YMAX)
-            ZMIN = domain%dz * (1 + domain%cpml)
-            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMIN = domain%dz * (1 + domain%npml)
+            ZMAX = domain%dz * (domain%nz - domain%npml)
             ZMID = 0.50_real64 * (ZMIN + ZMAX)
 
-            call direction_polarization_vector( source%x_z_rotation, &
-                                                source%x_y_rotation, &
-                                                source%y_z_rotation, &
+            call direction_polarization_vector( source%dip, &
+                                                source%strike, &
+                                                source%plunge, &
                                                 p, ehat)
             call select_injection_faces(p, active)
 
@@ -1630,12 +1632,12 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
 
-            i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml - 1
-            j_min = domain%cpml + 2
-            j_max = domain%ny - domain%cpml - 1
-            k_min = domain%cpml + 2
-            k_max = domain%nz - domain%cpml - 1
+            i_min = domain%npml + 2
+            i_max = domain%nx - domain%npml - 1
+            j_min = domain%npml + 2
+            j_max = domain%ny - domain%npml - 1
+            k_min = domain%npml + 2
+            k_max = domain%nz - domain%npml - 1
 
             call array_eigenvalues4_3(c11, c12, c13, c14, c15, c16, &
                                       c22, c23, c24, c25, c26, &
@@ -2177,7 +2179,7 @@ module cpmlfdtd
                         do kk = k_min,k_max
                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
                             call boundary_seismic_field(r, r0, t, source%source_frequency, &
-                                source%x_z_rotation, source%x_y_rotation, source%y_z_rotation, &
+                                source%dip, source%strike, source%plunge, &
                                 cbackground, source%amplitude, source%source_wavelet, &
                                 Vvec, strain_vec, source%source_type)
                             vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
@@ -2200,7 +2202,7 @@ module cpmlfdtd
                         do kk = k_min,k_max
                             r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
                             call boundary_seismic_field(r, r0, t, source%source_frequency, &
-                                source%x_z_rotation, source%x_y_rotation, source%y_z_rotation, &
+                                source%dip, source%strike, source%plunge, &
                                 cbackground, source%amplitude, source%source_wavelet, &
                                 Vvec, strain_vec, source%source_type)
                             vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
@@ -2223,7 +2225,7 @@ module cpmlfdtd
                         do jj = j_min,j_max
                             r = (/ ii * domain%dx, jj * domain%dy, ZLOC /)
                             call boundary_seismic_field(r, r0, t, source%source_frequency, &
-                                source%x_z_rotation, source%x_y_rotation, source%y_z_rotation, &
+                                source%dip, source%strike, source%plunge, &
                                 cbackground, source%amplitude, source%source_wavelet, &
                                 Vvec, strain_vec, source%source_type)
                             vx(ii,jj,kk) = vx(ii,jj,kk) + Vvec(1)
@@ -2474,20 +2476,20 @@ module cpmlfdtd
         
         ! ------------------------ Assign some constants -----------------------
         ! Assign the source location indices
-        isource = source%xind + domain%cpml
-        jsource = source%zind + domain%cpml
+        isource = source%xind + domain%npml
+        jsource = source%zind + domain%npml
 
         ! ================================ LOAD SOURCE ================================
         if ( source%source_type == 'pw' ) then 
-            XMIN = domain%dx * (1 + domain%cpml) 
-            XMAX = domain%dx * ( domain%nx - domain%cpml) !2*cpml was added in python so we have to correct. 
+            XMIN = domain%dx * (1 + domain%npml) 
+            XMAX = domain%dx * ( domain%nx - domain%npml) !2*cpml was added in python so we have to correct. 
             XMID = 0.50_real64 * (XMIN + XMAX)
-            ZMIN = domain%dz * (1 + domain%cpml) 
-            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMIN = domain%dz * (1 + domain%npml) 
+            ZMAX = domain%dz * (domain%nz - domain%npml)
             ZMID = 0.50_real64 * (ZMIN + ZMAX)
-            call direction_polarization_vector( source%x_z_rotation, &
-                                                source%x_y_rotation, &
-                                                source%y_z_rotation, &
+            call direction_polarization_vector( source%dip, &
+                                                source%strike, &
+                                                source%plunge, &
                                                 p, ehat)
             call select_injection_faces(p, active)
             r0 = (/ XMID, 0.0_real64, ZMID /)
@@ -2509,10 +2511,10 @@ module cpmlfdtd
                 r0(3) = ZMAX
                 ZLOC = ZMAX
             endif
-            i_min = domain%cpml + 2
-            i_max = domain%nx - domain%cpml - 1
-            k_min = domain%cpml + 2
-            k_max = domain%nz - domain%cpml - 1
+            i_min = domain%npml + 2
+            i_max = domain%nx - domain%npml - 1
+            k_min = domain%npml + 2
+            k_max = domain%nz - domain%npml - 1
             
             call array_eigenvalues2_2(eps11, eps13, eps33, eig_array, nx, nz)
             eps_r_min = minval(eig_array)
@@ -2589,8 +2591,8 @@ module cpmlfdtd
         !---  beginning of time loop
         !---
         ! ======================== I/O Setup ========================
-        call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
-        if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block)
+        call setup_io_params_2d(nx, nz, domain%npml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io_2d(nx, nz, domain%npml, steps_per_block)
         block_count = 0
         
         Ex_old = Ex 
@@ -2685,9 +2687,9 @@ module cpmlfdtd
                         Hv = (/ 0.0_real64, Hy(xi,ip), 0.0_real64 /)
                         call boundary_em_field(r, r0, t, &
                                         source%source_frequency, &
-                                        source%x_z_rotation, &
-                                        source%x_y_rotation, &
-                                        source%y_z_rotation, &
+                                        source%dip, &
+                                        source%strike, &
+                                        source%plunge, &
                                         vbackground, eta, &
                                         source%amplitude, &
                                         source%source_wavelet, &
@@ -2705,9 +2707,9 @@ module cpmlfdtd
                         Hv = (/ 0.0_real64, Hy(ip,zi), 0.0_real64 /)
                         call boundary_em_field(r, r0, t, &
                                         source%source_frequency, &
-                                        source%x_z_rotation, &
-                                        source%x_y_rotation, &
-                                        source%y_z_rotation, &
+                                        source%dip, &
+                                        source%strike, &
+                                        source%plunge, &
                                         vbackground, eta, &
                                         source%amplitude, &
                                         source%source_wavelet, &
@@ -2986,8 +2988,8 @@ module cpmlfdtd
 
         ! ------------------------ Assign some constants -----------------------
         ! Assign the source location indices
-        isource = source%xind + domain%cpml
-        ksource = source%zind + domain%cpml
+        isource = source%xind + domain%npml
+        ksource = source%zind + domain%npml
 
         ! Define the 
         ! DT = minval( (/dx, dy, dz/) )/ ( 2.0d0 * Clight/ sqrt( minval( (/ eps11, eps22, eps33 /) ) ) )
@@ -3006,18 +3008,18 @@ module cpmlfdtd
         
         ! ================================ LOAD SOURCE ================================
         if ( source%source_type == 'pw' ) then 
-            XMIN = domain%dx * (1 + domain%cpml) 
-            XMAX = domain%dx * ( domain%nx - domain%cpml) !2*cpml was added in python so we have to correct. 
+            XMIN = domain%dx * (1 + domain%npml) 
+            XMAX = domain%dx * ( domain%nx - domain%npml) !2*cpml was added in python so we have to correct. 
             XMID = 0.50_real64 * (XMIN + XMAX)
-            YMIN = domain%dy * (1 + domain%cpml)
-            YMAX = domain%dy * ( domain%ny - domain%cpml)
+            YMIN = domain%dy * (1 + domain%npml)
+            YMAX = domain%dy * ( domain%ny - domain%npml)
             YMID = 0.50_real64 * (YMIN + YMAX)
-            ZMIN = domain%dz * (1 + domain%cpml) 
-            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMIN = domain%dz * (1 + domain%npml) 
+            ZMAX = domain%dz * (domain%nz - domain%npml)
             ZMID = 0.50_real64 * (ZMIN + ZMAX)
-            call direction_polarization_vector( source%x_z_rotation, &
-                                                source%x_y_rotation, &
-                                                source%y_z_rotation, &
+            call direction_polarization_vector( source%dip, &
+                                                source%strike, &
+                                                source%plunge, &
                                                 p, ehat)
             call select_injection_faces(p, active)
             r0 = (/ XMID, YMID, ZMID /)
@@ -3049,12 +3051,12 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
 
-            i_min = domain%cpml + 3
-            i_max = domain%nx - domain%cpml - 2
-            j_min = domain%cpml + 3 
-            j_max = domain%ny - domain%cpml - 2
-            k_min = domain%cpml + 3 
-            k_max = domain%nz - domain%cpml - 2
+            i_min = domain%npml + 3
+            i_max = domain%nx - domain%npml - 2
+            j_min = domain%npml + 3 
+            j_max = domain%ny - domain%npml - 2
+            k_min = domain%npml + 3 
+            k_max = domain%nz - domain%npml - 2
             
             call array_eigenvalues2_25(eps11, eps12, eps13, eps22, eps23, eps33, eig_array, nx, nz)
             eps_r_min = minval(eig_array)
@@ -3145,8 +3147,8 @@ module cpmlfdtd
         Ez_old = Ez
         
         ! Initialize the block count 
-        call setup_io_params_2d(nx, nz, domain%cpml, block_output, steps_per_block, legacy_output)
-        if (block_output) call init_io_2d(nx, nz, domain%cpml, steps_per_block) 
+        call setup_io_params_2d(nx, nz, domain%npml, block_output, steps_per_block, legacy_output)
+        if (block_output) call init_io_2d(nx, nz, domain%npml, steps_per_block) 
         block_count = 0
         
         ! Reset velocnorm before the time loop
@@ -3617,9 +3619,9 @@ module cpmlfdtd
 
         ! ------------------------ Assign some constants -----------------------
         ! Assign the source location indices
-        isource = source%xind + domain%cpml
-        jsource = source%yind + domain%cpml
-        ksource = source%zind + domain%cpml
+        isource = source%xind + domain%npml
+        jsource = source%yind + domain%npml
+        ksource = source%zind + domain%npml
 
         ! Define the 
         ! DT = minval( (/dx, dy, dz/) )/ ( 2.0d0 * Clight/ sqrt( minval( (/ eps11, eps22, eps33 /) ) ) )
@@ -3644,19 +3646,19 @@ module cpmlfdtd
         ! ================================ LOAD SOURCE ================================
 
         if ( source%source_type == 'pw' ) then
-            XMIN = domain%dx * (1 + domain%cpml)
-            XMAX = domain%dx * (domain%nx - domain%cpml)
+            XMIN = domain%dx * (1 + domain%npml)
+            XMAX = domain%dx * (domain%nx - domain%npml)
             XMID = 0.50_real64 * (XMIN + XMAX)
-            YMIN = domain%dy * (1 + domain%cpml)
-            YMAX = domain%dy * (domain%ny - domain%cpml)
+            YMIN = domain%dy * (1 + domain%npml)
+            YMAX = domain%dy * (domain%ny - domain%npml)
             YMID = 0.50_real64 * (YMIN + YMAX)
-            ZMIN = domain%dz * (1 + domain%cpml)
-            ZMAX = domain%dz * (domain%nz - domain%cpml)
+            ZMIN = domain%dz * (1 + domain%npml)
+            ZMAX = domain%dz * (domain%nz - domain%npml)
             ZMID = 0.50_real64 * (ZMIN + ZMAX)
 
-            call direction_polarization_vector( source%x_z_rotation, &
-                                                source%x_y_rotation, &
-                                                source%y_z_rotation, &
+            call direction_polarization_vector( source%dip, &
+                                                source%strike, &
+                                                source%plunge, &
                                                 p, ehat)
             call select_injection_faces(p, active)
 
@@ -3689,12 +3691,12 @@ module cpmlfdtd
                 ZLOC = ZMAX
             endif
 
-            i_min = domain%cpml + 3
-            i_max = domain%nx - domain%cpml - 2
-            j_min = domain%cpml + 3
-            j_max = domain%ny - domain%cpml - 2
-            k_min = domain%cpml + 3
-            k_max = domain%nz - domain%cpml - 2
+            i_min = domain%npml + 3
+            i_max = domain%nx - domain%npml - 2
+            j_min = domain%npml + 3
+            j_max = domain%ny - domain%npml - 2
+            k_min = domain%npml + 3
+            k_max = domain%nz - domain%npml - 2
 
             call array_eigenvalues2_3(eps11, eps12, eps13, eps22, eps23, eps33, &
                                       eig_array, nx, ny, nz)
@@ -3962,9 +3964,9 @@ module cpmlfdtd
                             r = (/ XLOC, jj * domain%dy, kk * domain%dz /)
                             call boundary_em_field(r, r0, t, &
                                             source%source_frequency, &
-                                            source%x_z_rotation, &
-                                            source%x_y_rotation, &
-                                            source%y_z_rotation, &
+                                            source%dip, &
+                                            source%strike, &
+                                            source%plunge, &
                                             vbackground, eta, &
                                             source%amplitude, &
                                             source%source_wavelet, &
@@ -3985,9 +3987,9 @@ module cpmlfdtd
                             r = (/ ii * domain%dx, YLOC, kk * domain%dz /)
                             call boundary_em_field(r, r0, t, &
                                             source%source_frequency, &
-                                            source%x_z_rotation, &
-                                            source%x_y_rotation, &
-                                            source%y_z_rotation, &
+                                            source%dip, &
+                                            source%strike, &
+                                            source%plunge, &
                                             vbackground, eta, &
                                             source%amplitude, &
                                             source%source_wavelet, &
@@ -4008,9 +4010,9 @@ module cpmlfdtd
                             r = (/ ii * domain%dx, jj * domain%dy, ZLOC /)
                             call boundary_em_field(r, r0, t, &
                                             source%source_frequency, &
-                                            source%x_z_rotation, &
-                                            source%x_y_rotation, &
-                                            source%y_z_rotation, &
+                                            source%dip, &
+                                            source%strike, &
+                                            source%plunge, &
                                             vbackground, eta, &
                                             source%amplitude, &
                                             source%source_wavelet, &
@@ -4227,8 +4229,8 @@ module cpmlfdtd
         
     !     ! ------------------------ Assign some constants -----------------------
         
-    !     isource = source%xind + domain%cpml
-    !     jsource = source%zind + domain%cpml
+    !     isource = source%xind + domain%npml
+    !     jsource = source%zind + domain%npml
     
     !     ! ================================ LOAD SOURCE =========================
     
