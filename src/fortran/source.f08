@@ -16,6 +16,10 @@ module source_module
               init_source_plane_wave,    &
               inject_source_explicit_stage2, &
               inject_source_explicit_stage3, &
+              init_source_elastic_xz, &
+              inject_source_explicit_stage_elastic2, &
+              inject_source_explicit_stage_elastic25, &
+              inject_source_explicit_stage_elastic3, &
               free_source
 
 contains
@@ -364,19 +368,19 @@ contains
     
     ! --------------------------------------------------------------------------
     !> Injects source amplitude into explicit stage RHS tensor T at stage time
-    subroutine inject_source_explicit_stage3(src, nx, ny, nz, T_stage, it, stage_time_frac, density_s)
+    subroutine inject_source_explicit_stage3(src, nx, ny, nz, T_stage, it, stage_frac, density_s)
         type(Source_Type), intent(in) :: src
         integer, intent(in) :: nx, ny, nz
         real(real64), intent(inout) :: T_stage(21, nx, ny, nz)
         integer, intent(in) :: it
-        real(real64), intent(in) :: stage_time_frac
+        real(real64), intent(in) :: stage_frac
         real(real64), intent(in) :: density_s(nx, ny, nz)
 
         real(real64) :: s_val, t_curr, t_delayed, t_idx, w_ker, frac
         real(real64) :: z_impedance, rho_val
         integer :: idx_floor, idx_ceil, i, j, k, di, dj, dk
 
-        t_curr = (real(it - 1, real64) + stage_time_frac) * src%dt
+        t_curr = (real(it - 1, real64) + stage_frac) * src%dt
         
         if (src%source_type == "pw") then
             
@@ -481,4 +485,340 @@ contains
         if (allocated(src%injection_mask))  deallocate(src%injection_mask)
     end subroutine free_source
 
+    ! --------------------------------------------------------------------------
+    subroutine init_source_elastic_xz( src, source_in, domain, grid, &
+                                        F_spec, freq_spec, n_spec)
+
+        type(Source_Type), intent(out) :: src
+        type(Source_Type), intent(in) :: source_in
+        type(Domain_Type), intent(in) :: domain
+        type(spectral_grid_t), intent(inout) :: grid
+
+        integer, intent(in) :: n_spec
+        complex(real64), intent(in) :: F_spec(n_spec)
+        real(real64), intent(in) :: freq_spec(n_spec)
+
+        type(Domain_Type) :: dom_xz
+        real(real64) :: kernel_mass
+
+        if (grid%nx /= domain%nx .or. &
+            grid%ny /= 1 .or. &
+            grid%nz /= domain%nz) then
+            error stop 'XZ source requires a matching ny=1 spectral grid.'
+        end if
+
+        if (domain%dx <= 0.0_real64 .or. &
+            domain%dz <= 0.0_real64) then
+            error stop 'XZ source requires positive grid spacings.'
+        end if
+
+        if (n_spec < 2) then
+            error stop 'XZ source spectrum requires at least two samples.'
+        end if
+
+        src = source_in
+        call free_source(src)
+
+        if (.not. allocated(src%source_type)) then
+            error stop 'XZ source_type is not initialized.'
+        end if
+
+        if (src%dt <= 0.0_real64 .or. src%time_steps < 1) then
+            error stop 'Invalid XZ source time sampling.'
+        end if
+
+        src%force_vec = 0.0_real64
+        src%moment_tensor = 0.0_real64
+
+        ! Convert x,z source coordinates to the padded computational grid.
+        src%xind = source_in%xind + domain%npml
+        src%zind = source_in%zind + domain%npml
+
+        src%x = source_in%x + real(domain%npml,real64)*domain%dx
+        src%z = source_in%z + real(domain%npml,real64)*domain%dz
+
+        if (src%xind < 1 .or. src%xind > domain%nx .or. &
+            src%zind < 1 .or. src%zind > domain%nz) then
+            error stop 'XZ source center is outside the padded grid.'
+        end if
+
+        ! Dummy y dimension used only to build the x,z kernel.
+        dom_xz = domain
+        dom_xz%ny = 1
+        dom_xz%dy = 1.0_real64
+
+        src%yind = 1
+        src%y = 0.0_real64
+
+        select case (trim(src%source_type))
+
+        case ('ac')
+            call init_source_weight_drop( &
+                src, dom_xz, F_spec, freq_spec, n_spec, grid)
+
+        case ('tnt')
+            call init_source_explosive( &
+                src, F_spec, freq_spec, n_spec, grid, dom_xz)
+
+        case ('dc')
+            call init_source_double_couple( &
+                src, dom_xz, F_spec, freq_spec, n_spec, grid)
+
+        case ('clvd')
+            call init_source_clvd( &
+                src, dom_xz, F_spec, freq_spec, n_spec, grid)
+
+        case default
+            error stop 'XZ initializer supports ac, tnt, dc, and clvd.'
+
+        end select
+
+        ! The retained spatial kernel is an area-normalized x,z source.
+        ! The active y-offset is zero because src%yind = 1.
+        kernel_mass = sum(src%spatial_kernel(:,0,:)) * &
+                    domain%dx * domain%dz
+
+        if (abs(kernel_mass) < 1.0e-12_real64) then
+            error stop 'XZ source kernel has near-zero integral.'
+        end if
+
+        src%spatial_kernel = src%spatial_kernel / kernel_mass
+
+        ! Restore physical transverse source location for 2.5D phase.
+        ! Keep yind=1 because the kernel has only one active y plane.
+        src%y = source_in%y
+
+    end subroutine init_source_elastic_xz
+    
+    ! --------------------------------------------------------------------------
+    subroutine inject_source_explicit_stage_elastic2( src, nx, nz, T_stage, &
+                                                it, stage_fraction, density_s)
+
+        type(Source_Type), intent(in) :: src
+        integer, intent(in) :: nx, nz, it
+
+        real(real64), intent(inout) :: T_stage(5,nx,nz)
+        real(real64), intent(in) :: stage_fraction
+        real(real64), intent(in) :: density_s(nx,nz)
+
+        real(real64) :: s_val, weight
+        integer :: i, k, di, dk
+
+        s_val = source_stage_sample(src, it, stage_fraction)
+
+        do k = src%k1, src%k2
+            dk = k - src%zind
+
+            do i = src%i1, src%i2
+                di = i - src%xind
+
+                weight = s_val * src%spatial_kernel(di,0,dk)
+
+                if (src%source_type == 'ac') then
+
+                    T_stage(1,i,k) = T_stage(1,i,k) + &
+                        weight * src%force_vec(1) / density_s(i,k)
+
+                    T_stage(2,i,k) = T_stage(2,i,k) + &
+                        weight * src%force_vec(3) / density_s(i,k)
+
+                else
+
+                    T_stage(3,i,k) = T_stage(3,i,k) + &
+                        weight * src%moment_tensor(1)
+
+                    T_stage(4,i,k) = T_stage(4,i,k) + &
+                        weight * src%moment_tensor(3)
+
+                    T_stage(5,i,k) = T_stage(5,i,k) + &
+                        weight * src%moment_tensor(5)
+
+                end if
+
+            end do
+        end do
+
+    end subroutine inject_source_explicit_stage_elastic2
+    
+    ! --------------------------------------------------------------------------
+    subroutine inject_source_explicit_stage_elastic25( src, nx, nz, T_stage, &
+                                            it, stage_fraction, density_s, ky)
+
+        type(Source_Type), intent(in) :: src
+        integer, intent(in) :: nx, nz, it
+
+        complex(real64), intent(inout) :: T_stage(9,nx,nz)
+
+        real(real64), intent(in) :: stage_fraction
+        real(real64), intent(in) :: density_s(nx,nz)
+        real(real64), intent(in) :: ky
+
+        complex(real64), parameter :: imag_unit = &
+            (0.0_real64, 1.0_real64)
+
+        real(real64) :: s_val
+        complex(real64) :: phase_y, weight
+        integer :: i, k, di, dk
+
+        s_val = source_stage_sample(src, it, stage_fraction)
+
+        phase_y = exp(-imag_unit * ky * src%y)
+
+        do k = src%k1, src%k2
+            dk = k - src%zind
+
+            do i = src%i1, src%i2
+                di = i - src%xind
+
+                weight = s_val * src%spatial_kernel(di,0,dk) * phase_y
+
+                if (src%source_type == 'ac') then
+
+                    T_stage(1:3,i,k) = T_stage(1:3,i,k) + &
+                        weight * src%force_vec / density_s(i,k)
+
+                else
+
+                    T_stage(4:9,i,k) = T_stage(4:9,i,k) + &
+                        weight * src%moment_tensor
+
+                end if
+
+            end do
+        end do
+
+    end subroutine inject_source_explicit_stage_elastic25
+    
+    
+    ! --------------------------------------------------------------------------
+    subroutine inject_source_explicit_stage_elastic3( &
+        src, nx, ny, nz, T_stage, it, stage_fraction, density_s)
+
+        type(Source_Type), intent(in) :: src
+        integer, intent(in) :: nx, ny, nz
+        integer, intent(in) :: it
+
+        real(real64), intent(inout) :: T_stage(9,nx,ny,nz)
+        real(real64), intent(in) :: stage_fraction
+        real(real64), intent(in) :: density_s(nx,ny,nz)
+
+        real(real64) :: sample_position, frac, s_val, weight
+        integer :: n, lo, hi
+        integer :: i, j, k, di, dj, dk
+
+        ! Q = [vx, vy, vz, sxx, syy, szz, syz, sxz, sxy]
+
+        if (.not. allocated(src%source_type)) then
+            error stop 'Elastic source_type is not initialized.'
+        end if
+
+        select case (trim(src%source_type))
+        case ('ac', 'tnt', 'dc', 'clvd')
+            ! Supported local sources.
+        case default
+            error stop 'Unsupported source type in elastic3 local injector.'
+        end select
+
+        if (.not. allocated(src%time_series)) then
+            error stop 'Elastic source time_series is not initialized.'
+        end if
+
+        if (.not. allocated(src%spatial_kernel)) then
+            error stop 'Elastic source spatial_kernel is not initialized.'
+        end if
+
+        n = size(src%time_series)
+
+        if (n < 1) error stop 'Elastic source time_series is empty.'
+
+        ! Samples are at t = 0, dt, 2*dt, ...
+        ! Avoid computing t/dt again when both use the solver time step.
+        sample_position = real(it - 1, real64) + stage_fraction
+
+        if (sample_position < 0.0_real64) return
+
+        ! Beyond the supplied samples, hold the final value.
+        ! Use a source record that ends in zero.
+        if (sample_position >= real(n - 1, real64)) then
+            s_val = src%time_series(n)
+        else
+            lo = floor(sample_position) + 1
+            hi = lo + 1
+            frac = sample_position - real(lo - 1, real64)
+
+            s_val = (1.0_real64 - frac)*src%time_series(lo) + &
+                    frac*src%time_series(hi)
+        end if
+
+        if (src%i1 < 1 .or. src%i2 > nx .or. &
+            src%j1 < 1 .or. src%j2 > ny .or. &
+            src%k1 < 1 .or. src%k2 > nz .or. &
+            src%i1 > src%i2 .or. src%j1 > src%j2 .or. &
+            src%k1 > src%k2) then
+            error stop 'Elastic source support is outside the grid.'
+        end if
+
+        do k = src%k1, src%k2
+            dk = k - src%zind
+
+            do j = src%j1, src%j2
+                dj = j - src%yind
+
+                do i = src%i1, src%i2
+                    di = i - src%xind
+
+                    weight = s_val * src%spatial_kernel(di,dj,dk)
+
+                    if (src%source_type == 'ac') then
+
+                        T_stage(1:3,i,j,k) = T_stage(1:3,i,j,k) + &
+                            weight * src%force_vec / density_s(i,j,k)
+
+                    else
+
+                        T_stage(4:9,i,j,k) = T_stage(4:9,i,j,k) + &
+                            weight * src%moment_tensor
+
+                    end if
+
+                end do
+            end do
+        end do
+
+    end subroutine inject_source_explicit_stage_elastic3
+    
+    ! --------------------------------------------------------------------------
+    function source_stage_sample(src, it, stage_fraction) result(s_val)
+        type(Source_Type), intent(in) :: src
+        integer, intent(in) :: it
+        real(real64), intent(in) :: stage_fraction
+
+        real(real64) :: s_val, position, frac
+        integer :: n, lo
+
+        if (.not. allocated(src%time_series)) then
+            error stop 'Source time_series is not initialized.'
+        end if
+
+        n = size(src%time_series)
+        if (n < 1) error stop 'Source time_series is empty.'
+
+        position = real(it - 1,real64) + stage_fraction
+
+        if (position < 0.0_real64) then
+            s_val = 0.0_real64
+
+        else if (position >= real(n - 1,real64)) then
+            s_val = src%time_series(n)
+
+        else
+            lo = floor(position) + 1
+            frac = position - real(lo - 1,real64)
+
+            s_val = (1.0_real64 - frac)*src%time_series(lo) + &
+                    frac*src%time_series(lo + 1)
+        end if
+
+    end function source_stage_sample
+    
 end module source_module

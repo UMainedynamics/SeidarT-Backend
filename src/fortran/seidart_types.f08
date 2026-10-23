@@ -87,7 +87,8 @@ module seidart_types
     end type Conductivity_Type
     
     type :: spectral_grid_t 
-        real(real64) :: inv_n_total 
+        integer :: nx = 0, ny = 0, nz = 0, nkx = 0
+        real(real64) :: inv_n_total = 0.0_real64 
         integer :: nkx, nky, nkz
         real(real64), allocatable :: kx(:), ky(:), kz(:)
         type(c_ptr) :: plan_fwd = c_null_ptr 

@@ -18,10 +18,11 @@ module pseudospectralfdtd
     
     private
     
-    public :: load_elastic_coefficients2, load_elastic_coefficients3
-    public :: seismic2_pseudospectral_rk4, seismic25_pseudospectral_rk4
-    public :: electromag2_pseudospectral_rk4, electromag25_pseudospectral_rk4
-    !public :: seismic3_pseudospectral_rk4, electromag3_pseudos
+    public :: load_elastic_coefficients2, load_elastic_coefficients3, &
+                seismic2_pseudospectral_rk4, seismic25_pseudospectral_rk4, &
+                seismic3_pseudospectral_rk4
+                ! electromag2_pseudospectral_rk4, electromag25_pseudospectral_rk4
+    
     
     contains 
     
@@ -151,6 +152,11 @@ module pseudospectralfdtd
         integer :: nx, nz, it
         real(real64) :: dx, dz, dt
         
+        type(Source_Type) :: src
+        integer :: n_spec
+        real(real64), allocatable :: freq_spec(:)
+        complex(real64), allocatable :: F_spec(:)
+        
         ! Derivative arrays
         ! dV_dX(i,k,velocity_component,derivative_direction)
         ! Components: 1 = vx, 2 = vz
@@ -174,9 +180,7 @@ module pseudospectralfdtd
         dz = domain%dz
         dt = source%dt
         
-        call init_spectral_grid(grid, nx, 1, nz, dx, 1.0_real64, dz)
-        call init_sponge_layer2(sponge, domain, 3.0_real64)
-        
+        ! ----------------------------------------------------------------------
         ! Allocations
         allocate(Q(5, nx, nz), Q_stage(5, nx, nz)) 
         allocate( k1(5, nx, nz), k2(5, nx, nz), k3(5, nx, nz), k4(5, nx, nz))
@@ -184,9 +188,25 @@ module pseudospectralfdtd
         allocate(dV_dX(nx,nz,2,2))
         allocate(dS_dX(nx,nz,2,2))
         
+        call init_spectral_grid(grid, nx, 1, nz, dx, 1.0_real64, dz)
+        call init_sponge_layer2(sponge, domain, 3.0_real64)
+        
+        ! ---------------------------- Source Terms ----------------------------
         ! Load coefficients 
         call load_elastic_coefficients2(nx, nz, C, gamma, rho) 
+        if (any(rho <= 0.0_real64)) then
+            error stop 'Elastic density must be positive.'
+        end if
+
+        call load_spectrum( 'freq_spectrum.dat', 'F_spectrum.dat', &
+            freq_spec, F_spec, n_spec)
+
+        call init_source_elastic_xz( src, source, domain, grid, &
+            F_spec, freq_spec, n_spec)
+
+        deallocate(freq_spec, F_spec)
         
+        ! ----------------------------------------------------------------------
         Q = 0.0_real64
         
         ! Determine output precision flag
@@ -218,15 +238,12 @@ module pseudospectralfdtd
             Q = Q + (dt / 6.0_real64) * (k1 + 2.0_real64 * k2 + 2.0_real64 * k3 + k4)
             
             ! Apply sponge damping
-            call apply_sponge_damping_2d(sponge, domain, Q)
+            call elastic_sponge_damping_2d(sponge, domain, Q)
             
-            if (mod(it, 100) == 0 .and. verbose) then
+            if (mod(it, 100) == 0) then
                 print *, "Pseudospectral RK4 time step:", it, "of", source%time_steps
             end if
             
-#ifdef SEIDART_OPENMP_GPU
-        !$omp target update from(vx, vz)
-#endif
 
             ! -------- Output --------
             if (block_output) then
@@ -257,6 +274,8 @@ module pseudospectralfdtd
         deallocate(dV_dX, dS_dX)
         deallocate(C, gamma, rho)
         
+        call free_source(src)
+        
         contains
 
         subroutine rhs_stage_2d(Q_in, stage_rate, stage_fraction)
@@ -279,8 +298,8 @@ module pseudospectralfdtd
             call elastic2_rk4( &
                 nx, nz, Q_in, dV_dX, dS_dX, C, gamma, rho, stage_rate)
 
-            call inject_source_explicit_stage2( &
-                source, domain, stage_rate, it, stage_fraction, rho)
+            call inject_source_explicit_stage_elastic2( src, nx, nz, &
+                                        stage_rate, it, stage_fraction, rho)
 
         end subroutine rhs_stage_2d
         
@@ -309,12 +328,17 @@ module pseudospectralfdtd
         character(len=32) :: env_val
         
         ! Derivative arrays
-        real(real64), allocatable :: dV_dX(:,:,:,:)
-        real(real64), allocatable :: dS_dX(:,:,:,:)
+        complex(real64), allocatable :: dV_dX(:,:,:,:)
+        complex(real64), allocatable :: dS_dX(:,:,:,:)
         
         logical :: block_output, legacy_output, SINGLE
         integer :: steps_per_block, block_count, ii, jj 
         character(len=256) :: current_block_file
+        
+        type(Source_Type) :: src
+        integer :: n_spec
+        real(real64), allocatable :: freq_spec(:)
+        complex(real64), allocatable :: F_spec(:)
         
         real(real64) :: ky 
         complex(real64) :: imag_unit = (0.0_real64, 1.0_real64)
@@ -329,16 +353,32 @@ module pseudospectralfdtd
         call init_spectral_grid(grid, nx, 1, nz, dx, 1.0_real64, dz)
         call init_sponge_layer2(sponge, domain, 3.0_real64)
         
+        ! ----------------------------------------------------------------------
         ! Allocations
         allocate(Q(9, nx, nz), Q_stage(9, nx, nz)) 
         allocate( k1(9, nx, nz), k2(9, nx, nz), k3(9, nx, nz), k4(9, nx, nz))
         allocate(C(21, nx, nz), gamma(6, nx, nz), rho(nx, nz) )
         allocate( dV_dX(nx, nz, 3, 3) )
         allocate( dS_dX(nx, nz, 3, 3) )
-        
+
+         ! ---------------------------- Source Terms ----------------------------
         ! Load coefficients 
         call load_elastic_coefficients25(nx, nz, C, gamma, rho)
         
+        if (any(rho <= 0.0_real64)) then
+            error stop 'Elastic density must be positive.'
+        end if
+
+        call load_spectrum( 'freq_spectrum.dat', 'F_spectrum.dat', &
+            freq_spec, F_spec, n_spec)
+
+        call init_source_elastic_xz( src, source, domain, grid, &
+            F_spec, freq_spec, n_spec)
+
+        deallocate(freq_spec, F_spec)
+        
+        ! ----------------------------------------------------------------------        
+
         Q = (0.0_real64, 0.0_real64)
         
         ! Determine output precision flag
@@ -370,16 +410,12 @@ module pseudospectralfdtd
             Q = Q + (dt / 6.0_real64) * (k1 + 2.0_real64 * k2 + 2.0_real64 * k3 + k4)
             
             ! Apply sponge damping
-            call apply_sponge_damping_2d(sponge, domain, Q)
+            call elastic_sponge_damping_2d(sponge, domain, Q)
             
-            if (mod(it, 100) == 0 .and. verbose) then
+            if (mod(it, 100) == 0) then
                 print *, "Pseudospectral RK4 time step:", it, "of", source%time_steps
             end if
             
-#ifdef SEIDART_OPENMP_GPU
-        !$omp target update from(vx, vz)
-#endif
-
             ! -------- Output --------
             if (block_output) then
                 if (current_step_in_block == 0) then
@@ -409,6 +445,8 @@ module pseudospectralfdtd
         deallocate(dV_dX)
         deallocate(dS_dX)
         deallocate(C, gamma, rho)
+        
+        call free_source(src)
         
         contains 
         
@@ -461,7 +499,8 @@ module pseudospectralfdtd
             call elastic25_rk4( &
                 nx, nz, Q_in, dV_dX, dS_dX, &
                 C, gamma, rho, stage_rate)
-    
+            call inject_source_explicit_stage_elastic25( src, nx, nz, &
+                stage_rate, it, stage_fraction, rho, ky)
         end subroutine rhs_stage_25d 
         
     end subroutine seismic25_pseudospectral_rk4
@@ -470,6 +509,7 @@ module pseudospectralfdtd
     subroutine seismic3_pseudospectral_rk4(domain, source, SINGLE_OUTPUT)
         type(Domain_Type), intent(in) :: domain
         type(Source_Type), intent(in) :: source
+        
         logical, intent(in), optional :: SINGLE_OUTPUT
         
         real(real64), allocatable :: C(:,:,:,:), rho(:,:,:), gamma(:,:,:,:)
@@ -483,7 +523,12 @@ module pseudospectralfdtd
         ! RK4 stage memory
         real(real64), allocatable :: Q_stage(:,:,:,:), k1(:,:,:,:), k2(:,:,:,:), k3(:,:,:,:), k4(:,:,:,:)
         integer :: nx, ny, nz, it
-        real(real64) :: dx, dz, dt
+        real(real64) :: dx, dy, dz, dt
+        
+        type(Source_Type) :: src 
+        integer :: n_spec 
+        real(real64), allocatable :: freq_spec(:)
+        complex(real64), allocatable :: F_spec(:)
         
         ! Derivative arrays
         ! dV_dX(i,k,velocity_component,derivative_direction)
@@ -515,11 +560,57 @@ module pseudospectralfdtd
         dz = domain%dz
         dt = source%dt
         
-        call init_spectral_grid(grid, nx, 1, nz, dx, 1.0_real64, dz)
+        call init_spectral_grid(grid, nx, ny, nz, dx, dy, dz)
         call init_sponge_layer3(sponge, domain, 3.0_real64)
         
+        ! --------------------------- Source Values ----------------------------
+        src = source
+        call free_source(src) 
+        src%force_vec = 0.0_real64 
+        src%moment_tensor = 0.0_real64 
+        
+        call load_spectrum('freq_spectrum.dat', 'F_spectrum.dat', &
+                            freq_spec, F_spec, n_spec)
+        
+        
+        src%xind = source%xind + domain%npml
+        src%yind = source%yind + domain%npml
+        src%zind = source%zind + domain%npml
+
+        src%x = source%x + real(domain%npml,real64)*domain%dx
+        src%y = source%y + real(domain%npml,real64)*domain%dy
+        src%z = source%z + real(domain%npml,real64)*domain%dz
+        
+        select case (trim(src%source_type))
+            case ('ac')
+                call init_source_weight_drop( &
+                    src, domain, F_spec, freq_spec, n_spec, grid)
+
+            case ('tnt')
+                call init_source_explosive( &
+                    src, F_spec, freq_spec, n_spec, grid, domain)
+
+            case ('dc')
+                call init_source_double_couple( &
+                    src, domain, F_spec, freq_spec, n_spec, grid)
+
+            case ('clvd')
+                call init_source_clvd( &
+                    src, domain, F_spec, freq_spec, n_spec, grid)
+
+            case ('pw')
+                error stop 'Elastic plane-wave injection is not implemented here.'
+
+            case default
+                error stop 'Unknown 3D elastic source type.'
+
+        end select
+
+        deallocate(freq_spec, F_spec)
+        ! ----------------------------------------------------------------------
+        
         ! Allocations
-        allocate(Q(9, nx, ny, nz), Q_stage(5, nx, ny, nz)) 
+        allocate(Q(9, nx, ny, nz), Q_stage(9, nx, ny, nz)) 
         allocate( k1(9, nx, ny, nz), k2(9, nx, ny, nz), k3(9, nx, ny, nz), k4(9, nx, ny, nz))
         allocate(C(21, nx, ny, nz), gamma(6, nx, ny, nz), rho(nx, ny, nz) )
         allocate(dV_dX(nx, ny,nz,3,3))
@@ -527,6 +618,10 @@ module pseudospectralfdtd
         
         ! Load coefficients 
         call load_elastic_coefficients3(nx, ny, nz, C, gamma, rho) 
+        
+        if (any(rho <= 0.0_real64)) then
+            error stop '3D elastic density must be positive.'
+        end if
         
         Q = 0.0_real64
         
@@ -559,15 +654,12 @@ module pseudospectralfdtd
             Q = Q + (dt / 6.0_real64) * (k1 + 2.0_real64 * k2 + 2.0_real64 * k3 + k4)
             
             ! Apply sponge damping
-            call apply_sponge_damping_3d(sponge, domain, Q)
+            call elastic_sponge_damping_3d(sponge, domain, Q)
             
-            if (mod(it, 100) == 0 .and. verbose) then
+            if (mod(it, 100) == 0) then
                 print *, "Pseudospectral RK4 time step:", it, "of", source%time_steps
             end if
             
-#ifdef SEIDART_OPENMP_GPU
-        !$omp target update from(vx, vz)
-#endif
 
             ! -------- Output --------
             if (block_output) then
@@ -575,16 +667,20 @@ module pseudospectralfdtd
                     block_count = block_count + 1
                     ii = (block_count - 1) * steps_per_block + 1
                     jj = min(block_count * steps_per_block, source%time_steps)
-                    write(current_block_file, "(a, i6.6, a, i6.6, a, i0, a, i0, a)") &
-                        'S2RK4.', ii, '-', jj, '.', source%xind, '.', source%zind, '.blk.zst'
+                    write(current_block_file, &
+                            "(a,i6.6,a,i6.6,a,i0,a,i0,a,i0,a)") &
+                            'S3RK4.', ii, '-', jj, '.', &
+                            source%xind, '.', source%yind, '.', source%zind, &
+                            '.blk.zst'
                 endif
-                call add_step_to_block_2d(current_block_file, &
-                    real(Q(1,:,:), real64), real( Q(2,:,:), real64))
+                call add_step_to_block_3d( current_block_file, &
+                                Q(1,:,:,:), Q(2,:,:,:), Q(3,:,:,:))
             endif
 
             if (legacy_output) then
-                call write_image2(real(Q(1,:,:), real64), nx, nz, source, it, 'Vx', SINGLE)
-                call write_image2(real(Q(2,:,:), real64), nx, nz, source, it, 'Vz', SINGLE)
+                call write_image3( Q(1,:,:,:), nx, ny, nz, source, it, 'Vx', SINGLE)
+                call write_image3( Q(2,:,:,:), nx, ny, nz, source, it, 'Vy', SINGLE)
+                call write_image3( Q(3,:,:,:), nx, ny, nz, source, it, 'Vz', SINGLE)
             endif
             
         end do
@@ -602,27 +698,55 @@ module pseudospectralfdtd
 
         subroutine rhs_stage_3d(Q_in, stage_rate, stage_fraction)
 
-            real(real64), intent(inout) :: Q_in(9, nx, nz)
-            real(real64), intent(out) :: stage_rate(9, nx, nz)
+            real(real64), intent(inout) :: Q_in(9,nx,ny,nz)
+            real(real64), intent(out) :: stage_rate(9,nx,ny,nz)
             real(real64), intent(in) :: stage_fraction
 
-            real(real64) :: scratch(nx, nz)
+            integer :: component
 
-            ! Q = [vx, vz, sxx, szz, sxz]
+            ! Two distinct scratch outputs are needed because grad3d
+            ! returns all three derivatives in each call.
+            real(real64) :: scratch1(nx,ny,nz)
+            real(real64) :: scratch2(nx,ny,nz)
 
-            call grad2d(grid, Q_in(1,:,:), dV_dX(:,:,1,1), dV_dX(:,:,1,2))
-            call grad2d(grid, Q_in(2,:,:), dV_dX(:,:,2,1), dV_dX(:,:,2,2))
+            ! Q = [vx, vy, vz, sxx, syy, szz, syz, sxz, sxy]
 
-            call grad2d(grid, Q_in(3,:,:), dS_dX(:,:,1,1), scratch)
-            call grad2d(grid, Q_in(4,:,:), scratch, dS_dX(:,:,2,2))
-            call grad2d(grid, Q_in(5,:,:), dS_dX(:,:,2,1), dS_dX(:,:,1,2))
+            do component = 1, 3
+                call grad3d(grid, Q_in(component,:,:,:), &
+                            dV_dX(:,:,:,component,1), &
+                            dV_dX(:,:,:,component,2), &
+                            dV_dX(:,:,:,component,3))
+            end do
 
-            call elastic2_rk4( &
-                nx, nz, Q_in, dV_dX, dS_dX, C, gamma, rho, stage_rate)
+            ! Normal stresses: retain their corresponding normal derivative.
+            call grad3d(grid, Q_in(4,:,:,:), &
+                        dS_dX(:,:,:,1,1), scratch1, scratch2)
 
-            call inject_source_explicit_stage2( &
-                source, domain, stage_rate, it, stage_fraction, rho)
+            call grad3d(grid, Q_in(5,:,:,:), &
+                        scratch1, dS_dX(:,:,:,2,2), scratch2)
 
+            call grad3d(grid, Q_in(6,:,:,:), &
+                        scratch1, scratch2, dS_dX(:,:,:,3,3))
+
+            ! syz: y derivative -> z momentum; z derivative -> y momentum.
+            call grad3d(grid, Q_in(7,:,:,:), &
+                        scratch1, dS_dX(:,:,:,3,2), dS_dX(:,:,:,2,3))
+
+            ! sxz: x derivative -> z momentum; z derivative -> x momentum.
+            call grad3d(grid, Q_in(8,:,:,:), &
+                        dS_dX(:,:,:,3,1), scratch1, dS_dX(:,:,:,1,3))
+
+            ! sxy: x derivative -> y momentum; y derivative -> x momentum.
+            call grad3d(grid, Q_in(9,:,:,:), &
+                        dS_dX(:,:,:,2,1), dS_dX(:,:,:,1,2), scratch1)
+
+            call elastic3_rk4( &
+                nx, ny, nz, Q_in, dV_dX, dS_dX, &
+                C, gamma, rho, stage_rate)
+            
+            call inject_source_explicit_stage_elastic3(src, nx, ny, nz, &
+                                stage_rate, it, stage_fraction, rho)
+            
         end subroutine rhs_stage_3d
         
     end subroutine seismic3_pseudospectral_rk4

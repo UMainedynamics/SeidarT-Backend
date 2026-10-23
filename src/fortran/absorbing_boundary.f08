@@ -6,7 +6,8 @@ module absorbing_boundary
     
     
     public :: sponge_layer_t, init_sponge_layer2,init_sponge_layer3, free_sponge_layer
-    public :: apply_sponge_damping3d, apply_sponge_damping_2d
+    public :: biot_sponge_damping3d, &
+                elastic_sponge_damping_2d, elastic_sponge_damping_3d
 
     type :: sponge_layer_t
         integer :: nx, ny, nz
@@ -123,7 +124,7 @@ module absorbing_boundary
     end subroutine init_sponge_layer3
     ! --------------------------------------------------------------------------
     ! 2D adaptation of sponge damping
-    subroutine apply_sponge_damping_2d(sp, dom, Q_vec)
+    subroutine elastic_sponge_damping_2d(sp, dom, Q_vec)
         type(sponge_layer_t), intent(in) :: sp
         type(Domain_Type), intent(in)   :: dom
         real(real64), intent(inout)     :: Q_vec(5, dom%nx, dom%nz)
@@ -140,11 +141,37 @@ module absorbing_boundary
                 end if
             end do
         end do
-    end subroutine apply_sponge_damping_2d
-    ! --------------------------------------------------------------------------
+    end subroutine elastic_sponge_damping_2d
     
+    ! --------------------------------------------------------------------------    
     ! Multiplies state vector and fluid pressure by damping mask at end of time step
-    subroutine apply_sponge_damping3d(sponge, domain, Q, fluid_pressure)
+    subroutine elastic_sponge_damping_3d(sponge, domain, Q)
+        type(sponge_layer_t), intent(in) :: sponge
+        type(Domain_Type), intent(in) :: domain
+        real(real64), intent(inout) :: Q(9, domain%nx, domain%ny, domain%nz)
+        
+        integer :: i, j, k, v
+        real(real64) :: w
+
+        !$omp parallel do collapse(3) schedule(static)
+        do k = 1, domain%nz
+            do j = 1, domain%ny
+                do i = 1, domain%nx
+                    w = sponge%damping_mask(i, j, k)
+                    if (w < 0.999999_real64) then
+                        do v = 1, 21
+                            Q(v, i, j, k) = Q(v, i, j, k) * w
+                        end do                    
+                    end if
+                end do
+            end do
+        end do
+        !$omp end parallel do
+    end subroutine elastic_sponge_damping_3d
+
+    ! --------------------------------------------------------------------------    
+    ! Multiplies state vector and fluid pressure by damping mask at end of time step
+    subroutine biot_sponge_damping_3d(sponge, domain, Q, fluid_pressure)
         type(sponge_layer_t), intent(in) :: sponge
         type(Domain_Type), intent(in) :: domain
         real(real64), intent(inout) :: Q(21, domain%nx, domain%ny, domain%nz)
@@ -174,8 +201,9 @@ module absorbing_boundary
                 end do
             end do
         end do
-    end subroutine apply_sponge_damping3d
+    end subroutine biot_sponge_damping_3d
 
+    
     ! --------------------------------------------------------------------------
     ! Destructor to release heap memory allocated for the sponge mask
     subroutine free_sponge_layer(sponge)

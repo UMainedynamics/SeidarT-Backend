@@ -7,7 +7,11 @@ module seidartio
     
     implicit none 
     
-    public :: parse_json, material_rw, material_rw2, material_rw3, read_geometry, loadsource, write_array
+    public :: parse_json, material_rw, material_rw2, material_rw3, &
+              read_geometry, loadsource, write_array, & 
+              setup_io_params_2d, setup_io_params_3d, & 
+              init_io_2d, init_io_3d, & 
+              add_step_to_block_2d, add_step_to_block_25d, add_step_to_block_3d
     
     real(c_float), allocatable, save, target :: block_buffer(:,:,:,:,:)
     integer, save :: total_block_limit = 0
@@ -501,7 +505,7 @@ module seidartio
     
     ! ==========================================================================
     ! =========================== ZSTD block writing ===========================
-    subroutine init_io(nx, ny, nz, cpml, n_steps_per_block)
+    subroutine init_io_3d(nx, ny, nz, cpml, n_steps_per_block)
         integer, intent(in) :: nx, ny, nz, cpml, n_steps_per_block
         integer :: output_nx, output_ny, output_nz
 
@@ -529,10 +533,10 @@ module seidartio
         allocate(block_buffer(output_nx, output_ny, output_nz, 3, total_block_limit) )
         current_step_in_block = 0 
 
-    end subroutine init_io  
+    end subroutine init_io_3d
     
     ! --------------------------------------------------------------------------
-    subroutine add_step_to_block3d(filename, Ex, Ey, Ez) 
+    subroutine add_step_to_block_3d(filename, Ex, Ey, Ez) 
         character(len=*), intent(in) :: filename
         real(c_double), intent(in) :: Ex(:,:,:)
         real(c_double), intent(in) :: Ey(:,:,:)
@@ -562,7 +566,7 @@ module seidartio
         if (current_step_in_block == total_block_limit) then
             call write_zstd_block(filename)
         end if
-    end subroutine add_step_to_block3d 
+    end subroutine add_step_to_block_3d 
     
     ! --------------------------------------------------------------------------
     subroutine write_zstd_block(filename) 
@@ -720,32 +724,6 @@ module seidartio
     end subroutine add_step_to_block_25d
 
     ! --------------------------------------------------------------------------
-    ! subroutine add_step_to_block_2d(filename, Ex, Ez)
-    !     character(len=*), intent(in) :: filename
-    !     real(c_double), intent(in) :: Ex(:,:)
-    !     real(c_double), intent(in) :: Ez(:,:)
-
-    !     if (.not. allocated(block_buffer)) then
-    !         print *, 'Error: zstd block I/O has not been initialized'
-    !         stop
-    !     end if
-
-    !     current_step_in_block = current_step_in_block + 1
-
-    !     block_buffer(:,1,:,1,current_step_in_block) = &
-    !         real(Ex(output_cpml+1:size(Ex,1)-output_cpml, &
-    !                 output_cpml+1:size(Ex,2)-output_cpml), c_float)
-    !     block_buffer(:,1,:,2,current_step_in_block) = &
-    !         real(Ez(output_cpml+1:size(Ez,1)-output_cpml, &
-    !                 output_cpml+1:size(Ez,2)-output_cpml), c_float)
-    !     ! Zero-fill component 3 to prevent writing uninitialized memory
-    !     block_buffer(:,1,:,3,current_step_in_block) = 0.0_c_float
-        
-    !     if (current_step_in_block == total_block_limit) then
-    !         call write_zstd_block(filename)
-    !     end if
-    ! end subroutine add_step_to_block_2d
-    
     subroutine add_step_to_block_2d(filename, Ex, Ez)
         ! 2D arrays for 2D field data (Ex, Ez) for the zstd block
         character(len=*), intent(in) :: filename
@@ -834,7 +812,7 @@ module seidartio
 
     
     ! --------------------------------------------------------------------------
-    subroutine setup_io_params(nx, ny, nz, cpml, block_output, steps_per_block, legacy_output)
+    subroutine setup_io_params_3d(nx, ny, nz, cpml, block_output, steps_per_block, legacy_output)
         integer, intent(in) :: nx, ny, nz, cpml
         logical, intent(out) :: block_output, legacy_output
         integer, intent(out) :: steps_per_block
@@ -884,7 +862,7 @@ module seidartio
             print*, "Steps per block: ", steps_per_block
         end if
         
-    end subroutine setup_io_params
+    end subroutine setup_io_params_3d
     
 
 end module seidartio

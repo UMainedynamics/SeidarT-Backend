@@ -136,57 +136,83 @@ module pseudospectral_stencils
     end subroutine elastic25_rk4
     
     ! --------------------------------------------------------------------------
-    subroutine elastic3_rk4(nx, nz, Q, &
-                            dvx_dx, dvx_dz, dvz_dx, dvz_dz, &
-                            dsxx_dx, dszz_dz, dsxz_dx, dsxz_dz, &
-                            C, gamma_visco, density_s, T)
+    subroutine elastic3_rk4(nx, ny, nz, Q, dV_dX, dS_dX, C, gamma_visco, density_s, T)
 
-        integer, intent(in) :: nx, nz
-        real(real64), intent(in)  :: Q(21, nx, ny, nz)
+        integer, intent(in) :: nx, ny, nz
+        real(real64), intent(in)  :: Q(9, nx, ny, nz)
      
-        real(real64), intent(in)  :: dvx_dx(nx,ny,nz), dvx_dy(nx,ny,nz), dvx_dz(nx,ny,nz)
-        real(real64), intent(in)  :: dvy_dx(nx,ny,nz), dvy_dy(nx,ny,nz), dvy_dz(nx,ny,nz)
-        real(real64), intent(in)  :: dvz_dx(nx,ny,nz), dvz_dy(nx,ny,nz), dvz_dz(nx,ny,nz)
+        real(real64), intent(in)  :: dV_dX(nx,ny,nz,3,3) 
+        real(real64), intent(in)  :: dS_dX(nx,ny,nz,3,3)
         
-        real(real64), intent(in)  :: dsxx_dx(nx,ny,nz), dsyy_dy(nx,ny,nz), dszz_dz(nx,ny,nz)
-        real(real64), intent(in)  :: dsxz_dx(nx,ny,nz), dsxz_dz(nx,ny,nz) 
-        real(real64), intent(in)  :: dsxy_dx(nx,ny,nz), dsxy_dy(nx,ny,nz)
-        real(real64), intent(in)  :: dsyz_dy(nx,ny,nz), dsyz_dz(nx,ny,nz)
-    
-        real(real64), intent(in)  :: C(21, nx, ny, nz), gamma_visco(6, nx, ny, nz)
+        real(real64), intent(in)  :: C(21, nx, ny, nz) 
+        real(real64), intent(in)  :: gamma_visco(6, nx, ny, nz)
         real(real64), intent(in)  :: density_s(nx, ny, nz)
-        real(real64), intent(out) :: T(5, nx, ny, nz)
+        real(real64), intent(out) :: T(9, nx, ny, nz)
 
-        integer :: i, k
-        real(real64) :: exx, ezz, gxz, inv_rho
+        integer :: i, j, k
+        real(real64) :: inv_rho
+        real(real64) :: exx, eyy, ezz, gyz, gxz, gxy
 
-#ifdef SEIDART_OPENMP_GPU
-    !$omp target teams distribute parallel do collapse(2) &
-    !$omp& private(i, k, exx, ezz, gxz, inv_rho)
-#else
-    !$omp parallel do collapse(2) schedule(static) &
-    !$omp& private(i, k, exx, ezz, gxz, inv_rho)
-#endif
+        !$omp parallel do collapse(3) schedule(static) &
+        !$omp& private(inv_rho, exx, eyy, ezz, gyz, gxz, gxy)
         do k = 1, nz
-            do i = 1, nx
-                inv_rho = 1.0_real64 / density_s(i,k)
+            do j = 1,ny
+                do i = 1, nx
+                    inv_rho = 1.0_real64 / density_s(i,j,k)
 
-                T(1, i, k) = (dsxx_dx(i,k) + dsxz_dz(i,k)) * inv_rho
-                T(2, i, k) = (dsxz_dx(i,k) + dszz_dz(i,k)) * inv_rho
+                    T(1,i,j,k) = sum(dS_dX(i,j,k,1,:)) * inv_rho
+                    T(2,i,j,k) = sum(dS_dX(i,j,k,2,:)) * inv_rho
+                    T(3,i,j,k) = sum(dS_dX(i,j,k,3,:)) * inv_rho
+                        
+                    exx = dV_dX(i,j,k,1,1)
+                    eyy = dV_dX(i,j,k,2,2)
+                    ezz = dV_dX(i,j,k,3,3)
+                    
+                    gyz = dV_dX(i,j,k,2,3) + dV_dX(i,j,k,3,2)
+                    gxz = dV_dX(i,j,k,1,3) + dV_dX(i,j,k,3,1)
+                    gxy = dV_dX(i,j,k,1,2) + dV_dX(i,j,k,2,1)
 
-                exx = dvx_dx(i,k)
-                
-                ezz = dvz_dz(i,k)
-                gxz = dvx_dz(i,k) + dvz_dx(i,k)
+                   T(4,i,j,k) = &
+                        C(1,i,j,k)*exx + C(2,i,j,k)*eyy + &
+                        C(3,i,j,k)*ezz + C(4,i,j,k)*gyz + &
+                        C(5,i,j,k)*gxz + C(6,i,j,k)*gxy - &
+                        gamma_visco(1,i,j,k)*Q(4,i,j,k)
 
-                T(3, i, k) = (C(1, i, k)*exx + C(2, i, k)*ezz + C(3, i, k)*gxz) - gamma_visco(1, i, k) * Q(3, i, k)
-                T(4, i, k) = (C(2, i, k)*exx + C(4, i, k)*ezz + C(5, i, k)*gxz) - gamma_visco(2, i, k) * Q(4, i, k)
-                T(5, i, k) = (C(3, i, k)*exx + C(5, i, k)*ezz + C(6, i, k)*gxz) - gamma_visco(3, i, k) * Q(5, i, k)
+                    T(5,i,j,k) = &
+                        C(2,i,j,k)*exx + C(7,i,j,k)*eyy + &
+                        C(8,i,j,k)*ezz + C(9,i,j,k)*gyz + &
+                        C(10,i,j,k)*gxz + C(11,i,j,k)*gxy - &
+                        gamma_visco(2,i,j,k)*Q(5,i,j,k)
+
+                    T(6,i,j,k) = &
+                        C(3,i,j,k)*exx + C(8,i,j,k)*eyy + &
+                        C(12,i,j,k)*ezz + C(13,i,j,k)*gyz + &
+                        C(14,i,j,k)*gxz + C(15,i,j,k)*gxy - &
+                        gamma_visco(3,i,j,k)*Q(6,i,j,k)
+
+                    T(7,i,j,k) = &
+                        C(4,i,j,k)*exx + C(9,i,j,k)*eyy + &
+                        C(13,i,j,k)*ezz + C(16,i,j,k)*gyz + &
+                        C(17,i,j,k)*gxz + C(18,i,j,k)*gxy - &
+                        gamma_visco(4,i,j,k)*Q(7,i,j,k)
+
+                    T(8,i,j,k) = &
+                        C(5,i,j,k)*exx + C(10,i,j,k)*eyy + &
+                        C(14,i,j,k)*ezz + C(17,i,j,k)*gyz + &
+                        C(19,i,j,k)*gxz + C(20,i,j,k)*gxy - &
+                        gamma_visco(5,i,j,k)*Q(8,i,j,k)
+
+                    T(9,i,j,k) = &
+                        C(6,i,j,k)*exx + C(11,i,j,k)*eyy + &
+                        C(15,i,j,k)*ezz + C(18,i,j,k)*gyz + &
+                        C(20,i,j,k)*gxz + C(21,i,j,k)*gxy - &
+                        gamma_visco(6,i,j,k)*Q(9,i,j,k)
+                end do
             end do
         end do
-#ifndef SEIDART_OPENMP_GPU
-    !$omp end parallel do
-#endif
+        !$omp end parallel do
+        
+        
     end subroutine elastic3_rk4
     
     ! --------------------------------------------------------------------------

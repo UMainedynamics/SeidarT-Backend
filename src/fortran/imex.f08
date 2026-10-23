@@ -342,7 +342,7 @@ module imex
             fluid_pressure = fluid_pressure + dt * fluid_pressure_dot 
             
             ! Attenuate waves at absorbing boundary
-            call apply_sponge_damping(sponge, domain, Q, fluid_pressure)
+            call biot_sponge_damping3d(sponge, domain, Q, fluid_pressure)
             
         end do
         
@@ -542,7 +542,7 @@ module imex
     !         fluid_pressure = fluid_pressure + dt * fluid_pressure_dot 
             
     !         ! Attenuate waves at absorbing boundary
-    !         call apply_sponge_damping(sponge, domain, Q, fluid_pressure)
+    !         call biot_sponge_damping3d(sponge, domain, Q, fluid_pressure)
             
     !     end do
         
