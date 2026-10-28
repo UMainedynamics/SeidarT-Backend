@@ -389,6 +389,85 @@ module pseudospectral_stencils
     end subroutine explicit_constitutive_kernel3_rk4
         
     ! --------------------------------------------------------------------------
+    subroutine implicit_drag_kernel2(nx, nz, Q_star, Q_out, &
+                                    drag_tensor, tau_relax, &
+                                    density_s, density_f, lwc, dt_gamma)
+
+        integer, intent(in) :: nx, nz
+        real(real64), intent(in) :: Q_star(10, nx, nz)
+        real(real64), intent(out) :: Q_out(10, nx, nz)
+        ! Ordering: xx, zz, xz.
+        real(real64), intent(in) :: drag_tensor(3, nx, nz), tau_relax(3, nx, nz)
+        real(real64), intent(in) :: density_s(nx, nz), density_f(nx, nz), lwc(nx, nz)
+        real(real64), intent(in) :: dt_gamma
+
+        integer :: i,k,l
+        real(real64) :: eff_rho_f, beta, alpha, bxx, bzz, bxz
+        real(real64) :: m11, m13, m33, det, inv_det
+        real(real64) :: wx_s, wz_s, wx, wz, bw_x, bw_z
+
+        alpha = dt_gamma
+        ! Stresses have no implicit contribution
+        Q_out(3:5,:,:,:) = Q_star(3:5,:,:,:)
+
+#ifdef SEIDART_OPENMP_GPU
+    !$omp target teams distribute parallel do collapse(2) &
+    !$omp& private(l, eff_rho_f, beta, bxx, bzz, bxz, &
+    !$omp&         m11, m13, m33, det, inv_det, &
+    !$omp&         wx_s, wz_s, wx, wz, bw_x, bw_z)
+#else
+    !$omp parallel do collapse(2) schedule(static) &
+    !$omp& private(l, eff_rho_f, beta, bxx, bzz, bxz, &
+    !$omp&         m11, m13, m33, det, inv_det, &
+    !$omp&         wx_s, wz_s, wx, wz, bw_x, bw_z)
+#endif
+        do k = 1,nz 
+            do i = 1,nx 
+                ! Implicit memory-variable decay: components 8:10.
+                do l = 1,3
+                    Q_out(7+l, i,k) = Q_star(7+l, i,k) / &
+                    (1.0_real64 + alpha / max(tau_relax(l,i,k), 1.0e-12_real64))
+                end do
+
+                eff_rho_f = max(density_f(i,k) * lwc(i,k), 1.0e-12_real64) 
+
+                bxx = drag_tensor(1, i, k)
+                bzz = drag_tensor(2, i, k)
+                bxz = drag_tensor(3, i, k)
+                
+                beta = ( density_s(i,k) + eff_rho_f ) / ( density_s(i,k) * eff_rho_f )
+
+                m11 = 1.0_real64 + alpha * beta * bxx
+                m33 = 1.0_real64 + alpha * beta * bzz
+                m13 = alpha * beta * bxz
+                
+                det =   m11 * m33 - m13  * m13
+                inv_det = 1.0_real64 / det
+                
+                ! Intermediate relative velocity: vf - vs.
+                wx_s = Q_star(6, i,k) - Q_star(1, i,k)
+                wz_s = Q_star(7, i,k) - Q_star(2, i,k)
+
+                wx = inv_det * ( m33 * wx_s - m13 * wz_s )
+
+                wz = inv_det * (-m13 * wx_s + m11 * wz_s )
+
+                bw_x = bxx * wx + bxz * wz
+                bw_z = bxz * wx + bzz * wz 
+
+                Q_out(1, i,k) = Q_star(1, i,k) + (alpha / density_s(i,k) ) * bw_x
+                Q_out(2, i,k) = Q_star(3, i,k) + (alpha / density_s(i,k) ) * bw_z
+
+                Q_out(6, i,k) = Q_star(6, i,k) - (alpha / eff_rho_f ) * bw_x
+                Q_out(7, i,k) = Q_star(7, i,k) - (alpha / eff_rho_f ) * bw_z
+            end do
+        end do
+#ifndef SEIDART_OPENMP_GPU
+    !$omp end parallel do
+#endif
+    end subroutine implicit_drag_kernel2
+    
+        ! --------------------------------------------------------------------------
     subroutine implicit_drag_kernel3(nx, ny, nz, Q_star, Q_out, &
                                     drag_tensor, tau_relax, &
                                     density_s, density_f, lwc, dt_gamma)

@@ -551,26 +551,22 @@ contains
         src%y = 0.0_real64
 
         select case (trim(src%source_type))
-
-        case ('ac')
-            call init_source_weight_drop( &
-                src, dom_xz, F_spec, freq_spec, n_spec, grid)
-
-        case ('tnt')
-            call init_source_explosive( &
-                src, F_spec, freq_spec, n_spec, grid, dom_xz)
-
-        case ('dc')
-            call init_source_double_couple( &
-                src, dom_xz, F_spec, freq_spec, n_spec, grid)
-
-        case ('clvd')
-            call init_source_clvd( &
-                src, dom_xz, F_spec, freq_spec, n_spec, grid)
-
-        case default
-            error stop 'XZ initializer supports ac, tnt, dc, and clvd.'
-
+            case ('ac')
+                call init_source_weight_drop( &
+                    src, dom_xz, F_spec, freq_spec, n_spec, grid)
+            case ('tnt')
+                call init_source_explosive( &
+                    src, F_spec, freq_spec, n_spec, grid, dom_xz)
+            case ('dc')
+                call init_source_double_couple( &
+                    src, dom_xz, F_spec, freq_spec, n_spec, grid)
+            case ('clvd')
+                call init_source_clvd( &
+                    src, dom_xz, F_spec, freq_spec, n_spec, grid)
+            case('pw')
+                    call init_source_plane_wave(source, domain, 1500.0_real64, 'P', F_spec, freq_spec, n_spec)
+            case default
+                error stop 'XZ initializer supports ac, tnt, dc, and clvd.'
         end select
 
         ! The retained spatial kernel is an area-normalized x,z source.

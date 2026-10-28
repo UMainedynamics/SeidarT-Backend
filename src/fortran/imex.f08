@@ -208,6 +208,8 @@ module imex
         type(Source_Type), intent(in) :: source
         character(len=*), intent(in)  :: method 
         
+        type(Source_Type) :: src
+        
         integer :: n_spec
         complex(real64), allocatable :: F_spec(:) ! 1D array holding the fourier coefficients (amplitude and phase) of the source wavelet in the frequency domain
         real(real64), allocatable :: freq_spec(:) ! 1D array containing the exact frequency values in (Hz) corresponding to each element in the F_spec
@@ -228,14 +230,14 @@ module imex
         
         real(real64), allocatable :: C(:,:,:), gamma_visco(:,:,:), &
                                      drag_tensor(:,:,:), tau_relax(:,:,:)
-        real(real64), allocatable :: fluid_pressure(:,:), fluid_pressure_dot(:,:), &
-                                     fluid_pressure_stage(:,:),  &
-                                     density_s(:,:), density_f(:,:), &
+        real(real64), allocatable :: fluid_pressure(:,:), fluid_pressure_stage(:,:)
+        real(real64), allocatable :: pressure_rate(:,:,:)
+        real(real64), allocatable :: density_s(:,:), density_f(:,:), &
                                      bulk_mod_fluid(:,:), lwc(:,:), phi(:,:)
         
         ! Spatial gradient work arrays
         real(real64), allocatable :: dV_dX(:,:,:,:), dS_dX(:,:,:,:)
-        real(real64), allocatable :: dP_dX(:,:,:), scartch(:,:)
+        real(real64), allocatable :: dP_dX(:,:,:), scratch(:,:)
 
         
         ! -------------------------------------------------------------------------
@@ -246,14 +248,18 @@ module imex
         call ars_coefficients(method, num_stages, A_exp, A_imp, b_exp, b_imp, c_vec)
         
         ! Allocations 
+        ! 1:2   solid velocities:  vsx, vsz
+        ! 3:5   stresses:          sxx, szz, sxz
+        ! 6:7   fluid velocities:  vfx, vfz
+        ! 8:10  memory variables:  rxx, rzz, rxz
         allocate(Q(10, nx, nz), Q_star(10, nx, nz), Q_stage(10, nx, nz))
-        allocate(T(10, nx, nz, num_stages), H(5, nx, nz, num_stages))
+        allocate(T(10, nx, nz, num_stages), H(10, nx, nz, num_stages))
         
         allocate(C(6, nx, nz))
         allocate(gamma_visco(3, nx, nz))
         allocate(drag_tensor(3, nx, nz), tau_relax(3, nx, nz))
-        allocate(fluid_pressure(nx, nz), fluid_pressure_dot(nx, nz))
-        allocate(fluid_pressure_stage(nx,nz))
+        allocate(fluid_pressure(nx, nz), fluid_pressure_stage(nx, nz))
+        allocate(pressure_rate(nx,nz, num_stages))
         allocate(density_s(nx, nz), density_f(nx, nz))
         allocate(bulk_mod_fluid(nx, nz), lwc(nx, nz), phi(nx, nz))
         
@@ -270,25 +276,26 @@ module imex
         
         Q = 0.0_real64
         fluid_pressure = 0.0_real64
-        fluid_pressure_dot = 0.0_real64
+        ! fluid_pressure_dot = 0.0_real64
         
         ! ------------------------------------------------------------------------
         ! Load spectrum directly inside solver initialization
         call load_spectrum('freq_spectrum.dat', 'F_spectrum.dat', freq_spec, F_spec, n_spec)
         
         ! Initialize the source 
-        select case (trim(source%source_type))
-            case('ac')
-                call init_source_weight_drop(source, domain, F_spec, freq_spec, n_spec, grid)
-            case('tnt')
-                call init_source_explosive(source, F_spec, freq_spec, n_spec, grid, domain)     
-            case('dc')
-                call init_source_double_couple(source, domain, F_spec, freq_spec, n_spec, grid) 
-            case('clvd')
-                call init_source_clvd(source, domain, F_spec, freq_spec, n_spec, grid)          
-            case('pw')
-                call init_source_plane_wave(source, domain, 1500.0_real64, 'P', F_spec, freq_spec, n_spec)
-        end select
+        call init_source_elastic_xz(src, source, domain, grid, F_spec, freq_spec, n_spec)
+        ! select case (trim(source%source_type))
+        !     case('ac')
+        !         call init_source_weight_drop(source, domain, F_spec, freq_spec, n_spec, grid)
+        !     case('tnt')
+        !         call init_source_explosive(source, F_spec, freq_spec, n_spec, grid, domain)     
+        !     case('dc')
+        !         call init_source_double_couple(source, domain, F_spec, freq_spec, n_spec, grid) 
+        !     case('clvd')
+        !         call init_source_clvd(source, domain, F_spec, freq_spec, n_spec, grid)          
+        !     case('pw')
+        !         call init_source_plane_wave(source, domain, 1500.0_real64, 'P', F_spec, freq_spec, n_spec)
+        ! end select
         
         ! Clean up temporary spectrum memory once wavelet initialization completes
         if (allocated(freq_spec)) deallocate(freq_spec)
@@ -327,12 +334,12 @@ module imex
                 end if
                 
                 ! 3. Compute spatial gradients via FFTW
-                call grad2d( grid, Q_stage(1,:,:), dV_dX(:,:,1,1), dV_dX(:,:,1,2) )
-                call grad2d(grid, Q_stage(2,:,:), dV_dX(:,:,2,1), dV_dX(:,:,2,2))
-                call grad2d(grid, Q_stage(3,:,:), dS_dX(:,:,1,1), scratch))
-                call grad2d(grid, Q_stage(4,:,:), scratch, dS_dX(:,:,2,2))
-                call grad2d(grid, Q_stage(5,:,:,:), dS_dX(:,:2,1), dS_dX(:,:,1,2))
-                call grad2d(grid, fluid_pressure_stage,   dP_dX,(:,:,1),   dP_dX(:,:,2))
+                call grad2d(grid, Q_stage(1,:,:), dV_dX(:,:,1,1), dV_dX(:,:,1,2) )
+                call grad2d(grid, Q_stage(2,:,:), dV_dX(:,:,2,1), dV_dX(:,:,2,2) )
+                call grad2d(grid, Q_stage(3,:,:), dS_dX(:,:,1,1), scratch )
+                call grad2d(grid, Q_stage(4,:,:), scratch, dS_dX(:,:,2,2) )
+                call grad2d(grid, Q_stage(5,:,:), dS_dX(:,:,2,1), dS_dX(:,:,1,2) )
+                call grad2d(grid, fluid_pressure_stage, dP_dX,(:,:,1),   dP_dX(:,:,2) )
                 
                 ! 4. Evaluate explicit spatial RHS (T)
                 call explicit_constitutive_kernel2_rk4(nx, nz, Q_stage, &
@@ -340,9 +347,10 @@ module imex
                                                   C, gamma_visco, &
                                                   density_s, density_f, phi, lwc, &
                                                   bulk_mod_fluid, &
-                                                  fluid_pressure_dot, T(:,:,:,stage))
+                                                  pressure_rate(:,:,stage), T(:,:,:,stage))
                 
-                call inject_source_explicit_stage(source, nx, nz, T(:,:,:,stage), it, c_vec(stage), density_s)
+                call inject_source_explicit_stage_elastic2(&
+                        src, nx, nz, T(:,:,:,stage), it, c_vec(stage), density_s)
                 
                 ! 5. Evaluate stiff evaluation H
                 if (abs(A_imp(stage, stage)) > 1.0e-14_real64) then 
@@ -360,10 +368,9 @@ module imex
                 if (abs(b_imp(s)) > 1.0e-14_real64) then 
                     Q = Q + (dt * b_imp(s)) * H(:,:,:,s)
                 end if 
+                fluid_pressure = fluid_pressure + dt * b_exp(s)*pressure_rate(:,:,s)
             end do
-            
-            fluid_pressure = fluid_pressure + dt * fluid_pressure_dot 
-            
+                        
             ! Attenuate waves at absorbing boundary
             call biot_sponge_damping2d(sponge, domain, Q, fluid_pressure)
             
@@ -371,6 +378,7 @@ module imex
         
         call free_spectral_grid(grid)
         call free_sponge_layer(sponge)
+        call free_source(src)
         
     end subroutine biot_poroviscoelasticity2
     
@@ -403,21 +411,13 @@ module imex
         
         real(real64), allocatable :: C(:,:,:,:), gamma_visco(:,:,:,:), &
                                      drag_tensor(:,:,:,:), tau_relax(:,:,:,:)
-        real(real64), allocatable :: fluid_pressure(:,:,:), fluid_pressure_dot(:,:,:), &
+        real(real64), allocatable :: fluid_pressure(:,:,:), pressure_rate(:,:,:), &
                                      density_s(:,:,:), density_f(:,:,:), &
                                      bulk_mod_fluid(:,:,:), lwc(:,:,:), phi(:,:,:)
         
         ! Spatial gradient work arrays
-        real(real64), allocatable :: dvx_dx(:,:,:), dvx_dy(:,:,:), dvx_dz(:,:,:)
-        real(real64), allocatable :: dvy_dx(:,:,:), dvy_dy(:,:,:), dvy_dz(:,:,:)
-        real(real64), allocatable :: dvz_dx(:,:,:), dvz_dy(:,:,:), dvz_dz(:,:,:)
-        real(real64), allocatable :: dsxx_dx(:,:,:), dsxx_dy(:,:,:), dsxx_dz(:,:,:)
-        real(real64), allocatable :: dsyy_dx(:,:,:), dsyy_dy(:,:,:), dsyy_dz(:,:,:)
-        real(real64), allocatable :: dszz_dx(:,:,:), dszz_dy(:,:,:), dszz_dz(:,:,:)
-        real(real64), allocatable :: dsyz_dx(:,:,:), dsyz_dy(:,:,:), dsyz_dz(:,:,:)
-        real(real64), allocatable :: dsxz_dx(:,:,:), dsxz_dy(:,:,:), dsxz_dz(:,:,:)
-        real(real64), allocatable :: dsxy_dx(:,:,:), dsxy_dy(:,:,:), dsxy_dz(:,:,:)
-        real(real64), allocatable :: dp_dx(:,:,:),   dp_dy(:,:,:),   dp_dz(:,:,:)
+        real(real64), allocatable :: dV_dX(:,:,:,:,:),  dS_dX(:,:,:,:,:)
+        real(real64), allocatable :: dP_dX(:,:,:,:)
 
         
         ! -------------------------------------------------------------------------
@@ -435,21 +435,15 @@ module imex
         allocate(C(21, nx, ny, nz))
         allocate(gamma_visco(6, nx, ny, nz))
         allocate(drag_tensor(6, nx, ny, nz), tau_relax(6, nx, ny, nz))
-        allocate(fluid_pressure(nx, ny, nz), fluid_pressure_dot(nx, ny, nz))
+        allocate(fluid_pressure(nx, ny, nz), fluid_pressure_stage(nx,ny,nz) ) 
+        allocate(pressure_rate(nx, ny, nz, num_stages))
         allocate(density_s(nx, ny, nz), density_f(nx, ny, nz))
         allocate(bulk_mod_fluid(nx, ny, nz), lwc(nx, ny, nz), phi(nx, ny, nz))
         
         ! Derivative allocations
-        allocate(dvx_dx(nx,ny,nz), dvx_dy(nx,ny,nz), dvx_dz(nx,ny,nz))
-        allocate(dvy_dx(nx,ny,nz), dvy_dy(nx,ny,nz), dvy_dz(nx,ny,nz))
-        allocate(dvz_dx(nx,ny,nz), dvz_dy(nx,ny,nz), dvz_dz(nx,ny,nz))
-        allocate(dsxx_dx(nx,ny,nz), dsxx_dy(nx,ny,nz), dsxx_dz(nx,ny,nz))
-        allocate(dsyy_dx(nx,ny,nz), dsyy_dy(nx,ny,nz), dsyy_dz(nx,ny,nz))
-        allocate(dszz_dx(nx,ny,nz), dszz_dy(nx,ny,nz), dszz_dz(nx,ny,nz))
-        allocate(dsyz_dx(nx,ny,nz), dsyz_dy(nx,ny,nz), dsyz_dz(nx,ny,nz))
-        allocate(dsxz_dx(nx,ny,nz), dsxz_dy(nx,ny,nz), dsxz_dz(nx,ny,nz))
-        allocate(dsxy_dx(nx,ny,nz), dsxy_dy(nx,ny,nz), dsxy_dz(nx,ny,nz))
-        allocate(dp_dx(nx,ny,nz),   dp_dy(nx,ny,nz),   dp_dz(nx,ny,nz))
+        allocate(dV_dX(nx,ny,nz,3,3))
+        allocate(dS_dX(nx,ny,nz,3.3))
+        allocate(dP_dX(nx,ny,nz,3))
         
         
         ! Initialize FFTW grid
@@ -541,7 +535,7 @@ module imex
                                                   C, gamma_visco, &
                                                   density_s, density_f, phi, lwc, &
                                                   bulk_mod_fluid, &
-                                                  fluid_pressure_dot, T(:,:,:,:,stage))
+                                                  pressure_rate, T(:,:,:,:,stage))
                 
                 call inject_source_explicit_stage(source, nx, ny, nz, T(:,:,:,:,stage), it, c_vec(stage), density_s)
                 
