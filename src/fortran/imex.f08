@@ -253,11 +253,12 @@ module imex
         allocate(gamma_visco(3, nx, nz))
         allocate(drag_tensor(3, nx, nz), tau_relax(3, nx, nz))
         allocate(fluid_pressure(nx, nz), fluid_pressure_dot(nx, nz))
+        allocate(fluid_pressure_stage(nx,nz))
         allocate(density_s(nx, nz), density_f(nx, nz))
         allocate(bulk_mod_fluid(nx, nz), lwc(nx, nz), phi(nx, nz))
         
         ! Derivative allocations
-        allocate(dV_dX(nx,nz,2,2), dS_dX(nx,nz,2,2), dP_dX( nx,nz,2), scratch(nx,nz)
+        allocate(dV_dX(nx,nz,2,2), dS_dX(nx,nz,2,2), dP_dX( nx,nz,2), scratch(nx,nz) )
         
         
         ! Initialize FFTW grid
@@ -305,13 +306,14 @@ module imex
                 
                 ! 1. Assemble intermediate explicit state
                 Q_star = Q 
+                fluid_pressure_stage = fluid_pressure
+                
                 do s = 1, stage - 1
-                    if (abs(A_exp(stage, s)) > 1.0e-14_real64) then 
-                        Q_star = Q_star + (dt * A_exp(stage, s)) * T(:,:,:,:,s) 
-                    end if
-                    if (abs(A_imp(stage, s)) > 1.0e-14_real64) then 
-                        Q_star = Q_star + (dt * A_imp(stage, s)) * H(:,:,:,:,s)
-                    end if 
+                    Q_star = Q_star + dt * A_exp(stage,s) * T(:,:,:,s) + &
+                                      dt * A_imp(stage,s) * H(:,:,:,s)
+                    
+                    fluid_pressure_stage = fluid_pressure_stage + &
+                                dt * A_exp(stage,s) * pressure_rate(:,:,s)
                 end do 
                 
                 ! 2. Solve local implicit stage for Q_stage 
@@ -325,12 +327,12 @@ module imex
                 end if
                 
                 ! 3. Compute spatial gradients via FFTW
-                call grad2d(grid, Q_stage(1,:,:), dV_dX(:,:,1,1), dV_dX(:,:,1,2))
+                call grad2d( grid, Q_stage(1,:,:), dV_dX(:,:,1,1), dV_dX(:,:,1,2) )
                 call grad2d(grid, Q_stage(2,:,:), dV_dX(:,:,2,1), dV_dX(:,:,2,2))
                 call grad2d(grid, Q_stage(3,:,:), dS_dX(:,:,1,1), scratch))
                 call grad2d(grid, Q_stage(4,:,:), scratch, dS_dX(:,:,2,2))
                 call grad2d(grid, Q_stage(5,:,:,:), dS_dX(:,:2,1), dS_dX(:,:,1,2))
-                call grad2d(grid, fluid_pressure,   dp_dx,   dp_dy,   dp_dz)
+                call grad2d(grid, fluid_pressure_stage,   dP_dX,(:,:,1),   dP_dX(:,:,2))
                 
                 ! 4. Evaluate explicit spatial RHS (T)
                 call explicit_constitutive_kernel2_rk4(nx, nz, Q_stage, &
