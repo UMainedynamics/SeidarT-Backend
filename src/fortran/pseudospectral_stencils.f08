@@ -16,6 +16,7 @@ module pseudospectral_stencils
     subroutine elastic2_rk4(nx, nz, Q, dV_dX, dS_dX, C, gamma_visco, density_s, T)
 
         integer, intent(in) :: nx, nz
+        
         real(real64), intent(in)  :: Q(5, nx, nz)
         real(real64), intent(in)  :: dV_dX(nx,nz, 2, 2)
         real(real64), intent(in)  :: dS_dX(nx, nz, 2, 2)
@@ -214,6 +215,70 @@ module pseudospectral_stencils
         
         
     end subroutine elastic3_rk4
+    
+    ! --------------------------------------------------------------------------
+    subroutine explicit_constitutive_kernel2_rk4(nx, nz, Q, dV_dX, dS_dX, dP_dX &
+                                            C, gamma_visco, density_s, density_f, &
+                                            phi, lwc, bulk_mod_fluid, fluid_pressure_dot, T)
+
+        integer, intent(in) :: nx, ny, nz 
+        ! Q(1:10,:,:) =
+        ! [vsx, vsz, sxx, szz, sxz, vfx, vfz, rxx, rzz, rxz]
+        real(real64), intent(in)  :: Q(10, nx,nz)
+        real(real64), intent(in)  :: dV_dX(nx,nz,2,2), dS_dX(nx,nz,2,2), dP_dX(nx,nz,2)
+        real(real64), intent(in)  :: C(6, nx, nz)
+        real(real64), intent(in)  :: gamma_visco(3, nx, nz)
+        real(real64), intent(in)  :: density_s(nx, nz), density_f(nx, nz)
+        real(real64), intent(in)  :: phi(nx, nz), lwc(nx, nz)
+        real(real64), intent(in)  :: bulk_mod_fluid(nx, nz)
+        real(real64), intent(out) :: fluid_pressure_dot(nx, nz)
+        real(real64), intent(out) :: T(10, nx, nz)
+
+        integer :: i, j, k
+        real(real64) :: exx, ezz, exz, gxz, eff_rho_f
+        
+        !$omp parallel do collapse(2) schedule(static) &
+        !$omp& private(exx, ezz, exz, gxz, eff_rho_f)
+        do k = 1,nz 
+            do i = 1,nx
+                    exx = dV_dX(i,k,1,1)
+                    ezz = dV_dX(i,k,2,2)
+                    exz = 0.5_real64 * (dV_dX(i,k,1,2) + dV_dX(i,k,2,1) )
+                    gxz = 2.0_real64 * exz
+                    
+                    ! Solid Acceleration
+                    T(1,i,k) = ( dS_dX(i,k,1,1) + dS_dX(i,k,1,2) ) / density_s(i,k)
+                    T(2,i,k) = ( dS_dX(i,k,2,1) + dS_dX(i,k,2,2) ) / density_s(i,k)
+                    
+                    ! Stress Rates C = [c11,c13,c15,c33,c35,c55]
+                    T(3, i,k) =  (  C(1,i,k) * exx +  C(2,i,k) * ezz +  &
+                                      C(3,i,k) * gxz ) - Q(16,i,k)
+                    T(4, i,k) =  (  C(2,i,k) * exx + C(4,i,k) * ezz + &
+                                      C(5,i,k) * gxz ) - Q(17,i,k)
+                    T(5, i,k) =  (  C(3,i,k) * exx + C(5,i,k) * ezz + &
+                                      C(6,i,k) * gxz ) - Q(18,i,k)
+                    
+                                      
+                    ! Fluid Acceleration
+                    eff_rho_f = max(density_f(i,k) * lwc(i,k), 1.0e-12_real64)
+
+                    T(6,i,j,k) = - dp_dx(i,k,1) / eff_rho_f
+                    T(7,i,j,k) = - dp_dz(i,k,2) / eff_rho_f
+                    
+                    ! Memory Variable 
+                    T(8,i,k) =  gamma_visco(1, i,k) * exx
+                    T(9,i,k) =  gamma_visco(2, i,k) * ezz
+                    T(10,i,k) = gamma_visco(3, i,k) * exz
+                    
+
+                    ! Fluid Pressure Rate
+                    fluid_pressure_dot(i,k) = - ( bulk_mod_fluid(i,k) / max(phi(i,k), 1.0e-5_real64) ) * &
+                                                (exx + ezz)
+                end do
+            end do
+        end do
+    !$omp end parallel do
+    end subroutine explicit_constitutive_kernel2_rk4
     
     ! --------------------------------------------------------------------------
     subroutine explicit_constitutive_kernel3_rk4(nx, ny, nz, Q, &

@@ -12,7 +12,7 @@ program main
     use seidartio 
     use cpmlfdtd 
     use seidart_types 
-    use imex, only: biot_poroviscoelasticity3 &
+    use imex, only: biot_poroviscoelasticity3
                     ! biot_poroviscoelasticity25, &
                     ! biot_poroviscoelasticity2
     
@@ -40,7 +40,7 @@ program main
 
      ! Check if the right number of arguments are provided
     if (argc < 1) then
-        print *, 'Usage: main <input.json> [seismic=<true|false>]'
+        print *, 'Usage: main <input.json> [seismic=<true|false>] [biot=<true|false>] [density_method=<arithmetic|geometric|harmonic>]'
         stop
     end if
      
@@ -51,6 +51,7 @@ program main
     ! Set defaults
     ! seismic flag 
     seismic = .true.
+    biot = .false.
     density_method = 'arithmetic'
     
     ! loop over any further key=value flags
@@ -67,7 +68,7 @@ program main
             else if (value == 'false') then
                 seismic = .false.
             end if
-        case ('biot')
+        case ('biot') ! Biot is only for elastic, but we will set seismic to false here
             if (value == 'true') then
                 biot = .true.
                 seismic = .false.
@@ -125,11 +126,10 @@ program main
             else
                 call seismic25_pseudospectral_rk4(domain, seismic_source)
             end if
-            call seismic25(domain, seismic_source)
         else if (biot) then
             print *, "Running 2.5D poroviscoelastic model with", seismic_source%time_steps, "time steps"
             error stop '2.5D Biot solver is not implemented.'
-            call biot_poroviscoelasticity25(domain, seismic_source)
+            ! call biot_poroviscoelasticity25(domain, seismic_source)
         else
             print *, "Running 2.5D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag25(domain, electromagnetic_source)
@@ -146,7 +146,7 @@ program main
         else if (biot) then
             print *, "Running 2D poroviscoelastic model with", seismic_source%time_steps, "time steps"
             error stop '2D Biot solver is not implemented.'
-            call biot_poroviscoelasticity2(domain, seismic_source, density_method, .TRUE.)
+            ! call biot_poroviscoelasticity2(domain, seismic_source, density_method, .TRUE.)
         else
             print *, "Running 2D electromagnetic model with", electromagnetic_source%time_steps, "time steps"
             call electromag2(domain, electromagnetic_source, .TRUE.)
